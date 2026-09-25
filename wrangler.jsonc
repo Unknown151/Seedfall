@@ -16,12 +16,12 @@
 
   // Cloud saves. Create the namespace once (dashboard: Storage & Databases > KV > Create, name it
   // seedfall-saves) and paste its ID here.
-  "kv_namespaces": [{ "binding": "SAVES", "id": "PASTE_KV_NAMESPACE_ID" }],
+  "kv_namespaces": [{ "binding": "SAVES", "id": "4297f3953e8d42c691b9bcb8efa718c5" }],
 
   // From Zero Trust > Access > Applications > your app > Additional settings. Not secret.
   "vars": {
-    "TEAM_DOMAIN": "https://PASTE-TEAM-NAME.cloudflareaccess.com",
-    "POLICY_AUD": "PASTE_APPLICATION_AUD_TAG"
+    "TEAM_DOMAIN": "https://seedfall-rsvn.cloudflareaccess.com",
+    "POLICY_AUD": "ab39c1b82bd6b17034a871d56f676616f11ac11523cfadd9048e8744116fdf55"
   },
   // ANTHROPIC_API_KEY is a secret: Worker > Settings > Variables and Secrets > Add > Secret.
 
