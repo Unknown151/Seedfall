@@ -97,6 +97,7 @@ function onKey(e) {
     if (UI.tool) selectTool(UI.tool);
     else if ($('help').classList.contains('show')) $('help').classList.remove('show');
     else if ($('confirm').classList.contains('show')) $('confirm').classList.remove('show');
+    else if ($('away').classList.contains('show')) $('away').classList.remove('show');
     else if ($('aiset').classList.contains('show')) $('aiset').classList.remove('show');
     else if ($('answer').classList.contains('show')) $('answer').classList.remove('show');
     else if ($('speak').classList.contains('show')) $('speak').classList.remove('show');

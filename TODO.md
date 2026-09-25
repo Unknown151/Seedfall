@@ -59,8 +59,7 @@ only, or a few invited emails.
   save. Keep downloads on the server: a client-side Blob plus `createObjectURL` plus `a.download` is the
   HTML-smuggling pattern that Defender dislikes.
 - **Phone support:** touch pan and zoom, and a lower-resolution static layer on small screens.
-- The world still only grows while a tab is visible. A catch-up for time spent away would be a design
-  change, so ask Rasmus first.
+- ~~Catch-up for time away~~: done (up to 8 hours, see `catchUp` in main.js).
 
 ## 2. Bigger worlds (128×128, or 96×96 as a middle ground)
 

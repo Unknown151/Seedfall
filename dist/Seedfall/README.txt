@@ -17,7 +17,11 @@ FIRST RUN
   folder access (a small banner tells you). It also keeps a copy in the browser.
 
 TIME
-  The world pauses whenever the tab isn't visible, and picks up where it left off.
+  The world pauses whenever the tab isn't visible. When you come back it catches up on
+  the time you were gone, but at most 8 hours of it (and never more than 250 years),
+  and a card tells you what you missed. With a voice key, a town historian writes you
+  a short letter about it too (only after 30 minutes or more away). Paused (Space)
+  time doesn't count.
   Normal pace: 1 year every 3 minutes, roughly 160 years per workday.
   Villages on day one, trains around week 2, rockets around week 3, the end of the
   Archive around week 5. After that it keeps going: open-ended cultural Ages, new

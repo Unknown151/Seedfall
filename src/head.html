@@ -161,6 +161,14 @@ select{font:inherit;font-size:12px;padding:4px 6px;border-radius:7px;border:1px 
 .card .acts{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
 .card .acts .btn{padding:10px 16px;font-size:13.5px}
 .card .fine{font-size:12px;color:var(--ink3);margin-top:16px}
+#away .card{max-height:calc(100vh - 60px);overflow:auto}
+.away-letter{font-family:Georgia,serif;font-size:14.5px;line-height:1.6;color:var(--ink);background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:12px 0;white-space:pre-wrap}
+.away-letter:empty{display:none}
+.away-letter b{display:block;font-size:15.5px;margin-bottom:6px}
+.away-letter.wait{color:var(--ink3);font-style:italic}
+.away-list{margin:10px 0 0;padding:0;list-style:none;font-size:13px;line-height:1.45;color:var(--ink2)}
+.away-list li{padding:6px 0;border-top:1px solid var(--line)}
+.away-list li i{font-style:normal;color:var(--ink3);margin-right:6px}
 .card input{font:inherit;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:3px 6px;width:110px;background:rgba(255,255,255,.7)}
 kbd{font-family:inherit;font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;background:#fff}
 .keys{display:grid;grid-template-columns:110px 1fr;gap:7px 12px;font-size:13px;color:var(--ink2);margin-top:12px}
@@ -307,7 +315,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
 <div class="modal" id="welcome"><div class="card">
   <h1>Seedfall</h1>
   <p>A single seed pod is about to fall onto an unnamed world. One colonist, a vault of sleeping embryos, and a lot of time.</p>
-  <p id="wText">The world only grows while it's on screen, so leave it running. Pick a folder and Seedfall will keep <b>save.json</b>, a readable <b>chronicle.md</b> and <b>stats.csv</b> in it.</p>
+  <p id="wText">The world grows while it's on screen, and keeps going for up to 8 hours while you're away. Pick a folder and Seedfall will keep <b>save.json</b>, a readable <b>chronicle.md</b> and <b>stats.csv</b> in it.</p>
   <div class="acts">
     <button class="btn primary" id="wFolder">Choose a save folder…</button>
     <button class="btn" id="wLocal">Start without a folder</button>
@@ -330,7 +338,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
     <span><kbd>Home</kbd></span><span>Hand the camera back</span>
     <span><kbd>Esc</kbd></span><span>Cancel / close</span>
   </div>
-  <p class="fine">Day and night, weather and shadows are set under Sky in the chronicle panel. The world pauses whenever this tab isn't visible (minimised, other tab, PC locked) and picks up where it left off. Festivals, new eras, shrines and answered prayers all add to Reverence.</p>
+  <p class="fine">Day and night, weather and shadows are set under Sky in the chronicle panel. The world pauses whenever this tab isn't visible (minimised, other tab, PC locked). When you come back it catches up on the time you were gone, up to 8 hours, and tells you what you missed. It picks up where it left off. Festivals, new eras, shrines and answered prayers all add to Reverence.</p>
   <div class="acts"><button class="btn primary" id="hClose">Got it</button></div>
 </div></div>
 
@@ -362,6 +370,14 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
   <textarea id="ansText" maxlength="200" rows="3"></textarea>
   <div class="fine" id="ansMode"></div>
   <div class="acts"><button class="btn primary" id="ansGo">Answer</button><button class="btn" id="ansCancel">Not now</button></div>
+</div></div>
+
+<div class="modal" id="away"><div class="card">
+  <h2>While you were away</h2>
+  <p id="awayWhen"></p>
+  <div id="awayLetter" class="away-letter"></div>
+  <ul id="awayList" class="away-list"></ul>
+  <div class="acts"><button class="btn primary" id="awayOk">Carry on</button></div>
 </div></div>
 
 <div class="modal" id="confirm"><div class="card">
