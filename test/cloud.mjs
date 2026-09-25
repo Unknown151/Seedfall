@@ -175,6 +175,12 @@ try {
   ok(seen.length === 1 && seen[0].headers['x-api-key'] === 'test-key' && seen[0].headers['anthropic-version'] && seen[0].body.model === 'claude-haiku-4-5-20251001', 'voice: the Worker adds the key and version');
   await A.evaluate(async () => { AI.model = 'claude-bogus'; await aiTest(); AI.model = 'claude-haiku-4-5-20251001'; });
   ok(/model not allowed/.test(await A.evaluate(() => AI.status)) && seen.length === 1, 'voice: models outside the allowlist are refused by the Worker');
+  // Tone setting: cosy by default, cheeky when picked in Voice settings (kept per browser, not in the world)
+  ok(/family-friendly/.test(seen[0].body.system) && !/cheeky is welcome/.test(seen[0].body.system), 'tone: cosy by default');
+  await A.click('#bVoice'); await A.selectOption('#aiTone', 'cheeky'); await A.click('#aiSave'); await A.click('#aiClose');
+  await A.evaluate(async () => { S.rev = 999; await speak('Nudism is the way forward.'); });
+  ok(seen.length === 2 && /cheeky is welcome/.test(seen[1].body.system) && /never write explicit sexual content/.test(seen[1].body.system), 'tone: cheeky reaches the prompt, with its limits');
+  ok(await A.evaluate(async () => (await IDB.get('ai')).tone === 'cheeky' && !JSON.stringify(serialize()).includes('cheeky is welcome')), 'tone: stored in the browser, not the world');
   await A.route('**/api/voice', r => r.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"not signed in"}' }));
   await A.evaluate(() => aiTest());
   ok(/signed out/.test(await A.evaluate(() => AI.status)) && (await st(A)).out, 'voice: signed out is reported, not blamed on the key');

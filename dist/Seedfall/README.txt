@@ -66,6 +66,8 @@ THE WATCHER'S VOICE (optional, uses Claude)
   the centuries unless you speak again.
   "Town gossip" (off / hourly / every ~20 min) lets Claude write small vignettes about
   your named people now and then.
+  "Tone" is Cosy (family-friendly, the default) or Cheeky (rude jokes and odd customs
+  welcome, still nothing explicit or cruel). It is kept in this browser, not the world.
   - Get a key at console.anthropic.com. A separate key with a low spend limit is smart.
   - The key stays in this browser only; it is never written to save.json or any file.
   - Default model: Claude Haiku 4.5 (fractions of a cent per call). Daily cap: 80 calls.
