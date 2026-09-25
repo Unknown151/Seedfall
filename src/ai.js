@@ -127,7 +127,7 @@ const TOOL_WORDS = {
     type: 'object',
     properties: {
       doctrine_name: { type: 'string', description: 'What the colonists come to call this teaching, 2-6 words, e.g. "The Teaching of the Soft Paw".' },
-      interpretation: { type: 'string', description: 'One or two sentences: what most colonists believe the words mean.' },
+      interpretation: { type: 'string', description: 'One or two sentences (at most ~300 characters): what most colonists believe the words mean.' },
       chronicle: {
         type: 'array', minItems: 2, maxItems: 5, description: 'Story beats spread over time. The first with years_from_now 0, the rest spread over the following decades.',
         items: { type: 'object', properties: {
@@ -211,7 +211,12 @@ const TOOL_GOSSIP = {
 };
 
 /* ---------- speaking ---------- */
-function clean(s, n = 220) { return String(s || '').replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n); }
+function clean(s, n = 220) {
+  const t = String(s || '').replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (t.length <= n) return t;
+  const c = t.slice(0, n - 1), sp = c.lastIndexOf(' '); // never stop mid-word
+  return (sp > n * .7 ? c.slice(0, sp) : c).replace(/[\s,;:–-]+$/, '') + '…';
+}
 function cleanIcon(s) { const a = Array.from(String(s || '').trim()); const ic = a.slice(0, 2).join(''); return ic && a.length <= 4 ? ic : '✨'; }
 function townByName(n, text) {
   const ts = towns();
@@ -266,7 +271,7 @@ function applyWords(d, r, log) {
   const fx = [];
   d.ai = true;
   d.name = clean(r.doctrine_name, 60) || d.name;
-  d.summary = clean(r.interpretation, 300) || d.summary;
+  d.summary = clean(r.interpretation, 700) || d.summary;
   const dev = clamp(r.devotion == null ? 2 : r.devotion | 0, 0, 3);
   d.str = .4 + dev * .2;
   const tb = r.trait_bias || {};
