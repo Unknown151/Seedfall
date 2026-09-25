@@ -536,7 +536,11 @@ function applyGrade(c, w) {
   c.globalCompositeOperation = 'source-atop';
   const cov = w.cover * w.cover, wa = (.2 * cov + .1 * w.rain + .16 * w.storm) * (.35 + .65 * dk);
   if (wa > .01) { c.fillStyle = rgbS(mix3([60, 64, 80], [118, 126, 140], 1 - w.storm * .8), wa.toFixed(3)); c.fillRect(0, 0, VW, VH); }
-  if (w.fog > .01) { c.fillStyle = rgbS(mix3([48, 54, 72], [226, 231, 236], dk), (.42 * w.fog).toFixed(3)); c.fillRect(0, 0, VW, VH); }
+  if (w.fog > .01) { // distance haze: thick far away (top of the screen), light over the middle, clear up close; the drifting banks do the rest
+    const f = mix3([48, 54, 72], [226, 231, 236], dk), g = c.createLinearGradient(0, 0, 0, VH);
+    g.addColorStop(0, rgbS(f, (.32 * w.fog).toFixed(3))); g.addColorStop(.45, rgbS(f, (.12 * w.fog).toFixed(3))); g.addColorStop(1, rgbS(f, (.04 * w.fog).toFixed(3)));
+    c.fillStyle = g; c.fillRect(0, 0, VW, VH);
+  }
   if (!sun.fixed) {
     const [r, g, b, a] = keyAt(GK, sun.el), aa = a * (1 - .35 * w.cover * dk);
     if (aa > .005) { c.fillStyle = `rgba(${r | 0},${g | 0},${b | 0},${aa.toFixed(3)})`; c.fillRect(0, 0, VW, VH); }
