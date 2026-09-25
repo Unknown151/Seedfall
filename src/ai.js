@@ -178,6 +178,18 @@ const TOOL_WORDS = {
     required: ['doctrine_name', 'interpretation', 'chronicle']
   }
 };
+const TOOL_DIGEST = {
+  name: 'write_letter',
+  description: 'Write a town historian\'s letter catching the Watcher up on what happened while they were away.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'A short title for the letter, at most 8 words.' },
+      letter: { type: 'string', description: 'The letter: 60 to 140 words of plain text, addressed to the Watcher, the big things first plus a small human detail or two, no lists. Signed by a named historian from one of the towns.' }
+    },
+    required: ['title', 'letter']
+  }
+};
 const TOOL_GOSSIP = {
   name: 'write_vignettes',
   description: 'Write small everyday vignettes for the chronicle.',
@@ -348,6 +360,23 @@ function stepCulture() {
 }
 function exQ(field, base) { const x = S.extraQ && S.extraQ[field]; return x && x.length && chance(.18) ? pick(x) : base; }
 
+/* ---------- the historian's letter after time away (see catchUp in main.js) ---------- */
+async function aiDigest(d) {
+  if (!aiOn() || AI.busy) return null;
+  const big = d.ev.filter(e => e.k === 'major' || e.k === 'era'), lines = (big.length >= 12 ? big : d.ev).slice(-60).map(e => `Year ${e.yr}: ${e.t}`);
+  AI.busy = true;
+  try {
+    const { input } = await aiTool(AI_SYSTEM, `${aiWorldBrief()}
+
+THE WATCHER HAS BEEN AWAY for ${fmtAway(d.away)}. In that time the world went from Year ${d.y0} to Year ${d.y1}, and from ${fmtInt(d.p0)} to ${fmtInt(d.p1)} people. What happened, in order:
+${lines.join('\n')}
+
+Write the letter a town historian sends the Watcher to catch them up. Use only the events above and the names in the brief; don't invent big events.`, TOOL_DIGEST, 700, 'digest');
+    return { title: clean(input.title, 80), letter: String(input.letter || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, 1400) }; // keeps its paragraphs; shown escaped
+  } catch (e) { AI.ok = false; AI.status = '✗ ' + e.message; return null; }
+  finally { AI.busy = false; renderAIStatus(); }
+}
+
 /* ---------- gossip: small vignettes now and then ---------- */
 async function aiMaybeGossip() {
   const mins = NARR_MIN[AI.narr] || 0;
@@ -418,7 +447,7 @@ function renderVoiceTab() {
   let tin = 0, tout = 0; for (const e of S.aiLog) if (e.usage) { tin += e.usage.input_tokens || 0; tout += e.usage.output_tokens || 0; }
   if (tin) h += `<div class="phint">Tokens in this world’s log: ${fmtInt(tin)} in, ${fmtInt(tout)} out.</div>`;
   for (const e of L) {
-    const title = e.kind === 'words' ? '🗣️ Your words' : e.kind === 'gossip' ? '💬 Town gossip' : e.kind === 'prayer' ? '🕯️ A prayer, written by Claude' : e.kind === 'answer' ? '🙏 Your answer to a prayer' : '🔌 Connection test';
+    const title = e.kind === 'words' ? '🗣️ Your words' : e.kind === 'gossip' ? '💬 Town gossip' : e.kind === 'prayer' ? '🕯️ A prayer, written by Claude' : e.kind === 'answer' ? '🙏 Your answer to a prayer' : e.kind === 'digest' ? '📜 While you were away' : '🔌 Connection test';
     const meta = [`Year ${e.yr}`, fmtClock(e.t)];
     if (e.ms) meta.push((e.ms / 1000).toFixed(1) + ' s');
     if (e.usage) meta.push(`${e.usage.input_tokens || 0} in / ${e.usage.output_tokens || 0} out tokens`);

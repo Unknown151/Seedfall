@@ -87,6 +87,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 | `faith1` | Reverence and prayers. Can be flaky under load (stale element handles), so rerun it alone. |
 | `econmig` | A pre-economy save still loads. |
 | `streetmig` | A save made by `dist/`'s build loads in the current build. |
+| `away` | Catch-up after time away: the 8 h and 250-year caps, the report card, the historian's letter (mocked). |
 | `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, and file:// staying cloud-free. Needs the root `npm install`. |
 
 **Inspection tools:**
@@ -192,6 +193,11 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
   - `townRadius` caps at 13. `findSite` caches failures in `T._fail`, so clear it after adding streets.
   - Houses need street frontage (`fronts()`). `growStreets` has a 12-month cooldown when a town is full.
   - New towns have to start in open country, at least `townRadius + 2.5` from any other town.
+- **Time away.** `S.lastLive` is stamped every visible frame (paused counts as visible). A gap of 3+ min
+  runs `catchUp` in `frame()`: at most 8 h of real time (Rasmus's rule: a weekend away must not skip an
+  age) and 250 years, in 40 ms slices with `FAST` on, then the "While you were away" card, plus a letter
+  from Claude (`aiDigest`) after 30+ min when the voice is on. `SF.ff` resets `lastLive`, so a long
+  fast-forward isn't mistaken for time away. `test/away.mjs` covers it.
 - **Economy.** Building costs are paid per month of progress. With nothing in stock a building goes at
   35% speed; it never stops. Materials are chosen from local production. Trade needs a road (the wheel)
   or a harbour on both ends.

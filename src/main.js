@@ -34,7 +34,9 @@ function frame(now) {
   let dt = (now - lastT) / 1000;
   if (dt < 1 / 26) return;
   lastT = now; dt = Math.min(dt, .25);
-  if (!document.hidden && !UI.paused && !S.flags.intro) {
+  // a long gap between frames (tab hidden, PC locked or asleep, or a save opened after a while) is time away
+  if (!document.hidden && !CATCH) { const last = S.lastLive || S.savedAt; if (last && Date.now() - last > AWAY_MIN * 1000) maybeCatchUp(); S.lastLive = Date.now(); }
+  if (!document.hidden && !UI.paused && !S.flags.intro && !CATCH) {
     simAcc += dt;
     const monthSec = (PACE[S.settings.pace] || 180) / 12;
     let n = 0;
@@ -56,6 +58,55 @@ function frame(now) {
   if (DEV) { fpsN++; if (now - fpsT > 1000) { $('fps').textContent = `${fpsN} fps · y${S.year.toFixed(1)} · walkers ${DYN.walkers.length} · parts ${DYN.parts.length}`; fpsN = 0; fpsT = now; } }
 }
 
+/* ---------- catch-up: time away counts, but only the last 8 hours of it ---------- */
+// S.lastLive is when the world was last on screen (paused counts as on screen, so a paused world stays paused).
+const AWAY_CAP = 8 * 3600, AWAY_MIN = 180, CATCH_MAX_YR = 250; // seconds, seconds, years (bounds the work on brisk/preview pace)
+let CATCH = null;
+function fmtAway(s) { const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return h >= 48 ? `${Math.round(h / 24)} days` : h ? `${h} h${m ? ' ' + m + ' min' : ''}` : `${m} min`; }
+function maybeCatchUp() {
+  const away = (Date.now() - (S.lastLive || S.savedAt)) / 1000; // older saves have no lastLive yet
+  if (CATCH || S.flags.intro || CLOUD.conflict || !(away > 0)) return;
+  const secs = Math.min(away, AWAY_CAP), yrs = Math.min(CATCH_MAX_YR, secs / (PACE[S.settings.pace] || 180));
+  if (yrs >= .25) catchUp(away, secs, yrs);
+}
+function catchUp(away, secs, yrs) {
+  const n = Math.round(yrs * 12), c0 = S.chronN, y0 = yr(), p0 = Math.round(totalPop()), t0 = Object.keys(S.tech.done).length;
+  CATCH = { done: 0 };
+  $('awayWhen').textContent = `You were gone ${fmtAway(away)}. Catching up…`;
+  $('awayLetter').textContent = ''; $('awayList').innerHTML = ''; $('away').classList.add('show');
+  const step = () => {
+    const t = performance.now();
+    FAST = true;
+    while (CATCH.done < n && performance.now() - t < 40) { simMonth(); CATCH.done++; } // in slices, so the page stays responsive
+    FAST = false; FXQ.length = 0;
+    if (CATCH.done < n) { $('awayWhen').textContent = `You were gone ${fmtAway(away)}. Catching up… Year ${yr()}`; return setTimeout(step, 0); }
+    CATCH = null; S.lastLive = Date.now();
+    syncWalkers(); faithRecalc();
+    UIDIRTY.chron = UIDIRTY.stats = UIDIRTY.tools = UIDIRTY.lore = UIDIRTY.people = UIDIRTY.prayers = true;
+    awayReport({ away, secs, y0, y1: yr(), p0, p1: Math.round(totalPop()), ideas: Object.keys(S.tech.done).length - t0, ev: S.chron.filter(e => e.n > c0) });
+    saveAll();
+  };
+  setTimeout(step, 0);
+}
+function awayReport(d) {
+  const kept = d.secs < d.away - 60 ? ` The world kept going for ${fmtAway(d.secs)} of it` : ' The world kept going';
+  const bits = [`Year ${d.y0} → ${d.y1}`, d.p0 === d.p1 ? `${fmtInt(d.p1)} people` : `${fmtInt(d.p0)} → ${fmtInt(d.p1)} people`]; if (d.ideas > 0) bits.push(`${d.ideas} new idea${d.ideas > 1 ? 's' : ''}`);
+  $('awayWhen').textContent = `You were gone ${fmtAway(d.away)}.${kept}: ${bits.join(' · ')}.`;
+  // the highlights: every new era, then the big moments spread over the whole stretch
+  const big = d.ev.filter(e => e.k === 'major' || e.k === 'era'), rest = d.ev.filter(e => !(e.k === 'major' || e.k === 'era'));
+  let pick = big.filter(e => e.k === 'era');
+  const pool = big.filter(e => e.k !== 'era').concat(big.length < 5 ? rest.slice(-(5 - big.length)) : []), room = Math.max(0, 8 - pick.length);
+  for (let i = 0; i < Math.min(room, pool.length); i++) pick.push(pool[Math.floor(i * pool.length / Math.min(room, pool.length))]);
+  pick.sort((a, b) => a.n - b.n);
+  $('awayList').innerHTML = pick.length ? pick.map(e => `<li><i>Year ${e.yr}</i>${esc(e.ic)} ${esc(e.t)}</li>`).join('') : '<li>A quiet stretch. Nobody wrote much down.</li>';
+  // with the voice on, a town historian writes it up (once per real absence, not for a coffee break)
+  if (d.away >= 1800 && d.ev.length >= 3 && aiOn()) {
+    const L = $('awayLetter'); L.className = 'away-letter wait'; L.textContent = 'The town historian is writing to you…';
+    aiDigest(d).then(r => { L.className = 'away-letter'; if (r) L.innerHTML = `<b>${esc(r.title)}</b>${esc(r.letter)}`; else L.textContent = ''; });
+  }
+}
+function bindAway() { $('awayOk').onclick = () => $('away').classList.remove('show'); }
+
 SF.ff = function (years) {
   const wasIntro = S.flags.intro;
   if (wasIntro) { DYN.intro = null; S.flags.intro = 0; const pod = Object.values(S.B).find(B => B.type === 'pod'); if (pod) { pod.hid = 0; markDirty(idx(pod.x, pod.y)); } introChronicle(); }
@@ -64,6 +115,7 @@ SF.ff = function (years) {
   for (let k = 0; k < n; k++) simMonth();
   FAST = false;
   FXQ.length = 0;
+  S.lastLive = Date.now(); // a long fast-forward isn't time away
   syncWalkers();
   UIDIRTY.chron = true;
 };
@@ -79,7 +131,7 @@ SF.pray = k => { const c = prayerCandidates().filter(x => !k || x[0] === k); if 
 SF.season = s => { LIGHT.forceSeason = s ? Object.assign({ autumn: 0, winter: 0, spring: 0 }, s) : null; LIGHT.seasonT = 0; LIGHT.chk = 0; };
 
 async function boot() {
-  initView(); initStatic(); initLight(); bindUI(); bindAI(); bindFaith();
+  initView(); initStatic(); initLight(); bindUI(); bindAI(); bindFaith(); bindAway();
   if (DEV) $('fps').style.display = 'block';
   try { await IDB.open(); } catch (e) { }
   try { await aiLoad(); } catch (e) { }
@@ -109,7 +161,7 @@ async function boot() {
   // first run
   const w = $('welcome'); w.classList.add('show');
   if (cloud) {
-    $('wText').textContent = 'The world only grows while it\'s on screen, so leave it running. It is saved to the cloud, so you can carry on from any browser you log in from. Already have a world? Load its save.json.';
+    $('wText').textContent = 'The world grows while it\'s on screen, and keeps going for up to 8 hours while you\'re away. It is saved to the cloud, so you can carry on from any browser you log in from. Already have a world? Load its save.json.';
     $('wFine').innerHTML = `World seed <input id="wSeed" spellcheck="false"> · saving to the cloud${CLOUD.email ? ' as ' + esc(CLOUD.email) : ''}.`;
     $('wSeed').value = randSeed();
     $('wFolder').textContent = 'Load a save.json…'; $('wLocal').textContent = 'Start a new world';
