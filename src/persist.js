@@ -31,6 +31,8 @@ function deserialize(obj) {
   S.doctrines = S.doctrines || []; S.aiQueue = S.aiQueue || [];
   if (S.rev == null) S.rev = 60;
   S.prayers = (S.prayers || []).filter(q => q.st === 'open'); S.prayers.forEach(q => { if (q.st === 'busy') q.st = 'open'; }); S.prayNext = null;
+  // interpretations used to be cut at 300 characters; the full text is still in the Voice log
+  for (const e of S.aiLog || []) { const d = e.kind === 'words' && e.input && e.doc && S.doctrines.find(x => x.id === e.doc); if (d && e.input.interpretation) e.summary = d.summary = clean(e.input.interpretation, 700); }
   recomputeCulture();
   if (!o0.map.plan) legacyStreets(); // saved before towns planned their own streets
   for (const k in S.P) ensurePerson(S.P[k]);
