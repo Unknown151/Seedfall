@@ -91,7 +91,7 @@ async function getSave(request, env, who) {
   const { value, metadata } = await env.SAVES.getWithMetadata('save:' + who.id, { type: 'arrayBuffer' });
   if (!value) return new Response(null, { status: 204 });
   const m = metadata || {};
-  const h = { 'etag': String(m.rev || 0), 'x-seedfall-meta': JSON.stringify(m), 'cache-control': 'no-store', 'content-type': m.gz ? 'application/octet-stream' : 'application/json' };
+  const h = { 'etag': String(m.rev || 0), 'x-seedfall-meta': asciiJson(m), 'cache-control': 'no-store', 'content-type': m.gz ? 'application/octet-stream' : 'application/json' };
   return new Response(request.method === 'HEAD' ? null : value, { status: 200, headers: h });
 }
 async function putSave(request, env, who) {
@@ -144,4 +144,6 @@ async function voice(request, env, who) {
   return new Response(r.body, { status: r.status, headers: { 'content-type': r.headers.get('content-type') || 'application/json', 'x-voice-calls-today': String(n + 1) } });
 }
 
+// header values must be Latin-1; planet names can be anything
+const asciiJson = o => JSON.stringify(o).replace(/[\u007f-\uffff]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });

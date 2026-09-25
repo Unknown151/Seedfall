@@ -13,6 +13,13 @@ try { new Function(js); } catch (e) { console.error('SYNTAX ERROR', e.message); 
 const n = {}; for (const m of js.matchAll(/^\s*function\s+([A-Za-z0-9_$]+)\s*\(/gm)) n[m[1]] = (n[m[1]] || 0) + 1;
 const dup = Object.keys(n).filter(k => n[k] > 1);
 if (dup.length) { console.error('DUPLICATE FUNCTIONS', dup.join(', ')); process.exit(1); }
+// hard rules from CLAUDE.md, checked here so a bad build never deploys
+const bad = js.match(/\beval\s*\(|new\s+Function\b|\batob\s*\(|\bbtoa\s*\(|fromCharCode/);
+if (bad) { console.error('FORBIDDEN IN SHIPPED CODE', bad[0]); process.exit(1); }
+const ids = src => [...src.matchAll(/'(claude-[\w.-]+)'/g)].map(m => m[1]).sort().join();
+const wk = fs.readFileSync(path.join(here, 'worker/index.js'), 'utf8').match(/const MODELS = \[([^\]]*)\]/);
+const am = js.match(/const AI_MODELS = \[(.*)\];/);
+if (!wk || !am || ids(wk[1]) !== ids(am[1])) { console.error('MODELS in worker/index.js must match AI_MODELS in src/ai.js'); process.exit(1); }
 if (process.argv.includes('--dist')) fs.copyFileSync(path.join(here, 'seedfall.html'), path.join(here, 'dist/Seedfall/seedfall.html'));
 if (process.argv.includes('--public')) { fs.mkdirSync(path.join(here, 'public'), { recursive: true }); fs.copyFileSync(path.join(here, 'seedfall.html'), path.join(here, 'public/index.html')); } // what the Worker serves
 console.log('syntax ok', (out.length / 1024).toFixed(0) + 'KB' + (process.argv.includes('--dist') ? ' (copied to dist/Seedfall)' : '') + (process.argv.includes('--public') ? ' (and public/index.html)' : ''));

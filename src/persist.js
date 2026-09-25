@@ -98,11 +98,16 @@ async function folderFlush(txtFn) {
   renderFolderStatus();
 }
 
-async function saveAll() {
+// force: true = push to the cloud now, 'hidden' = the tab was just hidden (cloud if 30 s have passed)
+async function saveAll(force) {
   if (!S || S.flags.intro) return;
+  if (CLOUD.conflict) return; // another device owns the world now: writing anything here would only clobber it
   S.savedAt = Date.now();
   if (FOLDER.ok) await folderFlush(() => JSON.stringify(serialize()));
-  await IDB.set('save', JSON.stringify(serialize()));
+  if (force === true && CLOUD.job) await CLOUD.job; // an upload asked for on purpose waits for one in flight, never skips
+  const txt = JSON.stringify(serialize());
+  if (cloudDue(force) && !(await cloudPut(txt, S.playSec)) && CLOUD.conflict) return;
+  await IDB.set('save', txt);
 }
 
 async function connectFolder(fromWelcome) {
@@ -151,6 +156,7 @@ async function reconnectFolder() {
 }
 function showBanner(denied) {
   const b = $('banner');
+  b.onclick = null;
   b.textContent = denied ? `Folder “${FOLDER.name}” isn't connected. Saving in this browser for now. Click to try again.` : `Click anywhere to reconnect your save folder “${FOLDER.name}”`;
   b.classList.add('show');
   if (!denied) {
@@ -158,9 +164,17 @@ function showBanner(denied) {
     addEventListener('pointerdown', once, true);
   }
 }
-function hideBanner() { $('banner').classList.remove('show'); }
+function hideBanner() { const b = $('banner'); b.classList.remove('show'); b.onclick = null; }
 function renderFolderStatus() {
   const el = $('fstat'), tx = $('ftext'), bt = $('bFolder');
+  if (CLOUD.on) {
+    const bad = CLOUD.conflict || CLOUD.out || CLOUD.err;
+    el.className = bad ? 'warn' : CLOUD.last ? 'ok' : '';
+    tx.textContent = CLOUD.conflict ? 'Open on another device · not saving here' : CLOUD.out ? 'Signed out · saving in this browser' : CLOUD.err ? `Cloud: ${CLOUD.err} · saving in this browser` : CLOUD.last ? `Saved to the cloud · ${agoStr(CLOUD.last)}` : 'Saving to the cloud';
+    tx.title = CLOUD.email ? 'Signed in as ' + CLOUD.email : '';
+    bt.textContent = 'Load save.json…'; bt.style.display = '';
+    return;
+  }
   if (!HAS_FSA) { tx.textContent = 'Saving in this browser (folders need Edge/Chrome)'; bt.style.display = 'none'; return; }
   if (FOLDER.ok) {
     el.className = FOLDER.err ? 'warn' : 'ok';
@@ -168,4 +182,176 @@ function renderFolderStatus() {
     tx.textContent = FOLDER.err ? `“${FOLDER.name}”: ${FOLDER.err}` : `Saving to “${FOLDER.name}” · ${t}`;
     bt.textContent = 'Change';
   } else { el.className = FOLDER.h ? 'warn' : ''; tx.textContent = FOLDER.h ? `“${FOLDER.name}” needs permission` : 'Saving in this browser only'; bt.textContent = FOLDER.h ? 'Reconnect' : 'Connect folder'; }
+}
+
+/* ---------- cloud saves (only when the page is served by the Worker, e.g. seedfall.rsvn.dk) ---------- */
+// Cloud mode needs http(s) and a 200 from /api/me. From file://, or any server without the API, none of this
+// runs and saving works exactly as before. Every /api call is same-origin and uses redirect: 'manual', because
+// an expired Access session answers with a redirect to the login page, which fetch can't follow cross-origin.
+const CLOUD = {
+  on: false, email: '', rev: undefined, // rev: undefined = don't know yet, null = the cloud has no save yet
+  last: 0, lastTry: 0, lastPlay: -1, busy: false, job: null, err: null, conflict: false, out: false,
+  session: self.crypto && crypto.randomUUID ? crypto.randomUUID() : 'tab-' + Date.now().toString(36) + Math.random().toString(36).slice(2)
+};
+const CLOUD_EVERY = 150e3; // KV's free tier allows ~1,000 writes a day
+function agoStr(t) { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} days ago`; }
+// header values must be Latin-1, and planet names needn't be
+const asciiJson = o => JSON.stringify(o).replace(/[\u007f-￿]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+const gzip = txt => new Response(new Blob([txt]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+const gunzip = buf => new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+
+async function cloudApi(path, opt = {}, ms = 30000) {
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), ms);
+  try {
+    const r = await fetch('/api/' + path, Object.assign({ redirect: 'manual', cache: 'no-store', credentials: 'same-origin', signal: ctl.signal }, opt));
+    if (r.type === 'opaqueredirect' || r.status === 401) { cloudSignedOut(); throw new Error('signed out'); }
+    return r;
+  } catch (e) {
+    throw new Error(CLOUD.out ? 'signed out' : e.name === 'AbortError' ? 'the server took too long' : e.message === 'Failed to fetch' || navigator.onLine === false ? 'can’t reach the server' : e.message);
+  } finally { clearTimeout(to); }
+}
+async function cloudDetect() {
+  if (!/^https?:$/.test(location.protocol)) return false;
+  let r;
+  try { r = await cloudApi('me', {}, 8000); } catch (e) { if (CLOUD.out) { CLOUD.on = true; return true; } return false; }
+  const j = r.status === 200 ? await r.json().catch(() => null) : null;
+  if (!j || !j.email) return false;
+  CLOUD.on = true; CLOUD.email = j.email;
+  return true;
+}
+async function cloudGet(head) { // -> { meta, txt, save } or null when the cloud has no save yet
+  const r = await cloudApi('save', head ? { method: 'HEAD' } : {});
+  if (r.status === 204) return null;
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  let meta = {}; try { meta = JSON.parse(r.headers.get('x-seedfall-meta') || '{}'); } catch (e) { }
+  meta.rev = +meta.rev || 0;
+  if (head) return { meta };
+  const buf = await r.arrayBuffer();
+  const txt = meta.gz ? await gunzip(buf) : new TextDecoder().decode(buf);
+  return { meta, txt, save: parseSave(txt) };
+}
+function cloudDue(force) {
+  if (!CLOUD.on || CLOUD.conflict || CLOUD.out || CLOUD.busy) return false;
+  if (force === true) return true;
+  if (S.playSec === CLOUD.lastPlay) return false; // nothing happened since the last upload (the world pauses when hidden)
+  return Date.now() - CLOUD.lastTry >= (force === 'hidden' ? 30e3 : CLOUD_EVERY);
+}
+function cloudPut(txt, play) { return CLOUD.job = cloudPut1(txt, play).finally(() => { CLOUD.job = null; }); }
+async function cloudPut1(txt, play) {
+  CLOUD.busy = true; CLOUD.lastTry = Date.now();
+  try {
+    if (CLOUD.rev === undefined) { // we never saw the cloud's copy (it was unreachable at startup): look before overwriting
+      const c = await cloudGet(true), lc = await IDB.get('cloud');
+      if (c && !(lc && lc.email === CLOUD.email && lc.rev === c.meta.rev)) { cloudConflict(c.meta); return false; }
+      CLOUD.rev = c ? c.meta.rev : null;
+    }
+    const gz = typeof CompressionStream === 'function';
+    const h = { 'content-type': gz ? 'application/octet-stream' : 'application/json', 'x-seedfall-session': CLOUD.session, 'x-seedfall-gzip': gz ? '1' : '0',
+      'x-seedfall-info': asciiJson({ year: yr(), planet: S.planet || '', pop: Math.round(totalPop()) }) };
+    if (CLOUD.rev != null) h['if-match'] = String(CLOUD.rev);
+    const r = await cloudApi('save', { method: 'PUT', headers: h, body: gz ? await gzip(txt) : txt }, 60000);
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 409) { cloudConflict(j.meta || {}); return false; }
+    if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+    CLOUD.rev = j.rev; CLOUD.last = Date.now(); CLOUD.lastPlay = play; CLOUD.err = null;
+    await IDB.set('cloud', { email: CLOUD.email, rev: j.rev }); // the local copy now continues this revision
+    return true;
+  } catch (e) { if (!CLOUD.out) CLOUD.err = e.message; return false; }
+  finally { CLOUD.busy = false; renderFolderStatus(); }
+}
+async function cloudClaim() {
+  const r = await cloudApi('claim', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ session: CLOUD.session }) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+}
+function cloudBanner(text, click) {
+  const b = $('banner'); b.textContent = text; b.onclick = click || null; b.classList.add('show');
+}
+function cloudConflict(meta) {
+  CLOUD.conflict = true; CLOUD.err = null;
+  const ago = meta.savedAt ? `, saved ${agoStr(meta.savedAt)}` : '';
+  cloudBanner(`This world is open on another device (Year ${meta.year != null ? meta.year : '?'}${ago}). Take over here?`, cloudTakeOver);
+  renderFolderStatus();
+}
+function cloudSignedOut() {
+  if (CLOUD.out) return;
+  CLOUD.out = true; CLOUD.err = null;
+  // keep saving to IndexedDB (unless another device owns the world); after logging in, startup offers to upload it
+  cloudBanner('Signed out. Your progress is kept in this browser. Click here to reload and log in.', () => { Promise.resolve(saveAll()).finally(() => location.reload()); });
+  renderFolderStatus();
+}
+async function cloudTakeOver() {
+  cloudBanner('Taking over…');
+  try {
+    await cloudClaim();
+    const c = await cloudGet();
+    if (c && !c.save) throw new Error('the cloud save wouldn’t open');
+    CLOUD.conflict = false; CLOUD.err = null; hideBanner();
+    if (c) {
+      CLOUD.rev = c.meta.rev; CLOUD.last = c.meta.savedAt || 0;
+      deserialize(c.save); startWorld(false);
+      await IDB.set('save', c.txt); await IDB.set('cloud', { email: CLOUD.email, rev: c.meta.rev });
+      toast(`Carrying on with ${S.planet || 'your world'} here.`);
+    } else CLOUD.rev = null;
+    CLOUD.lastTry = Date.now(); CLOUD.lastPlay = S.playSec;
+  } catch (e) { if (!CLOUD.out) cloudBanner(`Couldn’t take over (${e.message}). Click to try again.`, cloudTakeOver); }
+  renderFolderStatus();
+}
+// a two-button question on the confirm card; resolves true for the first button
+function choose(title, text, yes, no) {
+  return new Promise(res => {
+    const cY = $('cYes'), cN = $('cNo'), l = [cY.textContent, cN.textContent];
+    const done = v => { $('confirm').classList.remove('show'); cY.textContent = l[0]; cN.textContent = l[1]; cY.onclick = cN.onclick = null; res(v); };
+    $('cTitle').textContent = title; $('cText').textContent = text; cY.textContent = yes; cN.textContent = no;
+    cY.onclick = () => done(true); cN.onclick = () => done(false);
+    $('confirm').classList.add('show');
+  });
+}
+const saveDesc = (planet, year, t) => `${planet || 'An unnamed world'} in Year ${year}${t ? ', saved ' + agoStr(t) : ''}`;
+// startup: which save to open, the cloud's or this browser's -> { save, upload } or null for a first run
+async function cloudStart() {
+  const loc = parseSave(await IDB.get('save')), lc = await IDB.get('cloud');
+  const mine = loc && (!lc || !CLOUD.email || lc.email === CLOUD.email); // another login's world here isn't ours to upload (signed out, we can't tell)
+  if (CLOUD.out) return mine ? { save: loc } : null;     // signed out already: carry on locally, the banner says why
+  let c;
+  try { c = await cloudGet(); } catch (e) { CLOUD.err = e.message; return mine ? { save: loc } : null; } // offline: rev stays unknown
+  if (!c) { CLOUD.rev = null; return mine ? { save: loc, upload: true } : null; }
+  CLOUD.rev = c.meta.rev; CLOUD.last = c.meta.savedAt || 0;
+  const lt = mine ? loc.state.savedAt || 0 : 0;
+  if (mine && (!c.save || lt > (c.meta.savedAt || 0))) {
+    // this browser played on after the cloud's copy: offline, or signed out. If nobody else saved since, just carry on
+    if (!c.save || lc && lc.rev === c.meta.rev) return { save: loc, upload: true };
+    const up = await choose('This browser has a newer save', `Here: ${saveDesc(loc.planet, loc.year, lt)}. In the cloud: ${saveDesc(c.meta.planet, c.meta.year, c.meta.savedAt)}. Upload this browser’s world? The cloud keeps a daily backup for two weeks either way.`, 'Upload this one', 'Use the cloud save');
+    if (up) return { save: loc, upload: true };
+  }
+  if (!c.save) return null;
+  await IDB.set('save', c.txt); await IDB.set('cloud', { email: CLOUD.email, rev: c.meta.rev });
+  return { save: c.save };
+}
+// after a world is on screen: this tab owns it now, so another device's next save gets a 409
+async function cloudOwn(upload) {
+  if (CLOUD.out) return;
+  try { await cloudClaim(); } catch (e) { if (!CLOUD.out) CLOUD.err = e.message; }
+  CLOUD.lastTry = Date.now(); if (!upload) CLOUD.lastPlay = S.playSec;
+  if (upload) await saveAll(true);
+  renderFolderStatus();
+}
+// bring a save.json over from the file:// version (a plain file input works in every browser)
+function pickSaveFile() {
+  return new Promise(res => {
+    const inp = $('fLoad'); inp.value = '';
+    inp.onchange = async () => { const f = inp.files && inp.files[0]; res(f ? parseSave(await f.text().catch(() => '')) || false : null); };
+    inp.click();
+  });
+}
+async function cloudLoadFile(welcome) {
+  const fs = await pickSaveFile();
+  if (fs === null) return false;
+  if (fs === false) { toast('That file isn’t a Seedfall save.'); return false; }
+  if (!welcome && S && !(await choose('Load this world?', `${saveDesc(fs.planet, fs.year)} will replace ${saveDesc(S.planet, yr())} here and in the cloud. The cloud keeps a daily backup for two weeks.`, 'Load it', 'Cancel'))) return false;
+  if (CLOUD.conflict) { CLOUD.conflict = false; hideBanner(); } // loading a file on purpose is a take-over too
+  try { const c = await cloudGet(true); CLOUD.rev = c ? c.meta.rev : null; } catch (e) { } // and it replaces whatever is there
+  deserialize(fs); startWorld(false);
+  toast(`Welcome back to ${S.planet || 'your world'}.`);
+  await cloudOwn(true);
+  return true;
 }

@@ -110,7 +110,7 @@ function prayerCandidates() {
   if (bs.length) { const c = pick(bs), par = S.P[c.par.find(id => S.P[id] && S.P[id].died === null)]; if (par && S.T[par.sid]) out.push(['name', 2, par, { child: c.id }]); }
   const ts = towns().filter(T => T.id !== 1 && S.year - T.founded < 15 && !T.asked && S.P[T.founder] && S.P[T.founder].died === null);
   if (ts.length) { const T = pick(ts); out.push(['town', 3, S.P[T.founder], { tid: T.id }]); }
-  out.push(['ask', AI.key ? 1.6 : 1, pick(L)]);
+  out.push(['ask', aiOn() ? 1.6 : 1, pick(L)]);
   const open = (S.prayers || []).filter(q => q.st === 'open');
   return out.filter(([k, w, p]) => p && !open.some(q => q.pid === p.id || q.k === k));
 }
@@ -123,7 +123,7 @@ function newPrayer() {
   if (k === 'town') S.T[q.tid].asked = 1;
   S.prayers.push(q);
   UIDIRTY.prayers = true;
-  if (k === 'ask' && AI.key && !AI.busy) aiPrayerText(q, p); // Claude rewrites the question to fit the person
+  if (k === 'ask' && aiOn() && !AI.busy) aiPrayerText(q, p); // Claude rewrites the question to fit the person
 }
 function prayerValid(q) {
   const p = S.P[q.pid]; if (!p || p.died !== null || !S.T[p.sid]) return false;
@@ -199,7 +199,7 @@ function answerWithWords(q, text) {
   }
   if (q.k === 'ask') {
     q.st = 'busy'; UIDIRTY.prayers = true;
-    if (AI.key) aiAnswerPrayer(q, p, text).then(ok => { if (!ok) offlineAnswer(q, p, text); });
+    if (aiOn()) aiAnswerPrayer(q, p, text).then(ok => { if (!ok) offlineAnswer(q, p, text); });
     else offlineAnswer(q, p, text);
   }
 }
@@ -291,7 +291,7 @@ function openAnswer(q) {
   const nameLike = q.k === 'name' || q.k === 'town';
   $('ansText').rows = nameLike ? 1 : 3; $('ansText').maxLength = nameLike ? 24 : 200; $('ansText').value = '';
   $('ansText').placeholder = q.k === 'name' ? 'A name…' : q.k === 'town' ? 'Starfold' : 'Go on. Say it.';
-  $('ansMode').textContent = q.k === 'ask' ? (AI.key ? `${p.first} will work out what to do with it (${AI.model}).` : 'Without a voice key they hear the words, but work out the rest on their own.') : 'Free. Gratitude comes back as Reverence.';
+  $('ansMode').textContent = q.k === 'ask' ? (aiOn() ? `${p.first} will work out what to do with it (${AI.model}).` : 'Without a voice key they hear the words, but work out the rest on their own.') : 'Free. Gratitude comes back as Reverence.';
   $('answer').classList.add('show'); setTimeout(() => $('ansText').focus(), 50);
 }
 function bindFaith() {

@@ -59,7 +59,7 @@ function bindUI() {
     const pe = e.target.closest('[data-pid]');
     if (pe && !pe.contains(e.relatedTarget)) { UI.panelHover = null; $('tip').style.opacity = 0; }
   });
-  $('bFolder').addEventListener('click', () => (FOLDER.h && !FOLDER.ok) ? reconnectFolder() : connectFolder(false));
+  $('bFolder').addEventListener('click', () => CLOUD.on ? cloudLoadFile(false) : (FOLDER.h && !FOLDER.ok) ? reconnectFolder() : connectFolder(false));
   $('pace').addEventListener('change', e => { S.settings.pace = e.target.value; });
   $('optCap').addEventListener('change', e => { S.settings.captions = e.target.checked; if (!e.target.checked) DYN.caps.length = 0; });
   $('optSky').addEventListener('change', e => { S.settings.sky = e.target.value; relightNow(); });
@@ -67,7 +67,7 @@ function bindUI() {
   $('optSh').addEventListener('change', e => { S.settings.shadows = e.target.checked; relightNow(); });
   $('bHelp').addEventListener('click', () => $('help').classList.add('show'));
   $('hClose').addEventListener('click', () => $('help').classList.remove('show'));
-  $('bNew').addEventListener('click', () => confirmBox('Start a new world?', `${S.planet || 'This world'} will be archived${FOLDER.ok ? ' to the worlds folder' : ''} and a new pod will fall somewhere else.`, () => newWorld(randSeed(), true)));
+  $('bNew').addEventListener('click', () => confirmBox('Start a new world?', CLOUD.on ? `${S.planet || 'This world'} will be replaced in the cloud (which keeps a daily backup for two weeks) and a new pod will fall somewhere else.` : `${S.planet || 'This world'} will be archived${FOLDER.ok ? ' to the worlds folder' : ''} and a new pod will fall somewhere else.`, () => newWorld(randSeed(), true)));
   $('cNo').addEventListener('click', () => $('confirm').classList.remove('show'));
   $('banner').addEventListener('click', () => reconnectFolder());
 }
