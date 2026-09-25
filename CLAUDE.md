@@ -10,16 +10,28 @@ question at a time, and show a screenshot after any visual change.
 
 ## Hard rules
 
-- **API key safety.** The Anthropic key lives only in the browser's IndexedDB (key `ai`). It must never
-  end up in save.json, chronicle.md, stats.csv, logs or any exported file. `test/voicetab.mjs` checks this.
-- **Shipped code must stay single-file with no dependencies, and it must work from `file://`.** The only
-  network call it makes is to `api.anthropic.com` for the voice, with the header
-  `anthropic-dangerous-direct-browser-access: true`.
+- **API key safety.** From `file://` the Anthropic key lives only in the browser's IndexedDB (key `ai`). On
+  the site it is the Worker secret and never reaches the browser. Either way it must never end up in
+  save.json, chronicle.md, stats.csv, logs, the cloud save or any exported file. `test/voicetab.mjs` and
+  `test/cloud.mjs` check this.
+- **Shipped code must stay single-file with no dependencies, and it must work from `file://`.** From
+  `file://` the only network call is to `api.anthropic.com` for the voice, with the header
+  `anthropic-dangerous-direct-browser-access: true`. In cloud mode (served over http(s) and `/api/me`
+  answers 200) it calls only its own origin's `/api/*` instead: saves, claim and the voice proxy. Nothing
+  else, ever.
 - **No `eval`, `new Function`, `atob`, `btoa` or `String.fromCharCode` in shipped code.** Windows Defender
   flagged a build once (`Trojan:Win32/MalUri.A!cl`, a cloud heuristic on HTML-smuggling patterns). The
-  build script's `new Function` syntax check is fine because it doesn't ship.
+  build script's `new Function` syntax check is fine because it doesn't ship. `build.mjs` fails the build if
+  any of these show up in seedfall.html, and if `MODELS` in worker/index.js drifts from `AI_MODELS`.
 - **Keep it an idle game.** Nothing should hard-stop; shortages only slow things down. The research
   "governor" keeps discoveries close to `TECHS[].yr`, so don't break the pacing (baseline below).
+
+## Git workflow (Claude Code cloud sessions)
+
+- Work on the session's own branch and push it only when a change is **finished and the tests pass**.
+- Rasmus opens the PR and merges it himself. Merging to `main` auto-deploys to seedfall.rsvn.dk (a failed
+  build doesn't deploy), so every push has to be safe to merge as it is. No half-done work on the branch.
+- Keep `package-lock.json` committed, so Cloudflare's build uses npm (not bun).
 
 ## Build and run
 
@@ -56,7 +68,9 @@ npm run serve              # (from the root) some tests need http://localhost:87
 cd test && node soak.mjs
 ```
 
-Set `PW_CHROMIUM` to use a specific Chromium binary. Runs are **not deterministic** (the sim uses
+Set `PW_CHROMIUM` to use a specific Chromium binary. In Claude Code cloud sessions the test Playwright is
+newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`
+(or whichever `chromium-*` folder is there) instead of downloading one. Runs are **not deterministic** (the sim uses
 `Math.random`), so ±10–15% in population between runs is noise.
 
 **Regression tests:**
@@ -73,6 +87,7 @@ Set `PW_CHROMIUM` to use a specific Chromium binary. Runs are **not deterministi
 | `faith1` | Reverence and prayers. Can be flaky under load (stale element handles), so rerun it alone. |
 | `econmig` | A pre-economy save still loads. |
 | `streetmig` | A save made by `dist/`'s build loads in the current build. |
+| `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, and file:// staying cloud-free. Needs the root `npm install`. |
 
 **Inspection tools:**
 
@@ -114,6 +129,12 @@ Set `PW_CHROMIUM` to use a specific Chromium binary. Runs are **not deterministi
     allows about 1,000 writes a day.
 - **The Anthropic key** is the Worker secret `ANTHROPIC_API_KEY`, never in the page. Local dev uses
   `--var DEV_USER:...` or `.dev.vars` (both gitignored and never deployed).
+- **Cloud mode in the game** (`persist.js`, bottom). `cloudDetect` at boot; `cloudStart` picks the cloud
+  save or this browser's (a newer local save that continues the same rev just uploads; a diverged one asks);
+  `cloudOwn` claims with the tab's session id. Uploads are gzipped, every 2.5 min and on hide (30 s minimum),
+  only if the world moved. IndexedDB keeps a copy plus `cloud: {email, rev}` (the rev it continues). A 409
+  stops *all* saving and shows the take-over banner; a redirect or 401 means signed out (local saves only).
+  `/api` fetches use `redirect: 'manual'`, because Access redirects cross-origin to its login page.
 - **Tested locally:** save round trip, both conflict cases (409), a forged, expired or wrong-audience JWT
   (rejected), the voice model allowlist and the daily counter.
 
@@ -140,7 +161,7 @@ Set `PW_CHROMIUM` to use a specific Chromium binary. Runs are **not deterministi
 | sea.js | Water bodies, harbours, sea routes, ships by era (sail, steamer, freighter, boxship, hover), fishing boats (out at dawn, home at dusk), ferries, lighthouse beams |
 | air.js | Planes that use airfields: apron, taxi, roll, climb, cruise, final approach, land, park |
 | ui.js | Panel and tabs (Chronicle, Towns, People, Lore, Voice), tooltips (`tipFor`), HUD |
-| persist.js | `serialize`/`deserialize` plus migrations, IndexedDB, folder saves (save.json, chronicle.md, stats.csv, dated backups) |
+| persist.js | `serialize`/`deserialize` plus migrations, IndexedDB, folder saves (save.json, chronicle.md, stats.csv, dated backups), cloud saves (`CLOUD`, only when served by the Worker) |
 | main.js | Frame loop, pace (`relaxed` 5 min/yr, `normal` 3 min/yr, `brisk` 1 min/yr, `preview` 4 s/yr), dev hooks |
 
 ## How things work (the parts that are easy to break)
@@ -186,9 +207,9 @@ Set `PW_CHROMIUM` to use a specific Chromium binary. Runs are **not deterministi
 
 See `TODO.md`:
 
-1. **Hosted site and cloud saves** (`seedfall.rsvn.dk`): a Cloudflare Worker with static assets, Cloudflare
-   Access for login, saves in R2, and a server-side proxy for the voice. The full spec, API and deploy
-   sketch are in TODO.md. The game has to keep working exactly as it does today when opened from
-   `file://`.
+1. **Hosted site and cloud saves** (`seedfall.rsvn.dk`): done. A Cloudflare Worker with static assets,
+   Cloudflare Access for login, saves in Workers KV, a server-side voice proxy, and cloud mode in the game.
+   Leftovers (server-side exports, phone support) are in TODO.md. The game still works exactly as before
+   when opened from `file://`.
 2. **Bigger worlds** (128×128 or 96×96). Blocked on static canvas memory, which would be ~420 MB at
    128×128 unless the layer is chunked.

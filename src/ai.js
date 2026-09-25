@@ -24,25 +24,30 @@ function leverW(k) { const x = CULT.lv && CULT.lv[k]; return x && x.w >= .25 ? M
 async function aiLoad() { const c = await IDB.get('ai'); if (c) for (const k of ['key', 'model', 'narr', 'calls', 'day', 'lastNarr']) if (c[k] != null) AI[k] = c[k]; }
 function aiStore() { return IDB.set('ai', { key: AI.key, model: AI.model, narr: AI.narr, calls: AI.calls, day: AI.day, lastNarr: AI.lastNarr }); }
 
+// voice available? In cloud mode the server holds the key, so there's nothing to set up here
+function aiOn() { return CLOUD.on || !!AI.key; }
 async function aiFetch(body) {
-  if (!AI.key) throw new Error('no API key set');
+  const cloud = CLOUD.on; // then the same body goes to our own Worker, which adds the key; no key ever leaves the server
+  if (!cloud && !AI.key) throw new Error('no API key set');
   const today = todayStr(); if (AI.day !== today) { AI.day = today; AI.calls = 0; }
   if (AI.calls >= AI_DAY_CAP) throw new Error(`daily safety limit of ${AI_DAY_CAP} calls reached`);
   AI.calls++; aiStore();
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 60000), t0 = performance.now();
   let res;
   try {
-    res = await fetch('https://api.anthropic.com/v1/messages', {
+    res = await fetch(cloud ? '/api/voice' : 'https://api.anthropic.com/v1/messages', Object.assign({
       method: 'POST', signal: ctl.signal,
-      headers: { 'content-type': 'application/json', 'x-api-key': AI.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: cloud ? { 'content-type': 'application/json' } : { 'content-type': 'application/json', 'x-api-key': AI.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify(Object.assign({ model: AI.model }, body))
-    });
-  } catch (e) { throw new Error(e.name === 'AbortError' ? 'the API took too long to answer' : 'couldn’t reach api.anthropic.com (offline, or blocked by a firewall/proxy)'); }
+    }, cloud ? { redirect: 'manual', credentials: 'same-origin', cache: 'no-store' } : {}));
+  } catch (e) { throw new Error(e.name === 'AbortError' ? 'the API took too long to answer' : cloud ? 'couldn’t reach the server (offline?)' : 'couldn’t reach api.anthropic.com (offline, or blocked by a firewall/proxy)'); }
   finally { clearTimeout(to); }
+  if (cloud && res.type === 'opaqueredirect') { cloudSignedOut(); throw new Error('signed out, reload the page to log in'); }
   const j = await res.json().catch(() => null);
   if (!res.ok) {
-    const m = j && j.error ? j.error.message : 'HTTP ' + res.status;
-    throw new Error(res.status === 401 ? 'the API key was rejected' : res.status === 404 ? `model “${AI.model}” not found` : res.status === 429 ? 'rate limited, try again in a bit' : m);
+    const e = j && j.error, m = e ? e.message || String(e) : 'HTTP ' + res.status;
+    if (cloud && res.status === 401 && e === 'not signed in') { cloudSignedOut(); throw new Error('signed out, reload the page to log in'); } // Access, not Anthropic
+    throw new Error(res.status === 401 ? (cloud ? 'the server’s API key was rejected' : 'the API key was rejected') : res.status === 404 ? `model “${AI.model}” not found` : res.status === 503 && cloud ? 'the server has no voice key yet' : res.status === 429 && !cloud ? 'rate limited, try again in a bit' : m);
   }
   const ms = Math.round(performance.now() - t0);
   AI.ok = true; AI.status = `OK · ${AI.model} · ${ms} ms`;
@@ -220,7 +225,7 @@ async function speak(words) {
   const d = { id: (S.doctrines = S.doctrines || []).length + 1, words, yr: yr(), str: 1, name: 'The Watcher’s Words', summary: 'Nobody is quite sure yet.', ai: false };
   S.doctrines.push(d);
   UIDIRTY.lore = true; renderTools();
-  if (!AI.key) { const L = aiLogPush({ kind: 'words', t: Date.now(), yr: yr(), words, ok: false, offline: true, err: 'No voice key set, so nothing was sent to Claude. The colonists are guessing.' }); offlineWords(d, L); toast('Heard, but without a voice key they can only guess what it means.'); return; }
+  if (!aiOn()) { const L = aiLogPush({ kind: 'words', t: Date.now(), yr: yr(), words, ok: false, offline: true, err: 'No voice key set, so nothing was sent to Claude. The colonists are guessing.' }); offlineWords(d, L); toast('Heard, but without a voice key they can only guess what it means.'); return; }
   AI.busy = true; toast('The colonists are listening…');
   try {
     const { input: r, log } = await aiTool(AI_SYSTEM, `${aiWorldBrief()}
@@ -340,7 +345,7 @@ function exQ(field, base) { const x = S.extraQ && S.extraQ[field]; return x && x
 /* ---------- gossip: small vignettes now and then ---------- */
 async function aiMaybeGossip() {
   const mins = NARR_MIN[AI.narr] || 0;
-  if (!mins || !AI.key || AI.busy || !S || S.flags.intro || UI.paused || document.hidden) return;
+  if (!mins || !aiOn() || AI.busy || !S || S.flags.intro || UI.paused || document.hidden) return;
   if (Date.now() - AI.lastNarr < mins * 60000) return;
   if (living().length < 4) return;
   AI.busy = true; AI.lastNarr = Date.now(); aiStore();
@@ -358,19 +363,24 @@ Write 1 to 3 small vignettes that will appear in the chronicle over the next few
 function openSpeak() {
   if (!S || S.flags.intro) return;
   if (!canAfford('speak')) { toast(`Speaking takes ${COST.speak} ✨ Reverence. You have ${Math.floor(S.rev)}; it gathers while the world is on screen.`); return; }
-  $('spkMode').textContent = AI.key ? `Understood by ${AI.model}${AI.ok === false ? ' (last call failed, see Voice settings)' : ''}.` : 'No voice key set: they will hear the words but can only guess at them. Add a key under Voice settings.';
+  $('spkMode').textContent = aiOn() ? `Understood by ${AI.model}${AI.ok === false ? ' (last call failed, see Voice settings)' : ''}.` : 'No voice key set: they will hear the words but can only guess at them. Add a key under Voice settings.';
   $('speak').classList.add('show');
   setTimeout(() => $('spkText').focus(), 50);
 }
 function openAISettings() {
   $('aiKey').value = AI.key ? '••••••••' + AI.key.slice(-4) : '';
+  if (CLOUD.on) { // the server holds the key: nothing to paste, nothing to forget
+    $('aiIntro').textContent = 'Here the voice runs through your server: Claude reads what you say to the colonists and works out how they understand it, argue about it and turn it into customs. It can also write the occasional bit of town gossip about your named people.';
+    $('aiFine').textContent = `No key needed in this browser: the server keeps it, and allows ${AI_DAY_CAP} calls a day. Each call costs a fraction of a cent with Haiku.`;
+  }
+  $('aiKeyRow').style.display = $('aiForget').style.display = CLOUD.on ? 'none' : '';
   $('aiModel').value = AI.model; $('aiNarr').value = AI.narr;
   renderAIStatus();
   $('aiset').classList.add('show');
 }
 function renderAIStatus() {
   const el = $('aiStatus'); if (!el) return;
-  el.textContent = `${AI.key ? 'Key saved in this browser.' : 'No key yet.'} ${AI.calls || 0} call${AI.calls === 1 ? '' : 's'} today (safety limit ${AI_DAY_CAP}). ${AI.status || ''}`;
+  el.textContent = `${CLOUD.on ? 'Voice runs through the server.' : AI.key ? 'Key saved in this browser.' : 'No key yet.'} ${AI.calls || 0} call${AI.calls === 1 ? '' : 's'} today (safety limit ${AI_DAY_CAP}). ${AI.status || ''}`;
 }
 function bindAI() {
   $('spkCancel').onclick = () => $('speak').classList.remove('show');
@@ -397,7 +407,7 @@ function fmtClock(t) { const d = new Date(t); const p = n => String(n).padStart(
 function renderVoiceTab() {
   const L = (S.aiLog || []).slice().reverse();
   const gossip = { off: 'off', rare: 'about hourly', often: 'about every 20 min' }[AI.narr] || AI.narr;
-  let h = `<div class="vx-top"><div><b>${AI.key ? 'Voice connected' : 'No voice key'}</b><small>${esc(AI.model)} · ${AI.calls || 0} call${AI.calls === 1 ? '' : 's'} today · gossip ${gossip}${AI.status ? ' · ' + esc(AI.status) : ''}</small></div><button class="btn" data-voiceset="1">Settings…</button></div>`;
+  let h = `<div class="vx-top"><div><b>${CLOUD.on ? 'Voice via the server' : AI.key ? 'Voice connected' : 'No voice key'}</b><small>${esc(AI.model)} · ${AI.calls || 0} call${AI.calls === 1 ? '' : 's'} today · gossip ${gossip}${AI.status ? ' · ' + esc(AI.status) : ''}</small></div><button class="btn" data-voiceset="1">Settings…</button></div>`;
   if (!L.length) return h + `<div class="phint">Nothing sent yet. Press <kbd>6</kbd> to speak to your people; every exchange with Claude will show up here, including the raw response.</div>`;
   let tin = 0, tout = 0; for (const e of S.aiLog) if (e.usage) { tin += e.usage.input_tokens || 0; tout += e.usage.output_tokens || 0; }
   if (tin) h += `<div class="phint">Tokens in this world’s log: ${fmtInt(tin)} in, ${fmtInt(tout)} out.</div>`;

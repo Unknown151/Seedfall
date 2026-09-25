@@ -83,21 +83,40 @@ async function boot() {
   if (DEV) $('fps').style.display = 'block';
   try { await IDB.open(); } catch (e) { }
   try { await aiLoad(); } catch (e) { }
-  if (QS.has('seed') && QS.has('fresh')) { newState(+QS.get('seed')); if (QS.has('nointro')) { S.flags.intro = 0; introChronicle(); } else { const pod = Object.values(S.B).find(B => B.type === 'pod'); if (pod) pod.hid = 1; } startWorld(true); return; }
-  let st = parseSave(await IDB.get('save'));
-  const h = await IDB.get('dir');
-  if (h && HAS_FSA) {
-    FOLDER.h = h; FOLDER.name = h.name;
-    let p = 'prompt'; try { p = await h.queryPermission({ mode: 'readwrite' }); } catch (e) { }
-    if (p === 'granted') {
-      FOLDER.ok = true;
-      const fs = parseSave(await readText(h, 'save.json'));
-      if (fs && (!st || (fs.state.savedAt || 0) > (st.state.savedAt || 0))) st = fs;
-    } else showBanner();
+  const cloud = await cloudDetect(); // served by the Worker and logged in: saves go to the cloud (file:// never is)
+  if (QS.has('seed') && QS.has('fresh')) {
+    newState(+QS.get('seed')); if (QS.has('nointro')) { S.flags.intro = 0; introChronicle(); } else { const pod = Object.values(S.B).find(B => B.type === 'pod'); if (pod) pod.hid = 1; } startWorld(true);
+    if (cloud && !CLOUD.out) { try { const c = await cloudGet(true); CLOUD.rev = c ? c.meta.rev : null; } catch (e) { } cloudOwn(false); } // asked for a fresh world, so it replaces the cloud's
+    return;
   }
-  if (st) { deserialize(st); startWorld(false); return; }
+  if (cloud) {
+    const r = await cloudStart();
+    if (r) { deserialize(r.save); startWorld(false); await cloudOwn(r.upload); return; }
+  } else {
+    let st = parseSave(await IDB.get('save'));
+    const h = await IDB.get('dir');
+    if (h && HAS_FSA) {
+      FOLDER.h = h; FOLDER.name = h.name;
+      let p = 'prompt'; try { p = await h.queryPermission({ mode: 'readwrite' }); } catch (e) { }
+      if (p === 'granted') {
+        FOLDER.ok = true;
+        const fs = parseSave(await readText(h, 'save.json'));
+        if (fs && (!st || (fs.state.savedAt || 0) > (st.state.savedAt || 0))) st = fs;
+      } else showBanner();
+    }
+    if (st) { deserialize(st); startWorld(false); return; }
+  }
   // first run
   const w = $('welcome'); w.classList.add('show');
+  if (cloud) {
+    $('wText').textContent = 'The world only grows while it\'s on screen, so leave it running. It is saved to the cloud, so you can carry on from any browser you log in from. Already have a world? Load its save.json.';
+    $('wFine').innerHTML = `World seed <input id="wSeed" spellcheck="false"> · saving to the cloud${CLOUD.email ? ' as ' + esc(CLOUD.email) : ''}.`;
+    $('wSeed').value = randSeed();
+    $('wFolder').textContent = 'Load a save.json…'; $('wLocal').textContent = 'Start a new world';
+    $('wFolder').onclick = async () => { if (await cloudLoadFile(true)) w.classList.remove('show'); };
+    $('wLocal').onclick = async () => { w.classList.remove('show'); await newWorld(+$('wSeed').value || randSeed()); cloudOwn(false); };
+    return;
+  }
   $('wSeed').value = randSeed();
   if (!HAS_FSA) { $('wFolder').style.display = 'none'; $('wFine').insertAdjacentHTML('afterbegin', 'This browser can’t write to folders (Edge or Chrome can), so the world will be saved in the browser. '); }
   $('wFolder').onclick = async () => {
@@ -111,8 +130,8 @@ async function boot() {
 }
 setInterval(() => { if (S && RUNNING) saveAll(); }, 45000);
 setInterval(() => { if (S && RUNNING) aiMaybeGossip(); }, 30000);
-document.addEventListener('visibilitychange', () => { if (document.hidden && S && RUNNING) saveAll(); else lastT = 0; });
-addEventListener('beforeunload', () => { if (S && RUNNING) { S.savedAt = Date.now(); try { IDB.set('save', JSON.stringify(serialize())); } catch (e) { } } });
+document.addEventListener('visibilitychange', () => { if (document.hidden && S && RUNNING) saveAll('hidden'); else lastT = 0; });
+addEventListener('beforeunload', () => { if (S && RUNNING && !CLOUD.conflict) { S.savedAt = Date.now(); try { IDB.set('save', JSON.stringify(serialize())); } catch (e) { } } });
 boot();
 </script>
 </body>

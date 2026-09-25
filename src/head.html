@@ -300,13 +300,14 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
 
 <div id="tip"></div>
 <div id="banner"></div>
+<input type="file" id="fLoad" accept=".json,application/json" hidden>
 <div id="toast"></div>
 <div id="fps"></div>
 
 <div class="modal" id="welcome"><div class="card">
   <h1>Seedfall</h1>
   <p>A single seed pod is about to fall onto an unnamed world. One colonist, a vault of sleeping embryos, and a lot of time.</p>
-  <p>The world only grows while it's on screen, so leave it running. Pick a folder and Seedfall will keep <b>save.json</b>, a readable <b>chronicle.md</b> and <b>stats.csv</b> in it.</p>
+  <p id="wText">The world only grows while it's on screen, so leave it running. Pick a folder and Seedfall will keep <b>save.json</b>, a readable <b>chronicle.md</b> and <b>stats.csv</b> in it.</p>
   <div class="acts">
     <button class="btn primary" id="wFolder">Choose a save folder…</button>
     <button class="btn" id="wLocal">Start without a folder</button>
@@ -343,14 +344,14 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
 
 <div class="modal" id="aiset"><div class="card">
   <h2>The Watcher’s voice</h2>
-  <p>With an Anthropic API key, Claude reads what you say to the colonists and works out how they understand it, argue about it and turn it into customs. It can also write the occasional bit of town gossip about your named people. Without a key your words are still heard, just not understood.</p>
+  <p id="aiIntro">With an Anthropic API key, Claude reads what you say to the colonists and works out how they understand it, argue about it and turn it into customs. It can also write the occasional bit of town gossip about your named people. Without a key your words are still heard, just not understood.</p>
   <div class="form">
-    <label>API key<input type="password" id="aiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"></label>
+    <label id="aiKeyRow">API key<input type="password" id="aiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"></label>
     <label>Model<input id="aiModel" list="aiModels" spellcheck="false"><datalist id="aiModels"></datalist></label>
     <label>Town gossip<select id="aiNarr"><option value="off">Off</option><option value="rare">Now and then (about hourly)</option><option value="often">Often (about every 20 min)</option></select></label>
   </div>
   <div class="fine" id="aiStatus"></div>
-  <p class="fine">The key is kept in this browser only, never in save.json or any other file. Get one at console.anthropic.com; a separate key with a low monthly spend limit is a good idea. Each call costs a fraction of a cent with Haiku.</p>
+  <p class="fine" id="aiFine">The key is kept in this browser only, never in save.json or any other file. Get one at console.anthropic.com; a separate key with a low monthly spend limit is a good idea. Each call costs a fraction of a cent with Haiku.</p>
   <div class="acts"><button class="btn primary" id="aiSave">Save</button><button class="btn" id="aiTest">Test</button><button class="btn" id="aiForget">Forget key</button><button class="btn" id="aiClose" style="margin-left:auto">Close</button></div>
 </div></div>
 
