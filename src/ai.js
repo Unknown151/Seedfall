@@ -1,6 +1,6 @@
 /* ============================== the Watcher's voice (Claude API) ============================== */
 // The key lives in this browser's IndexedDB only. It is never written to save.json, chronicle.md or any other file.
-const AI = { key: '', model: 'claude-haiku-4-5-20251001', narr: 'rare', busy: false, calls: 0, day: '', lastNarr: 0, status: '', ok: null };
+const AI = { key: '', model: 'claude-haiku-4-5-20251001', narr: 'rare', tone: 'cosy', busy: false, calls: 0, day: '', lastNarr: 0, status: '', ok: null };
 const AI_MODELS = [['claude-haiku-4-5-20251001', 'Haiku 4.5 · fast and cheap'], ['claude-sonnet-5', 'Sonnet 5 · better writer'], ['claude-opus-5-5', 'Opus 5.5 · the good stuff']];
 const AI_DAY_CAP = 80;
 const NARR_MIN = { off: 0, rare: 60, often: 20 };
@@ -21,8 +21,8 @@ let CULT = { tb: {}, bld: {}, ev: {}, lv: {}, shun: {}, rs: 0, bs: 0 };
 function lever(k) { const x = CULT.lv && CULT.lv[k]; return x && x.w >= .25 ? x.v : null; }
 function leverW(k) { const x = CULT.lv && CULT.lv[k]; return x && x.w >= .25 ? Math.min(1, x.w) : 0; }
 
-async function aiLoad() { const c = await IDB.get('ai'); if (c) for (const k of ['key', 'model', 'narr', 'calls', 'day', 'lastNarr']) if (c[k] != null) AI[k] = c[k]; }
-function aiStore() { return IDB.set('ai', { key: AI.key, model: AI.model, narr: AI.narr, calls: AI.calls, day: AI.day, lastNarr: AI.lastNarr }); }
+async function aiLoad() { const c = await IDB.get('ai'); if (c) for (const k of ['key', 'model', 'narr', 'tone', 'calls', 'day', 'lastNarr']) if (c[k] != null) AI[k] = c[k]; }
+function aiStore() { return IDB.set('ai', { key: AI.key, model: AI.model, narr: AI.narr, tone: AI.tone, calls: AI.calls, day: AI.day, lastNarr: AI.lastNarr }); }
 
 // voice available? In cloud mode the server holds the key, so there's nothing to set up here
 function aiOn() { return CLOUD.on || !!AI.key; }
@@ -65,9 +65,9 @@ function aiLogPush(e) {
   return e;
 }
 async function aiTool(system, user, tool, maxTokens = 1400, kind = 'words', words = null) {
-  const log = { kind, t: Date.now(), yr: yr(), model: AI.model, words, prompt: user, ok: false };
+  const log = { kind, t: Date.now(), yr: yr(), model: AI.model, tone: AI.tone, words, prompt: user, ok: false };
   try {
-    const j = await aiFetch({ max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }], tools: [tool], tool_choice: { type: 'tool', name: tool.name } });
+    const j = await aiFetch({ max_tokens: maxTokens, system: system + '\n' + toneTxt(AI.tone), messages: [{ role: 'user', content: user }], tools: [tool], tool_choice: { type: 'tool', name: tool.name } });
     log.ms = j._ms; log.usage = j.usage || null; log.stop = j.stop_reason || null;
     log.raw = { id: j.id, model: j.model, stop_reason: j.stop_reason, usage: j.usage, content: j.content };
     const tu = (j.content || []).find(c => c.type === 'tool_use');
@@ -89,8 +89,14 @@ async function aiTest() {
 /* ---------- prompts ---------- */
 const AI_SYSTEM = `You write for Seedfall, a cozy, slow, procedural colony simulation that runs on a screen in someone's office.
 The world: every colonist descends from one seed-pod colonist (the Founder) who landed on a pastel alien planet with a vault of frozen embryos and "the Archive" (Earth's knowledge). Mossbacks are gentle grazing beasts, loamhounds are dog-like pets, skimmers are birds, glowcaps and puffwood are the local flora, sunroot is the staple crop, the Pod is the Founder's landing capsule (now a moss-covered monument), and the Makers were a vanished earlier people who planted the forests. The colonists believe in "the Watcher" (the player), who sends omens.
-Tone: warm, dry, gently funny, like a good fantasy chronicle. Short sentences. Keep it PG. No violence, cruelty, deaths of named people, or real-world politics. Always use the real names of the towns and people you are given, and keep their established quirks consistent.
+Tone: warm, dry, gently funny, like a good fantasy chronicle. Short sentences. No wars or battles, and no deaths of named people (the simulation handles births and deaths itself). Always use the real names of the towns and people you are given, and keep their established quirks consistent.
 Chronicle lines: present tense, one or two sentences, at most about 200 characters, plain text, no markdown, no quotation marks around the whole line.`;
+// the player's Tone setting (Voice settings, kept per browser like the key, never in the world)
+const AI_TONE = {
+  cosy: `Content: keep everything family-friendly, in every field you write (names, sayings, quirks, guilty pleasures, gossip, prayers): no sexual content or innuendo, nudity, crude humour, drugs, swearing, cruelty or real-world politics. If the Watcher's words push that way, the colonists misunderstand them innocently and charmingly (e.g. "nudism is the way forward" becomes going barefoot in summer); never repeat or hint at the adult reading.`,
+  cheeky: `Content: the Watcher is an adult and this is their private world, so cheeky is welcome: innuendo, rude jokes, mild swearing, eccentric or risqué customs, and playing along with odd or saucy words in a funny way. Still never write explicit sexual content, anything illegal, real-world hate or harassment, or genuine cruelty; if the words ask for that, the colonists find a harmless, funny reading instead.`
+};
+function toneTxt(t) { return AI_TONE[t] || AI_TONE.cosy; }
 
 function aiWorldBrief() {
   const ts = towns().sort((a, b) => b.pop - a.pop);
@@ -374,7 +380,7 @@ function openAISettings() {
     $('aiFine').textContent = `No key needed in this browser: the server keeps it, and allows ${AI_DAY_CAP} calls a day. Each call costs a fraction of a cent with Haiku.`;
   }
   $('aiKeyRow').style.display = $('aiForget').style.display = CLOUD.on ? 'none' : '';
-  $('aiModel').value = AI.model; $('aiNarr').value = AI.narr;
+  $('aiModel').value = AI.model; $('aiNarr').value = AI.narr; $('aiTone').value = AI.tone;
   renderAIStatus();
   $('aiset').classList.add('show');
 }
@@ -393,7 +399,7 @@ function bindAI() {
     const k = $('aiKey').value.trim();
     if (k && !k.startsWith('••••')) AI.key = k;
     AI.model = $('aiModel').value.trim() || AI_MODELS[0][0];
-    AI.narr = $('aiNarr').value;
+    AI.narr = $('aiNarr').value; AI.tone = $('aiTone').value;
     aiStore(); AI.status = 'Saved.'; renderAIStatus(); openAISettings();
   };
   $('aiTest').onclick = async () => { $('aiSave').onclick(); await aiTest(); };
@@ -426,7 +432,7 @@ function renderVoiceTab() {
     if (e.beats && e.beats.length) h += `<div class="vx-k">Chronicle beats</div><ol>${e.beats.map(b => { const done = b.at <= S.year; return `<li class="${done ? 'done' : 'soon'}"><span>${done ? '✓ Year ' + Math.floor(b.at) : 'Coming in Year ' + Math.floor(b.at)}</span>${esc(b.ic)} ${esc(b.t)}</li>`; }).join('')}</ol>`;
     if (e.input) h += `<details data-vk="i${e.id}"${VOICE_OPEN.has('i' + e.id) ? ' open' : ''}><summary>What Claude returned (JSON)</summary><pre>${esc(JSON.stringify(e.input, null, 2))}</pre><button class="btn" data-copy="i${e.id}">Copy</button></details>`;
     if (e.raw) h += `<details data-vk="r${e.id}"${VOICE_OPEN.has('r' + e.id) ? ' open' : ''}><summary>Full API response</summary><pre>${esc(JSON.stringify(e.raw, null, 2))}</pre><button class="btn" data-copy="r${e.id}">Copy</button></details>`;
-    if (e.prompt) h += `<details data-vk="p${e.id}"${VOICE_OPEN.has('p' + e.id) ? ' open' : ''}><summary>What Claude was told</summary><pre>${esc(AI_SYSTEM + '\n\n' + e.prompt)}</pre><button class="btn" data-copy="p${e.id}">Copy</button></details>`;
+    if (e.prompt) h += `<details data-vk="p${e.id}"${VOICE_OPEN.has('p' + e.id) ? ' open' : ''}><summary>What Claude was told</summary><pre>${esc(AI_SYSTEM + '\n' + toneTxt(e.tone) + '\n\n' + e.prompt)}</pre><button class="btn" data-copy="p${e.id}">Copy</button></details>`;
     h += `</div>`;
   }
   if ((S.aiLog || []).length >= 30) h += `<div class="phint">Only the last 30 exchanges are kept (full prompts and raw responses for the last 10).</div>`;
@@ -434,7 +440,7 @@ function renderVoiceTab() {
 }
 function voiceCopy(key) {
   const e = (S.aiLog || []).find(x => x.id === +key.slice(1)); if (!e) return;
-  const txt = key[0] === 'i' ? JSON.stringify(e.input, null, 2) : key[0] === 'r' ? JSON.stringify(e.raw, null, 2) : AI_SYSTEM + '\n\n' + e.prompt;
+  const txt = key[0] === 'i' ? JSON.stringify(e.input, null, 2) : key[0] === 'r' ? JSON.stringify(e.raw, null, 2) : AI_SYSTEM + '\n' + toneTxt(e.tone) + '\n\n' + e.prompt;
   const done = () => toast('Copied to the clipboard.');
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done)); else fallbackCopy(txt, done);
 }
