@@ -193,18 +193,6 @@ function shadowHull(j, b0, b1) {
   for (const p of Hh) { if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0]; if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; }
   return { pts: Hh, bb: [x0, y0, x1, y1] };
 }
-function clipSq(P, ox, oy, e) {
-  let out = P.map(p => [p[0] + ox, p[1] + oy]);
-  for (let ax = 0; ax < 2; ax++) for (const s of [1, -1]) {
-    const inp = out; out = []; if (!inp.length) return out;
-    for (let k = 0; k < inp.length; k++) {
-      const a = inp[k], b = inp[(k + 1) % inp.length], da = a[ax] * s - e, db = b[ax] * s - e;
-      if (da <= 0) out.push(a);
-      if ((da < 0 && db > 0) || (da > 0 && db < 0)) { const t = da / (da - db); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); }
-    }
-  }
-  return out;
-}
 function castShadows(c, i, x, y, cx, cy) {
   const L = LT, sx = -L.shdx, sy = -L.shdy, zr = surfZ(i), R = Math.min(L.shMax, (CHMAX + 12) * L.shk);
   const xa = clamp(Math.floor(Math.min(x, x + sx * R)) - 1, 0, W - 1), xb = clamp(Math.ceil(Math.max(x, x + sx * R)) + 1, 0, W - 1);
@@ -221,17 +209,18 @@ function castShadows(c, i, x, y, cx, cy) {
     if (b0 === 0) { hs = SHC[j]; if (!hs || hs.k !== L.key || hs.b1 !== b1) { hs = shadowHull(j, 0, b1); hs.k = L.key; hs.b1 = b1; SHC[j] = hs; } }
     else hs = shadowHull(j, b0, b1);
     const bb = hs.bb;
-    if (bb[2] + ox < -.52 || bb[0] + ox > .52 || bb[3] + oy < -.52 || bb[1] + oy > .52) continue;
-    const inside = bb[0] + ox > -.515 && bb[2] + ox < .515 && bb[1] + oy > -.515 && bb[3] + oy < .515;
-    const poly2 = inside ? hs.pts.map(p => [p[0] + ox, p[1] + oy]) : clipSq(hs.pts, ox, oy, .515);
-    if (poly2.length < 3) continue;
-    if (!any) { c.beginPath(); any = true; }
+    if (bb[2] + ox < -.55 || bb[0] + ox > .55 || bb[3] + oy < -.55 || bb[1] + oy > .55) continue;
+    const poly2 = hs.pts.map(p => [p[0] + ox, p[1] + oy]); // clipped to the tile's diamond below
+    if (!any) { c.save(); tileClip(c, cx, cy); c.beginPath(); any = true; }
     let p = pt(cx, cy, poly2[0][0], poly2[0][1], 0); c.moveTo(p[0], p[1]);
     for (let k = 1; k < poly2.length; k++) { p = pt(cx, cy, poly2[k][0], poly2[k][1], 0); c.lineTo(p[0], p[1]); }
     c.closePath();
   }
-  if (any) { c.fillStyle = L.shCol; c.fill('nonzero'); }
+  if (any) { c.fillStyle = L.shCol; c.fill('nonzero'); c.restore(); }
 }
+// Exactly the (slightly oversized) diamond drawTile fills with ground. Clipping the shadow to the same shape means
+// the next tile's ground and its shadow always cover the same pixels, so tile edges don't show through as a grid.
+function tileClip(c, cx, cy) { c.beginPath(); c.moveTo(cx, cy - 8.45); c.lineTo(cx + 16.6, cy); c.lineTo(cx, cy + 8.45); c.lineTo(cx - 16.6, cy); c.closePath(); c.clip(); }
 
 /* ---------- glow ---------- */
 const GLOWS = new Map();
