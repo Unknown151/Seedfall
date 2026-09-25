@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seedfall</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2386c9e0'/%3E%3Cpath d='M8 44 L32 56 L56 44 L32 32Z' fill='%2394d4a6'/%3E%3Cellipse cx='32' cy='36' rx='12' ry='6' fill='%23f2f3f6' transform='rotate(-18 32 36)'/%3E%3Crect x='28' y='29' width='3' height='12' fill='%23e5874f' transform='rotate(-18 32 36)'/%3E%3C/svg%3E">
+<style>
+:root{
+  --ink:#2b2833; --ink2:#6d6676; --ink3:#9a93a3;
+  --glass:rgba(255,251,245,.84); --glass2:rgba(255,251,245,.6);
+  --line:rgba(70,45,35,.12); --accent:#d9774b; --teal:#2f8a82; --good:#4f9d69;
+  --shadow:0 10px 40px rgba(60,40,60,.18), 0 2px 8px rgba(60,40,60,.08);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#cfe3e6;
+  font-family:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;color:var(--ink);
+  -webkit-font-smoothing:antialiased;user-select:none}
+#view{position:fixed;inset:0;width:100vw;height:100vh;display:block;touch-action:none}
+body.nocursor, body.nocursor *{cursor:none!important}
+body.targeting #view{cursor:crosshair}
+button{font:inherit;color:inherit;cursor:pointer}
+
+/* HUD */
+#hud{position:fixed;left:16px;top:14px;pointer-events:none;transition:opacity .6s,background 2s;min-width:250px;
+  padding:11px 15px 12px;border-radius:14px;background:rgba(255,251,245,.8);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 4px 18px rgba(60,40,60,.12),0 0 0 1px rgba(70,45,35,.05)}
+#hudName{font-size:13px;letter-spacing:.3em;text-transform:uppercase;font-weight:700;color:rgba(43,40,51,.92)}
+#hudLine{font-size:12.5px;color:rgba(43,40,51,.8);margin-top:3px;letter-spacing:.01em;font-weight:500}
+#hudPause{display:none;margin-top:6px;font-size:11px;letter-spacing:.2em;color:var(--accent);font-weight:700}
+body.paused #hudPause{display:block}
+body.panel #hud{opacity:1}
+
+/* dock */
+#dock{position:fixed;left:50%;bottom:18px;transform:translate(-50%,12px);display:flex;gap:6px;padding:7px;
+  background:var(--glass);backdrop-filter:blur(10px);border-radius:16px;box-shadow:var(--shadow);
+  opacity:0;pointer-events:none;transition:opacity .35s,transform .35s}
+body.active #dock, #dock:hover{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
+.tool{position:relative;width:46px;height:46px;border:0;border-radius:11px;background:transparent;
+  display:flex;align-items:center;justify-content:center;font-size:21px;overflow:hidden}
+.tool:hover{background:rgba(217,119,75,.12)}
+.tool.sel{background:rgba(217,119,75,.22);box-shadow:inset 0 0 0 2px var(--accent)}
+.tool .cd{position:absolute;inset:0;background:rgba(255,251,245,.78);transform-origin:bottom;pointer-events:none}
+.tool .k{position:absolute;right:4px;bottom:2px;font-size:9px;color:var(--ink3);font-weight:600}
+.tool.off{filter:grayscale(1);opacity:.55}
+.dsep{width:1px;background:var(--line);margin:6px 3px}
+#tip2{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:rgba(43,40,51,.86);color:#fff;
+  font-size:12px;padding:6px 10px;border-radius:8px;pointer-events:none;opacity:0;transition:opacity .2s;white-space:nowrap}
+
+/* panel */
+#panel{position:fixed;top:0;right:0;bottom:0;width:390px;background:var(--glass);backdrop-filter:blur(14px);
+  box-shadow:var(--shadow);transform:translateX(105%);transition:transform .45s cubic-bezier(.2,.8,.2,1);
+  display:flex;flex-direction:column;z-index:5;user-select:text}
+body.panel #panel{transform:none}
+#pHead{padding:22px 22px 12px}
+#pName{font-family:Georgia,"Palatino Linotype",serif;font-size:26px;font-weight:600;letter-spacing:.01em}
+#pSub{font-size:13px;color:var(--ink2);margin-top:2px}
+#pClose{position:absolute;right:14px;top:14px;border:0;background:transparent;font-size:18px;color:var(--ink3);width:30px;height:30px;border-radius:8px}
+#pClose:hover{background:rgba(0,0,0,.06)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:0 22px}
+.stat{background:rgba(255,255,255,.55);border-radius:10px;padding:8px 9px}
+.stat b{display:block;font-size:17px;font-variant-numeric:tabular-nums;font-weight:650}
+.stat span{font-size:10.5px;color:var(--ink2);text-transform:uppercase;letter-spacing:.06em}
+#spark{display:block;margin:10px 22px 0;width:346px;height:46px}
+#research{margin:10px 22px 0;font-size:12px;color:var(--ink2)}
+#research .bar{height:5px;border-radius:3px;background:rgba(0,0,0,.07);margin-top:5px;overflow:hidden}
+#research .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--teal),#5fc0b2);border-radius:3px}
+.tabs{display:flex;gap:4px;padding:14px 22px 8px;border-bottom:1px solid var(--line)}
+.tab{border:0;background:transparent;padding:6px 8px;border-radius:8px;font-size:12.5px;color:var(--ink2);font-weight:600}
+.tab.on{background:rgba(43,40,51,.08);color:var(--ink)}
+#pBody{flex:1;overflow-y:auto;padding:8px 14px 16px 22px;scrollbar-width:thin}
+.ev{display:grid;grid-template-columns:52px 22px 1fr;gap:4px;padding:7px 0;border-bottom:1px solid rgba(70,45,35,.06);font-size:13px;line-height:1.38;cursor:default}
+.ev.loc{cursor:pointer}
+.ev.loc:hover{background:rgba(217,119,75,.06)}
+.ev .y{font-size:11px;color:var(--ink3);font-variant-numeric:tabular-nums;padding-top:2px}
+.ev .i{font-size:14px}
+.ev.major{font-weight:600}
+.ev.era{grid-template-columns:1fr;padding:14px 0 8px;font-family:Georgia,serif;font-size:15px;color:var(--accent);border-bottom:1px solid var(--line)}
+.town{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(70,45,35,.06);font-size:13px;cursor:pointer}
+.town:hover{color:var(--accent)}
+.town small{color:var(--ink3)}
+.tcard{padding:10px 0 12px;border-bottom:1px solid rgba(70,45,35,.07);font-size:13px}
+.tcard .th{display:flex;justify-content:space-between;cursor:pointer}
+.tcard .th:hover b{color:var(--accent)}
+.tcard .th small{color:var(--ink3)}
+.tcard.valley{background:rgba(255,255,255,.4);border-radius:12px;padding:10px 11px 11px;margin:6px 0 4px;border:0}
+.tcard.valley .th{cursor:default}
+.sect{display:flex;height:7px;border-radius:4px;overflow:hidden;margin:8px 0 3px;background:rgba(43,40,51,.06)}
+.sect.thin{height:5px;margin-top:7px}
+.sect i{display:block;height:100%}
+.slab{font-size:11px;color:var(--ink2);line-height:1.4}
+.known{font-size:11.5px;color:#9a6f28;margin-top:3px;font-style:italic}
+.stock{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:8px}
+.stock div{background:rgba(255,255,255,.55);border-radius:8px;padding:5px 6px 5px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
+.stock div b{font-weight:650}
+.stock div span{font-size:11px}
+.stock div em{display:block;font-style:normal;font-size:10px;color:var(--ink3);margin-top:1px}
+.stock div i{display:block;height:3px;border-radius:2px;background:rgba(43,40,51,.08);margin-top:4px;overflow:hidden}
+.stock div i u{display:block;height:100%}
+.stock div.short em{color:var(--accent);font-weight:600}
+.stock div.off{opacity:.38}
+.person{padding:8px 0;border-bottom:1px solid rgba(70,45,35,.06);font-size:13px}
+.person small{display:block;color:var(--ink2);font-size:11.5px}
+#pFoot{border-top:1px solid var(--line);padding:12px 22px 16px;font-size:12px;color:var(--ink2);display:flex;flex-direction:column;gap:8px}
+.row{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.btn{border:1px solid var(--line);background:rgba(255,255,255,.7);padding:6px 11px;border-radius:8px;font-size:12px;font-weight:600}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.05)}
+select{font:inherit;font-size:12px;padding:4px 6px;border-radius:7px;border:1px solid var(--line);background:rgba(255,255,255,.8)}
+#fstat{display:flex;align-items:center;gap:6px}
+#fstat .dot{width:8px;height:8px;border-radius:50%;background:#c9b9a8}
+#fstat.ok .dot{background:var(--good)}
+#fstat.warn .dot{background:var(--accent)}
+
+/* tooltip */
+#tip{position:fixed;pointer-events:none;background:rgba(43,40,51,.88);color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;
+  line-height:1.4;max-width:280px;opacity:0;transition:opacity .15s;z-index:6}
+#tip b{font-weight:650}
+#tip small{color:rgba(255,255,255,.7)}
+#tip.wide{width:330px;max-width:330px;padding:13px 15px;border-radius:12px;background:rgba(38,35,46,.94)}
+.pc-h b{display:block;font-size:14.5px;font-weight:650}
+.pc-h span{font-size:11.5px;opacity:.72}
+.pc-lin{font-size:11.5px;color:#9fe0ae;margin-top:5px}
+.pc-tag{display:inline-block;margin:8px 0 7px;font-size:10.5px;padding:2px 9px;border-radius:10px;background:rgba(255,255,255,.14);font-weight:600}
+.pc-st{display:grid;grid-template-columns:66px 1fr 16px;gap:4px 7px;align-items:center;font-size:10.5px;margin:2px 0 9px}
+.pc-st i{height:5px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden;display:block}
+.pc-st i b{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#5fd0c9,#f2b84b)}
+.pc-st em{font-style:normal;opacity:.65;text-align:right;font-variant-numeric:tabular-nums}
+.pc-q{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+.pc-q div:last-child{grid-column:1/-1}
+.pc-q div,.pc-rel div,.pc-deeds{font-size:11.5px;line-height:1.35}
+.pc-q span,.pc-rel span,.pc-deeds span{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;opacity:.55;margin-bottom:1px}
+.pc-rel{border-top:1px solid rgba(255,255,255,.14);margin-top:9px;padding-top:7px;display:flex;flex-direction:column;gap:4px}
+.pc-deeds{border-top:1px solid rgba(255,255,255,.14);margin-top:8px;padding-top:7px}
+.pc-foot{font-size:11px;opacity:.6;margin-top:7px;font-style:italic}
+.pd{background:rgba(255,255,255,.55);border-radius:12px;padding:14px 15px;margin:4px 0 10px;font-size:13px}
+.pd .pc-h b{font-family:Georgia,serif;font-size:20px}
+.pd .pc-lin{color:#3f8f55}
+.pd .pc-tag,.pd .pc-st i{background:rgba(43,40,51,.08)}
+.pd .pc-rel,.pd .pc-deeds{border-top-color:var(--line)}
+.pd .pc-q div,.pd .pc-rel div,.pd .pc-deeds{font-size:12.5px}
+.pc a{color:var(--accent);cursor:pointer;font-weight:600}
+.pc a:hover{text-decoration:underline}
+.pback{display:flex;justify-content:space-between;padding:8px 0 4px;font-size:12.5px;font-weight:600}
+.pback a{color:var(--accent);cursor:pointer}
+.phint{font-size:11.5px;color:var(--ink3);padding:6px 0 4px;line-height:1.45}
+.pgrp{font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 4px;font-weight:600}
+.pgrp small{font-weight:400}
+.prow{display:flex;justify-content:space-between;gap:8px;padding:6px 6px;margin:0 -6px;border-radius:7px;font-size:13px;cursor:pointer}
+.prow:hover{background:rgba(217,119,75,.09)}
+.prow .pm{color:var(--ink3);font-size:11.5px;white-space:nowrap}
+
+/* overlays */
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(215,232,234,.35);backdrop-filter:blur(3px);z-index:10}
+.modal.show{display:flex}
+.card{background:var(--glass);backdrop-filter:blur(16px);border-radius:20px;box-shadow:var(--shadow);padding:34px 38px;max-width:520px;width:calc(100% - 40px)}
+.card h1{font-family:Georgia,"Palatino Linotype",serif;font-weight:600;font-size:42px;margin:0;letter-spacing:.02em}
+.card h2{font-family:Georgia,serif;font-weight:600;font-size:22px;margin:0 0 10px}
+.card p{color:var(--ink2);font-size:14px;line-height:1.55;margin:10px 0}
+.card .acts{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
+.card .acts .btn{padding:10px 16px;font-size:13.5px}
+.card .fine{font-size:12px;color:var(--ink3);margin-top:16px}
+.card input{font:inherit;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:3px 6px;width:110px;background:rgba(255,255,255,.7)}
+kbd{font-family:inherit;font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;background:#fff}
+.keys{display:grid;grid-template-columns:110px 1fr;gap:7px 12px;font-size:13px;color:var(--ink2);margin-top:12px}
+#banner{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:rgba(43,40,51,.88);color:#fff;font-size:12.5px;
+  padding:8px 14px;border-radius:20px;display:none;z-index:8;cursor:pointer;box-shadow:var(--shadow)}
+#banner.show{display:block}
+#toast{position:fixed;left:24px;bottom:22px;font-size:12px;color:rgba(43,40,51,.6);pointer-events:none;transition:opacity 1s}
+.card textarea{width:100%;font:inherit;font-size:15px;line-height:1.45;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:rgba(255,255,255,.8);resize:vertical;user-select:text}
+.card textarea:focus,.form input:focus,.form select:focus{outline:2px solid rgba(217,119,75,.45);border-color:transparent}
+.form{display:flex;flex-direction:column;gap:10px;margin:14px 0 6px}
+.form label{display:grid;grid-template-columns:96px 1fr;align-items:center;gap:10px;font-size:13px;color:var(--ink2)}
+.form input,.form select{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:rgba(255,255,255,.8);width:100%}
+.vx-top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0 6px}
+.vx-top b{display:block;font-size:13px}.vx-top small{display:block;font-size:11px;color:var(--ink3);margin-top:2px;line-height:1.4}
+.vx{background:rgba(255,255,255,.55);border-radius:12px;padding:12px 13px;margin:10px 0;font-size:12.5px;line-height:1.45}
+.vx.bad{background:rgba(217,119,75,.08)}
+.vx-h{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}.vx-h b{font-size:13px}.vx-h span{font-size:10.5px;color:var(--ink3)}
+.vx q{display:block;font-family:Georgia,serif;font-style:italic;font-size:14px;margin:4px 0 8px;color:var(--ink)}
+.vx-err{color:#b85a33;font-size:12px;margin:4px 0}
+.vx-t{margin:4px 0 2px}.vx-s{color:var(--ink2)}.vx-s.dim{color:var(--ink3);font-size:11.5px;margin-top:3px}
+.vx-k{font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:10px 0 3px;font-weight:600}
+.vx ul,.vx ol{margin:0;padding-left:17px}.vx li{margin:2px 0}
+.vx ol li span{display:block;font-size:10.5px;color:var(--ink3)}.vx ol li.done span{color:var(--good)}.vx ol li.soon{color:var(--ink2)}
+.vx details{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+.vx summary{cursor:pointer;font-size:11.5px;font-weight:600;color:var(--accent)}
+.vx pre{font:11px/1.45 Consolas,"Cascadia Mono",monospace;background:rgba(43,40,51,.06);border-radius:8px;padding:8px 9px;margin:6px 0;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;user-select:text}
+.doc q{display:block;font-family:Georgia,serif;font-style:italic;margin:3px 0 4px;color:var(--ink)}
+.doc .dm{color:var(--ink3);margin-top:3px}
+#fps{position:fixed;left:8px;bottom:6px;font:11px monospace;color:#333;display:none}
+body.night #hud{background:rgba(32,30,44,.74);box-shadow:0 4px 18px rgba(0,0,0,.28),0 0 0 1px rgba(255,255,255,.06)}
+/* reverence */
+#hudRev{position:relative;margin-top:8px;font-size:12px;color:rgba(43,40,51,.78)}
+#hudRev .rv-l b{font-weight:700;color:rgba(43,40,51,.95);font-variant-numeric:tabular-nums}
+#hudRev em{font-style:normal;opacity:.7;margin-left:1px}
+#hudRev small{opacity:.8;margin-left:6px;font-size:11px}
+#hudRev i{display:block;height:4px;border-radius:2px;background:rgba(43,40,51,.12);margin-top:5px;overflow:hidden}
+#hudRev i b{display:block;height:100%;width:0;border-radius:2px;background:linear-gradient(90deg,#e9b44c,#ffd98a);transition:width .6s}
+#hudRev.full i b{background:linear-gradient(90deg,#ffd98a,#fff1c4);box-shadow:0 0 8px #ffd98a}
+#hudRev.full .rv-l b{color:#c98a1e}
+body.night #hudRev{color:rgba(255,246,232,.8)}body.night #hudRev .rv-l b{color:rgba(255,246,232,.96)}
+body.night #hudRev i{background:rgba(255,246,232,.15)}
+.revpop{position:absolute;left:0;top:-2px;white-space:nowrap;font-size:12px;font-weight:650;color:#c98a1e;animation:revpop 2.6s ease-out forwards;text-shadow:0 1px 2px rgba(255,255,255,.8)}
+body.night .revpop{color:#ffd98a;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+@keyframes revpop{0%{opacity:0;transform:translateY(4px)}12%{opacity:1;transform:translateY(-10px)}80%{opacity:1}100%{opacity:0;transform:translateY(-22px)}}
+/* prayers */
+#prayers{position:fixed;left:16px;top:122px;width:300px;display:flex;flex-direction:column;gap:8px;z-index:4}
+.pray{background:rgba(255,251,245,.8);backdrop-filter:blur(10px);border-radius:14px;padding:10px 12px 9px;box-shadow:0 6px 24px rgba(60,40,60,.14);font-size:12.5px;animation:prin .6s ease-out;position:relative;overflow:hidden}
+#prayers{transition:opacity .8s}
+body:not(.active):not(.panel) #prayers:not(:hover){opacity:.62}
+@keyframes prin{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+.pray.done,.pray.gone{animation:prout 6s ease-in forwards}
+@keyframes prout{0%,70%{opacity:1}100%{opacity:0}}
+.pr-h{display:flex;align-items:center;gap:8px}
+.pr-h b{display:block;font-size:12.5px;cursor:pointer}.pr-h b:hover{color:var(--accent)}
+.pr-h small{display:block;font-size:11px;color:var(--ink3)}
+.pr-ic{font-size:18px;width:26px;text-align:center}
+.pr-x{margin-left:auto;border:0;background:transparent;color:var(--ink3);font-size:15px;border-radius:6px;width:22px;height:22px;align-self:flex-start}
+.pr-x:hover{background:rgba(0,0,0,.06)}
+.pray q{display:block;font-family:Georgia,serif;font-style:italic;font-size:13px;line-height:1.4;margin:6px 0 8px;color:var(--ink)}
+.pr-f{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pr-go{border:0;background:var(--accent);color:#fff;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600}
+.pr-go:hover{filter:brightness(1.06)}
+.pr-go.dim{background:rgba(43,40,51,.18);color:var(--ink2)}
+.pr-rw{font-size:11.5px;color:#b07a18;font-weight:600}
+.pr-ok{font-size:12px;font-weight:600;color:var(--good)}.pr-ok.dim{color:var(--ink3);font-weight:500}
+.pr-t{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(43,40,51,.06)}
+.pr-t b{display:block;height:100%;background:rgba(217,119,75,.45)}
+body.night .pray{background:rgba(40,38,52,.78);color:#f3eee6;box-shadow:0 6px 24px rgba(0,0,0,.3)}
+body.night .pray q{color:#f7f2ea}
+body.night .pr-h small{color:rgba(243,238,230,.6)}
+.ansq{font-family:Georgia,serif;font-style:italic;font-size:15px!important;color:var(--ink)!important}
+body.night #hudName{color:rgba(255,246,232,.95)}
+body.night #hudLine{color:rgba(255,246,232,.8)}
+body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
+#hud,#hudName,#hudLine{transition:color 2s}
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="hud"><div id="hudName"></div><div id="hudLine"></div>
+  <div id="hudRev" title="Reverence: the colonists' faith in the Watcher. It gathers while the world is on screen; nudges and words cost it."><span class="rv-l">✨ <b id="revNum">0</b><em>/<span id="revMax">0</span></em> <small id="revRate"></small></span><i><b id="revBar"></b></i></div>
+  <div id="hudPause">PAUSED</div></div>
+<div id="prayers"></div>
+
+<div id="dock">
+  <button class="tool" data-tool="rain"><span>🌧️</span><i class="cd"></i><span class="k">1</span></button>
+  <button class="tool" data-tool="drop"><span>📦</span><i class="cd"></i><span class="k">2</span></button>
+  <button class="tool" data-tool="inspire"><span>✨</span><i class="cd"></i><span class="k">3</span></button>
+  <button class="tool" data-tool="starfall"><span>☄️</span><i class="cd"></i><span class="k">4</span></button>
+  <button class="tool" data-tool="bloom"><span>🌱</span><i class="cd"></i><span class="k">5</span></button>
+  <button class="tool" data-tool="speak"><span>🗣️</span><i class="cd"></i><span class="k">6</span></button>
+  <div class="dsep"></div>
+  <button class="tool" id="dockChron" title="Chronicle (C)"><span>📜</span><span class="k">C</span></button>
+</div>
+<div id="tip2"></div>
+
+<aside id="panel">
+  <button id="pClose" title="Close (C)">✕</button>
+  <div id="pHead"><div id="pName">—</div><div id="pSub"></div></div>
+  <div class="stats">
+    <div class="stat"><b id="sPop">0</b><span>People</span></div>
+    <div class="stat"><b id="sTowns">0</b><span>Towns</span></div>
+    <div class="stat"><b id="sTech">0</b><span>Ideas</span></div>
+    <div class="stat"><b id="sBld">0</b><span>Buildings</span></div>
+  </div>
+  <canvas id="spark" width="692" height="92"></canvas>
+  <div id="research"></div>
+  <div class="tabs">
+    <button class="tab on" data-tab="chron">Chronicle</button>
+    <button class="tab" data-tab="towns">Towns</button>
+    <button class="tab" data-tab="people">People</button>
+    <button class="tab" data-tab="lore">Lore</button>
+    <button class="tab" data-tab="voice">Voice</button>
+  </div>
+  <div id="pBody"></div>
+  <div id="pFoot">
+    <div class="row"><div id="fstat"><span class="dot"></span><span id="ftext">Saving in this browser only</span></div><button class="btn" id="bFolder">Connect folder</button></div>
+    <div class="row"><span>Pace</span>
+      <select id="pace">
+        <option value="relaxed">Relaxed · 1 year / 5 min</option>
+        <option value="normal">Normal · 1 year / 3 min</option>
+        <option value="brisk">Brisk · 1 year / 1 min</option>
+        <option value="preview">Preview · 1 year / 4 s</option>
+      </select></div>
+    <div class="row"><span>Sky</span>
+      <select id="optSky">
+        <option value="hour">Day and night · 1 hour</option>
+        <option value="fast">Day and night · 20 min</option>
+        <option value="real">Real sun over Horsens</option>
+        <option value="off">Always day</option>
+      </select></div>
+    <div class="row" style="justify-content:flex-start;gap:14px"><label><input type="checkbox" id="optCap" checked> Captions</label><label><input type="checkbox" id="optWx" checked> Weather</label><label><input type="checkbox" id="optSh" checked> Shadows</label></div>
+    <div class="row" style="justify-content:flex-start;gap:6px"><button class="btn" id="bVoice">🗣️ Voice…</button><button class="btn" id="bHelp">Help</button><button class="btn" id="bNew" style="margin-left:auto">New world…</button></div>
+  </div>
+</aside>
+
+<div id="tip"></div>
+<div id="banner"></div>
+<div id="toast"></div>
+<div id="fps"></div>
+
+<div class="modal" id="welcome"><div class="card">
+  <h1>Seedfall</h1>
+  <p>A single seed pod is about to fall onto an unnamed world. One colonist, a vault of sleeping embryos, and a lot of time.</p>
+  <p>The world only grows while it's on screen, so leave it running. Pick a folder and Seedfall will keep <b>save.json</b>, a readable <b>chronicle.md</b> and <b>stats.csv</b> in it.</p>
+  <div class="acts">
+    <button class="btn primary" id="wFolder">Choose a save folder…</button>
+    <button class="btn" id="wLocal">Start without a folder</button>
+  </div>
+  <div class="fine" id="wFine">World seed <input id="wSeed" spellcheck="false"> · you can connect a folder later from the chronicle panel (<kbd>C</kbd>).</div>
+</div></div>
+
+<div class="modal" id="help"><div class="card">
+  <h2>How to watch a world</h2>
+  <p>Seedfall runs itself. Leave it on a screen and check in now and then. The camera wanders on its own; drag or scroll to look around and it drifts back after a while.</p>
+  <div class="keys">
+    <span><kbd>C</kbd></span><span>Chronicle, towns, people, lore</span>
+    <span><kbd>1</kbd>–<kbd>5</kbd></span><span>Nudges: rain, supply pod, inspire, starfall, bloom. Then click the world. Each costs ✨ Reverence, which gathers while the world is on screen.</span>
+    <span>🕯️</span><span>Prayers: now and then someone asks the Watcher for something. Answer from the card; grateful people give back more Reverence than it cost. Ignoring them is fine too.</span>
+    <span>⛵</span><span>Fishing boats, ferries, harbours with ships trading along the coast, and later planes flying between airfields. Some of it takes a few eras to show up.</span>
+    <span>🪨</span><span>Towns build from what their land gives: timber by the woods, stone under the crags, brick by the river. C › Towns shows their stores and what they are known for.</span>
+    <span><kbd>6</kbd></span><span>Speak to your people. With a voice key (Voice… in the panel) they actually try to understand you, and your words can reshape how they build, grow, light their nights and even the weather.</span>
+    <span><kbd>F</kbd></span><span>Fullscreen</span>
+    <span><kbd>Space</kbd></span><span>Pause / resume</span>
+    <span><kbd>Home</kbd></span><span>Hand the camera back</span>
+    <span><kbd>Esc</kbd></span><span>Cancel / close</span>
+  </div>
+  <p class="fine">Day and night, weather and shadows are set under Sky in the chronicle panel. The world pauses whenever this tab isn't visible (minimised, other tab, PC locked) and picks up where it left off. Festivals, new eras, shrines and answered prayers all add to Reverence.</p>
+  <div class="acts"><button class="btn primary" id="hClose">Got it</button></div>
+</div></div>
+
+<div class="modal" id="speak"><div class="card">
+  <h2>Speak to your people</h2>
+  <p>They will hear it on the wind. They will argue about it for centuries. They will probably misunderstand it.</p>
+  <textarea id="spkText" maxlength="280" rows="3" placeholder="Be kind to the mossbacks."></textarea>
+  <div class="fine" id="spkMode"></div>
+  <div class="acts"><button class="btn primary" id="spkGo">Speak</button><button class="btn" id="spkCancel">Cancel</button><button class="btn" id="spkSettings" style="margin-left:auto">Voice settings…</button></div>
+</div></div>
+
+<div class="modal" id="aiset"><div class="card">
+  <h2>The Watcher’s voice</h2>
+  <p>With an Anthropic API key, Claude reads what you say to the colonists and works out how they understand it, argue about it and turn it into customs. It can also write the occasional bit of town gossip about your named people. Without a key your words are still heard, just not understood.</p>
+  <div class="form">
+    <label>API key<input type="password" id="aiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"></label>
+    <label>Model<input id="aiModel" list="aiModels" spellcheck="false"><datalist id="aiModels"></datalist></label>
+    <label>Town gossip<select id="aiNarr"><option value="off">Off</option><option value="rare">Now and then (about hourly)</option><option value="often">Often (about every 20 min)</option></select></label>
+  </div>
+  <div class="fine" id="aiStatus"></div>
+  <p class="fine">The key is kept in this browser only, never in save.json or any other file. Get one at console.anthropic.com; a separate key with a low monthly spend limit is a good idea. Each call costs a fraction of a cent with Haiku.</p>
+  <div class="acts"><button class="btn primary" id="aiSave">Save</button><button class="btn" id="aiTest">Test</button><button class="btn" id="aiForget">Forget key</button><button class="btn" id="aiClose" style="margin-left:auto">Close</button></div>
+</div></div>
+
+<div class="modal" id="answer"><div class="card">
+  <h2 id="ansTitle">Answer</h2>
+  <p id="ansQ" class="ansq"></p>
+  <textarea id="ansText" maxlength="200" rows="3"></textarea>
+  <div class="fine" id="ansMode"></div>
+  <div class="acts"><button class="btn primary" id="ansGo">Answer</button><button class="btn" id="ansCancel">Not now</button></div>
+</div></div>
+
+<div class="modal" id="confirm"><div class="card">
+  <h2 id="cTitle">Start a new world?</h2>
+  <p id="cText"></p>
+  <div class="acts"><button class="btn primary" id="cYes">Yes</button><button class="btn" id="cNo">Cancel</button></div>
+</div></div>
+
+<script>

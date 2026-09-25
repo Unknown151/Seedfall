@@ -1,0 +1,29 @@
+// Cloudflare Worker for seedfall.rsvn.dk. Deployed by Workers Builds on every push to main.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "seedfall",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-09-01",
+
+  // Only reachable through the custom domain, where Cloudflare Access asks you to log in.
+  // (No workers.dev or preview URLs: those would skip the login.)
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "seedfall.rsvn.dk", "custom_domain": true }],
+
+  // The game itself. `node build.mjs --public` writes public/index.html; the Worker only runs for /api/*
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+
+  // Cloud saves. Create the namespace once (dashboard: Storage & Databases > KV > Create, name it
+  // seedfall-saves) and paste its ID here.
+  "kv_namespaces": [{ "binding": "SAVES", "id": "PASTE_KV_NAMESPACE_ID" }],
+
+  // From Zero Trust > Access > Applications > your app > Additional settings. Not secret.
+  "vars": {
+    "TEAM_DOMAIN": "https://PASTE-TEAM-NAME.cloudflareaccess.com",
+    "POLICY_AUD": "PASTE_APPLICATION_AUD_TAG"
+  },
+  // ANTHROPIC_API_KEY is a secret: Worker > Settings > Variables and Secrets > Add > Secret.
+
+  "observability": { "enabled": true }
+}

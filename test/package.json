@@ -1,0 +1,13 @@
+{
+  "name": "seedfall-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "quick": "node hover.mjs && node walk2.mjs",
+    "soak": "node soak.mjs",
+    "pace": "node pace.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.47.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "seedfall",
+  "private": true,
+  "type": "module",
+  "description": "An ambient, idle, isometric civilisation sim in a single HTML file.",
+  "scripts": {
+    "build": "node build.mjs",
+    "dist": "node build.mjs --dist",
+    "public": "node build.mjs --public",
+    "dev": "node build.mjs --public && wrangler dev --var DEV_USER:you@localhost",
+    "deploy": "node build.mjs --public && wrangler deploy",
+    "serve": "npx --yes http-server -p 8765 -c-1 ."
+  },
+  "devDependencies": {
+    "wrangler": "^4.40.0"
+  }
+}

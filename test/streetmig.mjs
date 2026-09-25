@@ -1,0 +1,23 @@
+import { launch, ROOT, HTTP } from './env.mjs';
+const b = await launch();
+const ctx = await b.newContext({viewport:{width:1400,height:900}});
+const p = await ctx.newPage();
+const errs=[]; p.on('pageerror', e=>errs.push('PAGEERR '+e.message+' '+(e.stack||'').split('\n').slice(0,3).join(' | ')));
+await p.goto(HTTP+'dist/Seedfall/seedfall.html?seed=4242&fresh&nointro');
+await p.waitForTimeout(1500);
+const before = await p.evaluate(()=>{ SF.ff(700); const S=SF.state(); return { y:S.year|0, houses:Object.values(S.B).filter(B=>B.type==='house').length, road:M.road.reduce((a,v)=>a+(v?1:0),0), hasPlan: !!M.plan }; });
+await p.evaluate(()=>SF.save()); await p.waitForTimeout(2000);
+console.log('old build', JSON.stringify(before));
+await p.goto(HTTP+'seedfall.html');
+await p.waitForTimeout(4000);
+const after = await p.evaluate(()=>{ const S=SF.state(); let plan=0; for (let i=0;i<M.plan.length;i++) if (M.plan[i]) plan++;
+  // how many existing houses face a planned street, and are towns still on the old 4-grid?
+  const hs=Object.values(S.B).filter(B=>B.type==='house'); const fr=hs.filter(B=>fronts(B.x,B.y)).length;
+  return { y:S.year|0, houses:hs.length, plan, fronting:fr, grids:towns().map(T=>T.grid&&T.grid.sx+'x'+T.grid.sy).join(',') }; });
+console.log('new build load', JSON.stringify(after));
+const later = await p.evaluate(()=>{ SF.ff(300); const S=SF.state(); return { y:S.year|0, houses:Object.values(S.B).filter(B=>B.type==='house').length, pop:Math.round(totalPop()), dbg:JSON.stringify(DBG) }; });
+console.log('after 300y', JSON.stringify(later));
+await p.evaluate(()=>{ const T=biggestTown(); focusOn(T.x,T.y,1,999); CAM.tz=1.8; CAM.x=CAM.tx; CAM.y=CAM.ty; CAM.z=CAM.tz; CAM.manualUntil=DYN.t+999; });
+await p.waitForTimeout(4000); await p.screenshot({path:'streetmig.png'});
+console.log('ERR', errs.join('\n')||'none');
+await b.close();
