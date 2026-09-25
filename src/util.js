@@ -61,11 +61,15 @@ function makeNoise(seed) {
 const _cc = new Map();
 function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
 function toHex(r, g, b) { return '#' + ((1 << 24) | (clamp(r | 0, 0, 255) << 16) | (clamp(g | 0, 0, 255) << 8) | clamp(b | 0, 0, 255)).toString(16).slice(1); }
+// Every lit surface goes through here. The palette is pastel by design; VIVID pushes colours away from grey
+// and bright tops only lift halfway to white, so the world reads crisp instead of chalky.
+const VIVID = 1.24;
 function shade(hex, f) {
   const k = hex + f; let v = _cc.get(k); if (v) return v;
-  const [r, g, b] = hexToRgb(hex);
+  let [r, g, b] = hexToRgb(hex);
+  const l = .299 * r + .587 * g + .114 * b; r = l + (r - l) * VIVID; g = l + (g - l) * VIVID; b = l + (b - l) * VIVID;
   if (f <= 1) v = toHex(r * f, g * f, b * f);
-  else { const t = f - 1; v = toHex(r + (255 - r) * t, g + (255 - g) * t, b + (255 - b) * t); }
+  else { const t = (f - 1) * .5; v = toHex(r + (255 - r) * t, g + (255 - g) * t, b + (255 - b) * t); }
   if (_cc.size > 20000) _cc.clear();
   _cc.set(k, v); return v;
 }
