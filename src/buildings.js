@@ -1,5 +1,5 @@
 /* ============================== buildings ============================== */
-const FLAT_TYPES = { farm: 1, solar: 1, airfield: 1, park: 1, plaza: 1 };
+const FLAT_TYPES = { farm: 1, solar: 1, airfield: 1, park: 1, plaza: 1, pasture: 1 };
 function winCol(st, B) { return B.style >= 5 ? st.glass : '#4f5463'; }
 function buildH(B) { return B.type === 'house' ? HOUSE_H[B.up != null ? B.up : B.tier] * .7 : (BT[B.type] ? BT[B.type].h * .55 : 20); }
 
@@ -256,6 +256,93 @@ function drawBuilding0(c, B, cx, cy, i, st) {
       { const [tx, ty] = pt(cx, cy, 0, 0, 74); emit(tx, ty, 12, '#bff3ff', .7); } return;
     }
     case 'monument': return drawMonument(c, B, cx, cy, st);
+    case 'pasture': return drawPasture(c, B, cx, cy, st);
+    case 'warehouse': {
+      box(c, cx, cy, 0, -.02, .42, .24, 0, 9, st.wall); roofGable(c, cx, cy, 0, -.02, .43, .25, 9, 5, st.roof, st.wall, true);
+      for (const u of [-.22, .08]) door(c, cx, cy, u, -.02, .24, .1, 6.5, shade(st.trim, .75));
+      windows(c, cx, cy, 0, -.02, .42, .24, 0, 9, 1, 4, winCol(st, B));
+      for (const [u, w, z] of [[.3, .36, 0], [.36, .3, 0], [.33, .33, 2.4]]) box(c, cx, cy, u, w, .05, .05, z, 2.4, '#b58d62'); // crates
+      cyl(c, ...pt(cx, cy, -.34, .34, 0), .045, 0, 3, '#8a5a3c', '#6b4530'); cyl(c, ...pt(cx, cy, -.26, .36, 0), .045, 0, 3, '#8a5a3c', '#6b4530'); // barrels
+      { const [lx, ly] = pt(cx, cy, -.07, .22, 7.5); emit(lx, ly, 5, LT.lampC, .55); } return;
+    }
+    case 'shipyard': return drawShipyard(c, B, cx, cy, st);
+    case 'theatre': {
+      box(c, cx, cy, 0, -.06, .36, .26, 0, 13, st.wall); windows(c, cx, cy, 0, -.06, .36, .26, 0, 13, 1, 3, winCol(st, B));
+      box(c, cx, cy, .06, -.14, .18, .14, 13, 10, shade(st.wall, .96)); roofGable(c, cx, cy, .06, -.14, .19, .15, 23, 4, st.roof, st.wall, true); // the fly tower
+      for (let k = 0; k < 4; k++) box(c, cx, cy, -.27 + k * .18, .26, .03, .03, 0, 11, shade(st.wall, 1.1)); // portico
+      box(c, cx, cy, 0, .24, .37, .07, 11, 2.5, shade(st.wall, 1.04)); roofPyr(c, cx, cy, 0, .24, .37, .07, 13.5, 3, st.roof);
+      door(c, cx, cy, 0, -.06, .26, .1, 6, '#7a3b3b');
+      { const [bx, by] = pt(cx, cy, .3, -.2, 23); line(c, bx, by, bx, by - 9, '#6b5040', .5); c.fillStyle = shade(st.accent, 1.05); c.fillRect(bx, by - 9, 4, 2.6); }
+      for (const u of [-.2, .2]) { const [lx, ly] = pt(cx, cy, u, .31, 9); emit(lx, ly, 6, '#ffd08a', .7); emit(lx, ly + 8, 9, '#ffd08a', .3, 1); }
+      return;
+    }
+    case 'bathhouse': {
+      box(c, cx, cy, 0, 0, .3, .22, 0, 7, mix(st.wall, '#e8e2d6', .4)); windows(c, cx, cy, 0, 0, .3, .22, 0, 7, 1, 3, winCol(st, B));
+      dome(c, cx, cy, .2, 7, 8, shade(st.roof, 1.05)); cyl(c, cx, cy, .04, 15, 2.5, st.accent);
+      door(c, cx, cy, 0, 0, .22, .09, 4.5, '#5c4a3e');
+      { const [sx, sy] = pt(cx, cy, .1, -.1, 16); emit(sx, sy, 8, '#fff1c9', .35); }
+      return;
+    }
+    case 'digsite': {
+      const P = (u, w, z) => pt(cx, cy, u, w, z);
+      flat(c, cx, cy, 0, 0, .44, .44, .1, '#c9a980');
+      for (const [u, w] of [[-.2, -.1], [.12, -.18], [-.05, .18], [.22, .14]]) pit(c, ...P(u, w, 0), .09, .09, 2.5, '#bf9d74', '#a9855f', '#b89266', 1);
+      for (const u of [-.35, -.05, .25]) { const a = P(u, -.4, .2), b = P(u, .4, .2); line(c, a[0], a[1], b[0], b[1], 'rgba(240,235,225,.8)', .3); }
+      for (const w of [-.35, -.05, .25]) { const a = P(-.4, w, .2), b = P(.4, w, .2); line(c, a[0], a[1], b[0], b[1], 'rgba(240,235,225,.8)', .3); }
+      { const [tx, ty] = P(-.3, -.32, 0), a = P(-.42, -.3, 0), b = P(-.18, -.34, 0); poly(c, [[tx, ty - 8], a, b], '#e9e2d0'); poly(c, [[tx, ty - 8], b, [b[0] + 3, b[1] - 1]], '#d6ceb8'); } // the scholars' tent
+      { const [sx, sy] = P(.32, .3, 0); ell(c, sx, sy - 1, 2.2, 1, '#8a6446'); line(c, sx - 2.2, sy - 1, sx - 1.6, sy + 1.5, '#6b5040', .4); } // a sieve
+      return;
+    }
+    case 'botanic': {
+      flat(c, cx, cy, 0, 0, .46, .46, .15, '#9ed49a');
+      for (const [u, w, col] of [[-.34, .34, '#f28bb5'], [.34, .34, '#f5d25b'], [-.34, -.34, '#b69cf0']]) flat(c, cx, cy, u, w, .08, .08, .3, col);
+      box(c, cx, cy, 0, -.04, .3, .2, 0, 6, shade(st.glass, 1.05)); // the glasshouse
+      parkTree(c, cx, cy, -.08, -.06, (B.var || 0) + .2); parkTree(c, cx, cy, .1, 0, (B.var || 0) + .7);
+      dome(c, ...pt(cx, cy, 0, -.04, 0), .26, 6, 9, st.glass, .55);
+      c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = .5; { const [gx, gy] = pt(cx, cy, 0, -.04, 6); c.beginPath(); c.ellipse(gx, gy, .26 * 22.6, 9, 0, Math.PI, TAU); c.stroke(); }
+      return;
+    }
+    case 'guildhall': {
+      const T = S.T[B.sid], r = T && guildOf(T), ec = r ? RES_COL[r] : st.accent;
+      box(c, cx, cy, 0, 0, .2, .26, 0, 18, st.wall); windows(c, cx, cy, 0, 0, .2, .26, 0, 18, 3, 2, winCol(st, B));
+      roofGable(c, cx, cy, 0, 0, .21, .27, 18, 11, st.roof, st.wall, false);
+      door(c, cx, cy, 0, 0, .26, .08, 6, shade(st.trim, .85));
+      { const [bx, by] = pt(cx, cy, -.2, .27, 16); line(c, bx, by, bx - 5, by - 1, '#6b5040', .6); c.fillStyle = ec; c.fillRect(bx - 5.5, by - 1, 3.4, 6.5); c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(bx - 4.4, by + 1.4, 1.2, 1.2); } // the guild's banner
+      { const [lx, ly] = pt(cx, cy, .06, .27, 8); emit(lx, ly, 5, LT.lampC, .55); }
+      return;
+    }
+    case 'sandpit': return drawSandpit(c, B, cx, cy, i);
+    case 'weaver': {
+      box(c, cx, cy, -.08, -.06, .28, .22, 0, 9, st.wall); windows(c, cx, cy, -.08, -.06, .28, .22, 0, 9, 1, 3, winCol(st, B));
+      door(c, cx, cy, -.08, -.06, .22, .1, 5, '#5c4a3e');
+      roofGable(c, cx, cy, -.08, -.06, .28, .22, 9, 5.5, st.roof, st.wall, v < .5);
+      // freshly dyed cloth drying on a frame
+      const cols = ['#c77fb0', '#7fb2c4', '#e0b04f', '#8fbf88'], a = pt(cx, cy, .3, -.3, 0), b = pt(cx, cy, .3, .3, 0);
+      for (const p of [a, b]) line(c, p[0], p[1], p[0], p[1] - 8, '#7a5a44', .7);
+      line(c, a[0], a[1] - 8, b[0], b[1] - 8, '#7a5a44', .5);
+      for (let k = 0; k < 4; k++) { const f = (k + .5) / 4, x0 = lerp(a[0], b[0], f), y0 = lerp(a[1], b[1], f) - 8; c.fillStyle = shade(cols[(k + Math.floor(v * 4)) % 4], LT.fR); c.fillRect(x0 - 1.3, y0, 2.4, 5.5 + (k % 2)); }
+      return;
+    }
+    case 'glassworks': {
+      box(c, cx, cy, -.12, .06, .24, .22, 0, 8, st.wall); windows(c, cx, cy, -.12, .06, .24, .22, 0, 8, 1, 2, st.glass);
+      roofGable(c, cx, cy, -.12, .06, .24, .22, 8, 4.5, st.roof, st.wall, true);
+      // the glass furnace: a brick cone with a glowing mouth
+      cyl(c, ...pt(cx, cy, .2, -.16, 0), .15, 0, 7, '#b8684f'); cone(c, ...pt(cx, cy, .2, -.16, 7), .15, 13, '#a85c44');
+      cyl(c, ...pt(cx, cy, .2, -.16, 0), .035, 20, 4, '#8a4a3a', '#3a3434');
+      { const [mx, my] = pt(cx, cy, .2, -.01, 2.5); c.fillStyle = '#ffb45e'; c.beginPath(); c.arc(mx, my, 1.4, Math.PI, 0); c.fill(); emit(mx, my, 7, '#ff9a4a', .8); emit(mx, my + 3, 9, '#ff9a4a', .3, 1); }
+      for (const [u, w] of [[.34, .26], [.26, .34]]) { const [gx, gy] = pt(cx, cy, u, w, 0); ell(c, gx, gy - 1.6, 1, 1.6, 'rgba(160,220,235,.8)'); } // a couple of fresh bottles
+      return;
+    }
+    case 'watertower': {
+      if (!S.tech.done.steam || B.built < S.tech.done.steam) { // a stone cistern tower
+        cyl(c, cx, cy, .15, 0, 17, st.wall); door(c, cx, cy, 0, 0, .14, .06, 4.5, '#5c4a3e');
+        cyl(c, cx, cy, .21, 17, 8, mix(st.wall, '#a8b4bf', .35), '#6fb7d4'); cone(c, cx, cy - 25, .23, 7, st.roof); return;
+      }
+      for (const [u, w] of [[-.15, -.15], [.15, -.15], [.15, .15], [-.15, .15]]) { const a = pt(cx, cy, u, w, 0), b = pt(cx, cy, u * .75, w * .75, 22); line(c, a[0], a[1], b[0], b[1], '#6c7683', 1.2); }
+      { const a = pt(cx, cy, -.15, .15, 7), b = pt(cx, cy, .15, .15, 7); line(c, a[0], a[1], b[0], b[1], '#7c8693', .6); }
+      cyl(c, cx, cy, .22, 22, 10, mix('#c9d2da', st.accent, .15), '#aab6c1'); dome(c, cx, cy, .22, 32, 4, '#b6c2cc');
+      { const [lx, ly] = pt(cx, cy, 0, .22, 27); emit(lx, ly, 5, LT.lampC, .5); } return;
+    }
     default: box(c, cx, cy, 0, 0, .3, .3, 0, 8, st.wall);
   }
 }
@@ -366,6 +453,50 @@ function parkTree(c, cx, cy, u, v, h) {
   circ(c, px, py - 7.5, 3.4, leafC(col, .85)); circ(c, px + .75 * LT.hx, py - 8.2, 2.6, topC(leafC(col)));
 }
 
+// a mossback standing still (the walking ones are drawn with the other agents)
+function mossback(c, x, y, s, left) {
+  const d = left ? -1 : 1;
+  ell(c, x, y, 2.4 * s, s, 'rgba(40,40,60,.15)');
+  c.fillStyle = '#b9ae9c'; for (const lx of [-1.5, -.9, 1, 1.5]) c.fillRect(x + lx * s * d, y - 1.8 * s, .55, 1.8 * s);
+  ell(c, x, y - 2.4 * s, 2.5 * s, 1.5 * s, '#cfc3ae'); ell(c, x - .2 * d, y - 3.1 * s, 2 * s, .9 * s, '#8fbf88');
+  circ(c, x + 2.4 * s * d, y - 2.8 * s, .9 * s, '#cfc3ae');
+}
+function drawPasture(c, B, cx, cy, st) {
+  const v = B.var || 0, P = (u, w, z) => pt(cx, cy, u, w, z), E = .43;
+  flat(c, cx, cy, 0, 0, .46, .46, .15, '#b3d98c');
+  for (let k = 0; k < 7; k++) { const [tx, ty] = P(hash2(B.x * 7 + k, B.y, 21) * .8 - .4, hash2(B.x, B.y * 7 + k, 22) * .8 - .4, .2); ell(c, tx, ty, 1.4, .6, '#94c47a'); } // grazed tufts
+  const corners = [[-E, -E], [E, -E], [E, E], [-E, E]];
+  for (let k = 0; k < 4; k++) { const a = corners[k], b = corners[(k + 1) % 4]; for (const z of [1.2, 2.3]) { const p0 = P(a[0], a[1], z), p1 = P(b[0], b[1], z); line(c, p0[0], p0[1], p1[0], p1[1], '#8a6446', .5); } }
+  for (const [u, w] of corners.concat([[0, -E], [E, 0], [0, E], [-E, 0]])) { const a = P(u, w, 0), b = P(u, w, 2.8); line(c, a[0], a[1], b[0], b[1], '#7a5a44', .7); }
+  box(c, cx, cy, -.25, -.25, .1, .08, 0, 4, mix(st.wall, '#a57f5e', .5)); roofGable(c, cx, cy, -.25, -.25, .12, .1, 4, 2.4, st.roof, st.wall, true);
+  box(c, cx, cy, .18, -.26, .09, .03, 0, 1.2, '#8a6446');
+  mossback(c, ...P(.06, .12, 0), 2.2, v < .5); mossback(c, ...P(.28, -.1, 0), 1.8, v >= .5); if (v > .3) mossback(c, ...P(-.18, .26, 0), 1.2, true);
+}
+function drawShipyard(c, B, cx, cy, st) {
+  const d = B.dir || [1, 0], P = (a, b, z) => pt(cx, cy, d[0] * a + d[1] * b, d[1] * a + d[0] * b, z); // a: out to the water, b: across
+  poly(c, [P(-.3, -.2, .2), P(.7, -.2, -2.5), P(.7, .2, -2.5), P(-.3, .2, .2)], shade('#b8a489', LT.fG)); // the slipway runs down into the water
+  const hull = shipKind() === 'sail' || shipKind() === 'steamer' ? '#9b7657' : '#7d8793', frac = .35 + (B.var || 0) * .6;
+  for (let k = 0; k < 7; k++) { // ribs, and planking on the part that's done
+    const a = -.15 + k * .1, [x0, y0] = P(a, -.13, 1.2), [x1, y1] = P(a, .13, 1.2), [xt, yt] = P(a, 0, -.4);
+    c.strokeStyle = shade(hull, .85); c.lineWidth = .8; c.beginPath(); c.moveTo(x0, y0 - 5); c.quadraticCurveTo(xt, yt + 1, x1, y1 - 5); c.stroke();
+    if (k / 6 < frac) { c.fillStyle = shade(hull, LT.fL); c.beginPath(); c.moveTo(x0, y0 - 5); c.quadraticCurveTo(xt, yt + 1, x1, y1 - 5); c.lineTo(x1, y1 - 3.8); c.quadraticCurveTo(xt, yt + 2, x0, y0 - 3.8); c.fill(); }
+  }
+  { const a = P(-.15, 0, 4.4), b = P(.45, 0, 4.4); line(c, a[0], a[1], b[0], b[1], shade(hull, .7), 1); } // the keel
+  // a gantry over the hull, and the yard shed behind
+  for (const b of [-.3, .3]) { const f = P(.15, b, 0), t = P(.15, b, 20); line(c, f[0], f[1], t[0], t[1], '#c8553d', 1.1); }
+  { const a = P(.15, -.3, 20), b = P(.15, .3, 20); line(c, a[0], a[1], b[0], b[1], '#c8553d', 1.3); const h = P(.15, 0, 20); line(c, h[0], h[1], h[0], h[1] + 9, 'rgba(60,60,70,.8)', .4); }
+  box(c, cx, cy, -d[0] * .3, -d[1] * .3, .16, .16, 0, 7, st.wall); roofGable(c, cx, cy, -d[0] * .3, -d[1] * .3, .17, .17, 7, 4, st.roof, st.wall, true);
+  { const [lx, ly] = P(.15, .3, 20); emit(lx, ly, 4, '#ff4d4d', .6); }
+}
+function drawSandpit(c, B, cx, cy, i) {
+  const v = B.var || 0;
+  pit(c, cx, cy, .3, .26, 4, '#ecd5a8', '#d9b77f', '#e7cc98', 2);
+  for (const [u, w, s] of [[.3, .2, 1], [.22, .34, .8]]) { const [hx, hy] = pt(cx, cy, u, w, 0); ell(c, hx, hy - 1.2 * s, 3 * s, 1.8 * s, topC(shade('#efd9ad', LT.fT))); }
+  // a cart full of sand
+  box(c, cx, cy, -.32, .3, .08, .05, 1, 2, '#9b7657'); const [wx, wy] = pt(cx, cy, -.32, .36, 1); circ(c, wx, wy, 1, '#6b5040');
+  { const [sx, sy] = pt(cx, cy, -.32, .3, 3); ell(c, sx, sy, 2, .9, '#ead3a2'); }
+  if (v > .5) { const a = pt(cx, cy, -.1, -.3, 0); line(c, a[0], a[1], a[0] + 1.2, a[1] - 6, '#7a5a44', .6); }
+}
 function drawPod(c, B, cx, cy) {
   ell(c, cx + 1, cy, 15, 7, 'rgba(70,55,50,.22)');
   const age = S.year;

@@ -90,7 +90,11 @@ body.panel #panel{transform:none}
 .sect i{display:block;height:100%}
 .slab{font-size:11px;color:var(--ink2);line-height:1.4}
 .known{font-size:11.5px;color:#9a6f28;margin-top:3px;font-style:italic}
-.stock{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:8px}
+.needs{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.needs span{font-size:11px;padding:2px 7px;border-radius:10px;background:rgba(127,191,106,.2);cursor:default;font-variant-numeric:tabular-nums}
+.needs span.mid{background:rgba(224,176,79,.24)}
+.needs span.low{background:rgba(217,119,75,.28);font-weight:600}
+.stock{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}
 .stock div{background:rgba(255,255,255,.55);border-radius:8px;padding:5px 6px 5px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
 .stock div b{font-weight:650}
 .stock div span{font-size:11px}

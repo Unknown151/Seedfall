@@ -163,8 +163,10 @@ function tipFor(i) {
     } else {
       h += `${st ? st.name + ' style · ' : ''}${B.mat && B.type !== 'house' ? MAT[B.mat].n + ' · ' : ''}built Year ${B.built}`;
       const ex = EX_INFO[B.type], T = S.T[B.sid];
-      if (ex) { const out = ex.out * toolsK() * (B.ef || .5), q = B.ef || .5; h += `<br>${RES_IC[EXTRACT[B.type]]} about ${fmt1(out)} ${RES_N[EXTRACT[B.type]]} a year${B.type === 'mine' ? ', and some stone' : ''} · ${({ lumber: ['thick forest', 'thinning woods', 'few trees left'], quarry: ['good stone', 'fair stone', 'poor stone'], claypit: ['good clay', 'fair clay', 'thin clay'], mine: ['a rich seam', 'a fair seam', 'a thin seam'] })[B.type][q > .7 ? 0 : q > .4 ? 1 : 2]}`; }
-      else if (MAKERS[B.type]) h += `<br>📦 makes about ${fmt1(MAKERS[B.type] * toolsK())} goods a year${B.type === 'fusion' ? ', and as much metal' : ''}`;
+      if (ex) { const out = ex.out * toolsK() * (B.ef || .5), q = B.ef || .5; h += `<br>${RES_IC[EXTRACT[B.type]]} about ${fmt1(out)} ${RES_N[EXTRACT[B.type]]} a year${B.type === 'mine' ? ', and some stone' : ''} · ${({ lumber: ['thick forest', 'thinning woods', 'few trees left'], quarry: ['good stone', 'fair stone', 'poor stone'], claypit: ['good clay', 'fair clay', 'thin clay'], mine: ['a rich seam', 'a fair seam', 'a thin seam'], pasture: ['lush grazing', 'fair grazing', 'thin grazing'], sandpit: ['fine sand', 'fair sand', 'gritty sand'] })[B.type][q > .7 ? 0 : q > .4 ? 1 : 2]}${B.type === 'pasture' ? ' · the wool feeds a weaver' : B.type === 'sandpit' ? ' · the sand feeds a glassworks' : ''}`; }
+      else if (CRAFT[B.type]) { const [r, n, feed] = CRAFT[B.type], own = T && econCache(T).n[feed]; h += `<br>${RES_IC[r]} makes about ${fmt1(n * toolsK() * (own ? 1 : .4))} ${RES_N[r]} a year${own ? '' : ` (no ${BT[feed].n.toLowerCase()} of its own, so it buys some in)`}`; }
+      else if (MAKERS[B.type]) h += `<br>📦 makes about ${fmt1(MAKERS[B.type] * toolsK() * (POWER_USE[B.type] ? gridK() : 1))} goods a year${B.type === 'fusion' ? ', and as much metal' : ''}`;
+      const nt = needTip(B); if (nt) h += `<br>${nt}`;
       if (B.type === 'plaza' && T && T.res) h += `<br>${stockLine(T)}`;
     }
     h += '</small>';
@@ -174,6 +176,7 @@ function tipFor(i) {
     const extra = [];
     if (M.tree[i]) extra.push(TREE_NAME[M.ttype[i]] || 'Trees');
     if (M.ruin[i]) extra.push(M.ruin[i] === 2 ? 'Maker ruins (studied)' : 'Maker ruins');
+    if (springAt(i)) extra.push('a hot spring');
     if (M.road[i]) extra.push(w ? 'bridge' : 'road');
     if (M.rail[i]) extra.push('railway');
     if (M.wild[i] === 2) extra.push('starfall crater');
@@ -209,7 +212,7 @@ function renderTownsTab() {
   for (const T of ts) { if (!T.res) continue; for (const r of RES) { tot[r] = (tot[r] || 0) + T.res[r]; fl[r] = (fl[r] || 0) + (T.flow[r] || 0); } const [n, t] = townMats(T); for (const k in n) mn[k] = (mn[k] || 0) + n[k]; mt += t; }
   const recent = S.trade ? S.trade.log.filter(e => e.y >= yr() - 25) : [];
   const exIc = {}; for (const B of Object.values(S.B)) if (EXTRACT[B.type] && B.prog >= 1) exIc[B.type] = (exIc[B.type] || 0) + 1;
-  const EXN = { lumber: ['woodcutters’ camp', 'woodcutters’ camps'], quarry: ['quarry', 'quarries'], claypit: ['clay pit', 'clay pits'], mine: ['mine', 'mines'] };
+  const EXN = { lumber: ['woodcutters’ camp', 'woodcutters’ camps'], quarry: ['quarry', 'quarries'], claypit: ['clay pit', 'clay pits'], mine: ['mine', 'mines'], pasture: ['pasture', 'pastures'], sandpit: ['sand pit', 'sand pits'] };
   const exTxt = Object.entries(exIc).map(([k, v]) => `${v} ${EXN[k][v > 1 ? 1 : 0]}`).join(' · ');
   h += `<div class="tcard valley"><div class="th"><b>The valley’s stores</b><span></span></div>
     <div class="stock">${RES.map(r => `<div class="${resOpen(r) ? '' : 'off'}"><span>${RES_IC[r]}</span> <b>${fmtInt(tot[r] || 0)}</b><em>${resOpen(r) ? '+' + fmt1(fl[r] || 0) + '/yr' : 'not yet'}</em></div>`).join('')}</div>
@@ -219,7 +222,7 @@ function renderTownsTab() {
     h += `<div class="tcard"><div class="th town0" data-x="${T.x}" data-y="${T.y}"><span><b>${esc(T.name)}</b><br><small>founded Year ${T.founded}${L && L.died === null ? ' · ' + titleFor() + ' ' + esc(L.name) : ''} · grows ${CROPS[T.crop].n}</small></span><span>${fmtInt(T.pop)}</span></div>`;
     const kn = T.known ? Object.keys(T.known) : [];
     if (kn.length) h += `<div class="known">Known for ${kn.map(r => KNOWN_FOR[r][0]).join(' and ')}</div>`;
-    h += sectorBar(townSectors(T));
+    h += sectorBar(townSectors(T)) + needsRow(T);
     if (T.res) {
       const cap = econCap(T);
       h += `<div class="stock">${RES.map(r => {

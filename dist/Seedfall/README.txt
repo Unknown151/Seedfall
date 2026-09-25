@@ -117,10 +117,18 @@ SKY, WEATHER AND SEASONS
   shadows is the lightest setting for a slow PC.
 
 WHAT THE TOWNS ARE BUILT FROM
-  Every town keeps a store of timber, stone, clay, metal and goods. It fills
-  them from the land around it: woodcutters' camps at the forest edge, quarries
-  in rocky ground, clay pits on riverbanks and sandy shores, mines on ore, and
-  workshops and works for goods. Building draws the stores down again.
+  Every town keeps a store of timber, stone, clay, metal, goods, cloth and
+  glass. It fills them from the land around it: woodcutters' camps at the
+  forest edge, quarries in rocky ground, clay pits on riverbanks and sandy
+  shores, mines on ore, and workshops and works for goods. Building draws the
+  stores down again.
+  Two small chains came later. Mossbacks are fenced into pastures and their
+  wool is spun at home, but a weaving house turns it into real cloth (from
+  Loomcraft): houses and markets are fitted out with it. Sand pits on the
+  dunes feed a glassworks (from Masonry), and glass goes into windows,
+  observatories, universities and, much later, the garden domes. A weaver
+  or glassworks without pastures or sand pits of its own buys some in and
+  makes less. Towns can become known for their cloth or their glass.
   Houses and small buildings are built from whatever the town has most of, so
   a town in the woods ends up timber-built, a town under the crags goes stone,
   and a river town bakes brick. Old eras lean on their own materials too:
@@ -135,6 +143,52 @@ WHAT THE TOWNS ARE BUILT FROM
   the site is, and a town square to see its stores.
   With a voice key, words about building ("build in stone", "use what the land
   gives") can set the towns' favourite material.
+
+WHAT THE TOWNS NEED
+  As the world learns things, every town starts to need a few of them. C >
+  Towns shows each need as a coloured pill (hover it for what it does):
+    Water    wells, then water towers (from Masonry). A town by a river or
+             lake gets some for nothing, and from Reinforced Concrete water
+             is piped everywhere. Short of water, a town grows more slowly.
+    Milling  every windmill grinds for about sixteen fields, and milled grain
+             feeds a quarter more people. Gene gardens make it moot.
+    Health   clinics (from Medicine), each caring for a few thousand people.
+             Healthy towns grow a bit faster, and their children live longer.
+    Power    one grid for the whole valley (from Electricity): power houses,
+             wind turbines, solar fields and fusion plants feed it; works,
+             gene gardens, universities, stations and so on draw from it.
+             On a short grid the big users run slow. Hover one to see.
+    Culture  shrines, markets, the library, parks, monuments, museums and
+             stadiums. Lively towns pull young people away from dull ones,
+             host more festivals, and add a little to Reverence.
+    News     a radio mast or Weave relay within range. Research is a bit
+             faster, and the Watcher's words are remembered for longer.
+  Smoke: from Steam on, works and power houses dirty the air around them (you
+  can see the soot on the ground). A smoky town grows a little slower and
+  loses young people to cleaner ones; parks help. Solar Glass cleans the
+  works up, and once a town has a fusion plant its old power house is pulled
+  down and becomes a park. C > Towns shows it as a 🏭 pill.
+  A town that is short of something sees to it before it builds more houses.
+  Nothing ever stops: an unmet need only slows a town down a little. Now and
+  then the chronicle notices (queues at the wells, brownouts, dull towns).
+
+WAREHOUSES, SHIPYARDS, AND THINGS FOR THE SOUL
+  Warehouses (from Coinage): a town whose stores are full builds one, and
+    each lets it keep half as much again.
+  Shipyards (from Masonry, harbour towns): bigger ships and more of them,
+    so sea trade carries more. Now and then a new ship is launched.
+  Hot springs: a few steaming pools on every world. Settlers like to found
+    towns near them, and a nearby town builds a bathhouse over the spring:
+    people born there live a few years longer.
+  Theatres (from the Printing Press): culture, and a new play now and then,
+    written by one of your named people.
+  The Maker dig (from the Printing Press): scholars dig properly at the old
+    stones. Every find helps research and adds a little Reverence, and goes
+    on show if there is a museum.
+  Botanical gardens (from Lenses): the gardeners plant trees around town
+    and, over the centuries, breed a few new crops that feed every field.
+  Guild halls (from Coinage): a town's guild for what it is known for (or
+    its biggest trade) makes 30% more of it.
 
 HOW TOWNS LAY THEMSELVES OUT
   Villages grow the old way: a few main lanes run out from the square, side

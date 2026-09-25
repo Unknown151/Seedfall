@@ -87,6 +87,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 | `faith1` | Reverence and prayers. Can be flaky under load (stale element handles), so rerun it alone. |
 | `econmig` | A pre-economy save still loads. |
 | `streetmig` | A save made by `dist/`'s build loads in the current build. |
+| `needs` | Town needs, the cloth and glass chains, smoke and its clean-up, the culture sites, and older saves picking all of it up. |
 | `away` | Catch-up after time away: the 8 h and 250-year caps, the report card, the historian's letter (mocked). |
 | `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, and file:// staying cloud-free. Needs the root `npm install`. |
 
@@ -152,7 +153,8 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 | light.js | Sun (synthetic 1 h or 20 min day, real sun over Horsens, or fixed), seasons by real date, weather Markov chain, `LT` light params, the progressive relight job with 3.5 s crossfade, cast shadows, emissive glows (`emit`) |
 | sim.js | World state `S`, `newState`, `mkBuilding`, `findSite` (all the site kinds), roads, rails, bridges, town growth (`planTown`/`buildTown`/`tryHousing`/`tryService`), founding, tech, eras and ages, events, `stepPeople`, `simMonth`, god tools |
 | streets.js | Street plan (`M.plan`): organic lanes early, grid quarters from Masonry/Steam, `connectRoad`/`pavePath`, conversion of old saves' 4-grid streets |
-| econ.js | Timber, stone, clay, metal and goods; extraction sites, material choice, building costs, shortages, road and sea trade, "known for", Towns-tab readouts |
+| econ.js | Timber, stone, clay, metal, goods, cloth and glass; extraction sites (incl. pastures and sand pits), crafts (`CRAFT`: weaver, glassworks), material choice, building costs, shortages, road and sea trade, "known for", Towns-tab readouts |
+| needs.js | Town needs (`NEEDS`: water, milling, health, power grid, culture, news), worked out every 3 months from the buildings (`refreshNeeds`, never saved), their effects (`needGrowthK`, `lifeBonus`, `gridK`, `migrate`) and `tryNeeds`, which builds for whatever is missing. Also smoke (`SMOKY`, `sootK`, `pollution`, the `SOOT` ground tint that `topColor` reads), hot springs (`S.springs`, `springAt`), and the culture sites: `tryCulture` (bathhouse, theatre, Maker dig, botanical garden, guild hall) and `yearlyCulture` |
 | people.js | Person model: traits, quirks, families, relationships |
 | ai.js | Claude API (`aiFetch`, daily cap 80), world brief, tool schemas, `CULT` doctrines, `lever(k)`, `LV_KEYS`/`LV_TXT` |
 | levers.js | `applyLevers` (style, nature, growth, streets, materials, lights, weather, names...), customs lists, map labels, sky lanterns |
@@ -198,6 +200,8 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
   age) and 250 years, in 40 ms slices with `FAST` on, then the "While you were away" card, plus a letter
   from Claude (`aiDigest`) after 30+ min when the voice is on. `SF.ff` resets `lastLive`, so a long
   fast-forward isn't mistaken for time away. `test/away.mjs` covers it.
+- **Needs.** Needs are soft multipliers, never hard stops. `tryNeeds` runs before housing when a need is under 60%, and may rebuild over an old house (`placeProject`) when there's no plot. The power grid is valley-wide. Keep `needGrowthK` near 1 for a typical town, or the pacing drifts.
+- **Industry and culture.** Warehouses (`econCap`) and shipyards (bigger sea cargo in `stepTrade`, more ships via `shipCap`) live in econ.js/sea.js; `STORE_T` types are counted in `econCache` but make nothing. `SOOT` is recomputed once a year (`updateSoot`) and on world load; changed tiles are `markDirty`'d. Older saves get `S.springs` in `deserialize`.
 - **Economy.** Building costs are paid per month of progress. With nothing in stock a building goes at
   35% speed; it never stops. Materials are chosen from local production. Trade needs a road (the wheel)
   or a harbour on both ends.

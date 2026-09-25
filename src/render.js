@@ -257,6 +257,7 @@ function topColor(i) {
   if ((b === BIO.MEADOW || b === BIO.LUSH) && LT.grass[1]) col = mix(col, LT.grass[0], LT.grass[1]);
   const v = q2((0.965 + hash2(x, y, 5) * 0.06 + M.elev[i] * 0.006) * g);
   col = shade(col, v);
+  if (SOOT[i] > .02) col = mix(col, '#6f6a66', q2(Math.min(.4, SOOT[i] * .5))); // soot from the works
   if (LT.snow && b !== BIO.SAND) col = mix(col, SNOWC, q2(LT.snow * (b === BIO.SNOW ? 0 : .85)));
   return col;
 }
@@ -287,7 +288,7 @@ function drawTile(c, x, y) {
   const bid = M.bld[i];
   let B = bid ? S.B[bid] : null;
   if (B && B.hid) B = null;
-  if (B && (B.type === 'farm' || B.type === 'solar' || B.type === 'airfield' || B.type === 'park' || B.type === 'plaza')) drawBuilding(c, B, cx, cy, i);
+  if (B && FLAT_TYPES[B.type]) drawBuilding(c, B, cx, cy, i);
   if (M.road[i]) drawRoad(c, i, x, y, cx, cy);
   if (M.rail[i]) drawRail(c, i, x, y, cx, cy);
   if (LT.shA > 0) castShadows(c, i, x, y, cx, cy);
@@ -300,6 +301,7 @@ function drawTileObjects(c, i, x, y, cx, cy) {
   if (B && B.hid) B = null;
   if (M.road[i] >= 2 && !w && (x + 2 * y) % (M.road[i] >= 4 ? 2 : 3) === 0) drawLamp(c, i, cx, cy);
   if (M.ruin[i]) drawRuin(c, i, x, y, cx, cy);
+  if (!B && !bid && springAt(i)) drawSpring(c, i, cx, cy);
   if (!w && S.ferries && S.ferries.length) { const fl = ferryLandings().get(i); if (fl) drawLanding(c, i, cx, cy, fl); }
   if (B && !FLAT_TYPES[B.type]) drawBuilding(c, B, cx, cy, i);
   else if (!B && !bid && M.tree[i]) drawTrees(c, i, x, y, cx, cy);

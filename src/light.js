@@ -138,7 +138,8 @@ const CAST_DIMS = {
   mine: [.3, .3, 8, 0], lumber: [.17, .13, 9, 0], quarry: [.06, .06, 12, 0], claypit: [.13, .13, 8, 1], harbor: [.3, .3, 9, 0], lighthouse: [.11, .11, 44, 1], mill: [.17, .17, 22, 1], hall: [.4, .3, 19, 0], observatory: [.22, .22, 17, 1], works: [.42, .3, 16, 0],
   station: [.42, .24, 13, 0], clinic: [.32, .3, 14, 0], power: [.36, .28, 17, 0], turbine: [.05, .05, 58, 1], mast: [.12, .12, 60, 0],
   university: [.44, .36, 25, 0], antenna: [.2, .2, 20, 0], vfarm: [.34, .34, 37, 0], stadium: [.45, .45, 7, 1], museum: [.4, .34, 18, 0],
-  launchpad: [.08, .08, 50, 1], fusion: [.4, .4, 21, 1], terraformer: [.2, .2, 66, 1], dome: [.42, .42, 18, 1], elevator: [.3, .3, 62, 0]
+  launchpad: [.08, .08, 50, 1], fusion: [.4, .4, 21, 1], terraformer: [.2, .2, 66, 1], dome: [.42, .42, 18, 1], elevator: [.3, .3, 62, 0],
+  watertower: [.2, .2, 32, 1], sandpit: [.05, .05, 4, 0], weaver: [.28, .22, 12, 0], glassworks: [.26, .24, 18, 1], warehouse: [.42, .26, 12, 0], shipyard: [.2, .2, 20, 0], theatre: [.36, .3, 24, 0], bathhouse: [.3, .24, 10, 1], digsite: [.08, .08, 8, 0], botanic: [.34, .26, 14, 0], guildhall: [.2, .26, 30, 0]
 };
 const MON_DIMS = { statue: [.14, .14, 24, 0], lantern: [.2, .2, 62, 0], spire: [.28, .28, 50, 0], harp: [.2, .2, 42, 0], gardens: [.4, .4, 38, 0], colossus: [.3, .3, 40, 1], hall: [.42, .34, 25, 0], clock: [.18, .18, 60, 0], orchard: [.3, .3, 20, 1], obelisk: [.12, .12, 60, 0] };
 const TREE_H = [16, 16, 22, 11, 11];

@@ -2,18 +2,24 @@
 // Every town keeps a small stockpile of timber, stone, clay, metal and goods. Woodcutters, quarries, clay pits
 // and mines fill it from whatever grows and lies around the town; building draws it down again. A town
 // without much forest builds in stone or brick instead. Running short slows building down, it never stops it.
-const RES = ['wood', 'stone', 'clay', 'metal', 'goods'];
-const RES_N = { wood: 'timber', stone: 'stone', clay: 'clay', metal: 'metal', goods: 'goods' };
-const RES_IC = { wood: '🪵', stone: '🪨', clay: '🧱', metal: '⚙️', goods: '📦' };
-const RES_TECH = { wood: null, stone: 'stone', clay: 'kiln', metal: 'smelt', goods: 'smelt' };
-const RES_COL = { wood: '#a0714a', stone: '#9aa0aa', clay: '#c0674c', metal: '#5f6b7a', goods: '#d2a24c' };
-const EXTRACT = { lumber: 'wood', quarry: 'stone', claypit: 'clay', mine: 'metal' };
+const RES = ['wood', 'stone', 'clay', 'metal', 'goods', 'cloth', 'glass'];
+const RES_N = { wood: 'timber', stone: 'stone', clay: 'clay', metal: 'metal', goods: 'goods', cloth: 'cloth', glass: 'glass' };
+const RES_IC = { wood: '🪵', stone: '🪨', clay: '🧱', metal: '⚙️', goods: '📦', cloth: '🧶', glass: '🪟' };
+const RES_TECH = { wood: null, stone: 'stone', clay: 'kiln', metal: 'smelt', goods: 'smelt', cloth: 'loom', glass: 'masonry' };
+const RES_COL = { wood: '#a0714a', stone: '#9aa0aa', clay: '#c0674c', metal: '#5f6b7a', goods: '#d2a24c', cloth: '#c77fb0', glass: '#6fc0d4' };
+const EXTRACT = { lumber: 'wood', quarry: 'stone', claypit: 'clay', mine: 'metal', pasture: 'cloth', sandpit: 'glass' };
+// two small chains: mossback wool is spun at home, but a weaver makes real cloth of it; sand becomes glass in a glassworks
+// [makes, a year, the site that feeds it]. Without that site the crafts buy their wool or sand in, and make less
+const CRAFT = { weaver: ['cloth', 2.6, 'pasture'], glassworks: ['glass', 3, 'sandpit'] };
+const CRAFT_INFO = { weaver: { tech: 'loom', min: 70, per: 900, max: 3, site: 'mid' }, glassworks: { tech: 'masonry', min: 140, per: 1200, max: 4, site: 'edge' } };
 // out: what one good site yields in a year
 const EX_INFO = {
   lumber: { tech: 'shelter', min: 8, per: 450, max: 3, site: 'forest', out: 5 },
   quarry: { tech: 'stone', min: 24, per: 900, max: 2, site: 'rock', out: 5 },
   claypit: { tech: 'kiln', min: 24, per: 900, max: 2, site: 'clay', out: 4.5 },
-  mine: { tech: 'smelt', min: 60, per: 1200, max: 2, site: 'ore', out: 3.5 }
+  mine: { tech: 'smelt', min: 60, per: 1200, max: 2, site: 'ore', out: 3.5 },
+  pasture: { tech: 'loom', min: 45, per: 700, max: 3, site: 'pasture', out: 1.1 },
+  sandpit: { tech: 'masonry', min: 120, per: 1500, max: 2, site: 'sand', out: .6 }
 };
 const MAKERS = { workshop: 2, works: 5, power: 2, fusion: 6 }; // goods a year (fusion also makes metal)
 // what a building looks like it is made of, blended with the style of its era
@@ -23,10 +29,14 @@ const MAT = {
   adobe: { res: 'clay', wall: '#e3c79c', roof: '#c9996a', n: 'adobe' },
   brick: { res: 'clay', wall: '#b8684f', roof: '#93503f', n: 'brick' }
 };
-const MAT_TYPES = { well: 1, granary: 1, shrine: 1, dock: 1, market: 1, school: 1, workshop: 1, mill: 1, hall: 1, library: 1, observatory: 1, clinic: 1, station: 1, works: 1 };
+const MAT_TYPES = { weaver: 1, glassworks: 1, well: 1, granary: 1, shrine: 1, dock: 1, market: 1, school: 1, workshop: 1, mill: 1, hall: 1, library: 1, observatory: 1, clinic: 1, station: 1, works: 1 };
 const MAT_ERA = [{ wood: 1.3 }, { wood: 1.3, adobe: 1.1 }, { stone: 1.2, adobe: 1.1 }, { stone: 1.3 }, { brick: 1.4 }, { brick: 1.1, stone: 1.1 }];
 const HCOST = [0, 4, 7, 11, 16];
-const HEAVY = { workshop: 1, works: 1, station: 1, power: 1, turbine: 1, mast: 1, airfield: 1, antenna: 1, solar: 1, fusion: 1, launchpad: 1, elevator: 1, terraformer: 1, vfarm: 1, dome: 1, stadium: 1, university: 1, mine: 1 };
+const HCLOTH = [0, 0, .5, .8, 1.2, 1.6, 2.5, 5], HGLASS = [0, 0, 0, .4, .8, 2, 5, 12];
+// what a finished building is fitted out with, besides its walls
+const FIT = { market: { cloth: 2 }, school: { cloth: .6 }, library: { cloth: 1, glass: .6 }, clinic: { cloth: 1.5, glass: .6 }, hall: { cloth: 1, glass: .8 },
+  observatory: { glass: 3 }, university: { glass: 4, cloth: 1 }, museum: { glass: 4, cloth: 1 }, station: { glass: 2 }, vfarm: { glass: 6 }, dome: { glass: 8 }, theatre: { cloth: 3 }, botanic: { glass: 4 } };
+const HEAVY = { shipyard: 1, warehouse: 1, glassworks: 1, watertower: 1, workshop: 1, works: 1, station: 1, power: 1, turbine: 1, mast: 1, airfield: 1, antenna: 1, solar: 1, fusion: 1, launchpad: 1, elevator: 1, terraformer: 1, vfarm: 1, dome: 1, stadium: 1, university: 1, mine: 1 };
 const SHORT = .35; // how fast a building goes up with nothing in the stockpile
 const LV_MAT = { timber: 'wood', stone: 'stone', brick: 'brick' };
 
@@ -36,12 +46,13 @@ function laborOf(T) {
   const mult = 1 + (hasTech('wheel') ? .3 : 0) + (hasTech('steam') ? .6 : 0) + (hasTech('electric') ? .6 : 0) + (hasTech('computing') ? .5 : 0) + (hasTech('fusion') ? 1 : 0);
   return (0.7 + Math.sqrt(T.pop) * 0.55) * mult;
 }
-const econCap = T => Math.round(30 + Math.sqrt(T.pop) * 2);   // how much the yards and stores hold
+const econCap = T => Math.round((30 + Math.sqrt(T.pop) * 2) * (1 + .5 * Math.min(3, econCache(T).done.warehouse || 0))); // how much the yards and stores hold; warehouses add half again each
+const STORE_T = { warehouse: 1, shipyard: 1 }; // counted with the producers, but they make nothing themselves
 const econLow = T => econCap(T) * .3;
 const toolsK = () => 1 + (hasTech('smelt') ? .25 : 0) + (hasTech('steam') ? .3 : 0) + (hasTech('electric') ? .25 : 0) + (hasTech('fusion') ? .2 : 0);
 
 function ensureEcon(T) {
-  if (T.res) return;
+  if (T.res) { if (T.res.glass == null) for (const r of RES) if (T.res[r] == null) T.res[r] = 0; return; } // saves from before cloth and glass
   T.res = {}; T.short = {}; T.flow = {}; T.exp = {}; T.use = {};
   const cap = econCap(T);
   for (const r of RES) T.res[r] = S.year < 1 ? (r === 'wood' ? 10 : r === 'metal' ? 6 : 0) : resOpen(r) ? cap * .6 : 0;
@@ -57,9 +68,11 @@ function econFound(T, P) {
 /* ---------- what the land around a town offers (0..1 each) ---------- */
 const rocky = i => { const b = M.bio[i]; return !M.water[i] && (b === BIO.ROCK || b === BIO.HIGH || M.elev[i] >= 7); };
 const clayey = i => { if (M.water[i]) return false; if (M.bio[i] === BIO.SAND) return true; const x = i % W, y = (i / W) | 0; for (const [dx, dy] of N4) { const nx = x + dx, ny = y + dy; if (inb(nx, ny)) { const j = idx(nx, ny); if (M.water[j] === 2 || M.bio[j] === BIO.FRESH) return true; } } return false; };
+const grazing = i => !M.water[i] && !M.bld[i] && !M.road[i] && M.tree[i] < 2 && (M.bio[i] === BIO.MEADOW || M.bio[i] === BIO.LUSH || M.bio[i] === BIO.HIGH);
+const sandy = i => !M.water[i] && M.bio[i] === BIO.SAND;
 function around(x, y, r, fn) { let n = 0; for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const nx = x + dx, ny = y + dy; if (inb(nx, ny)) n += fn(idx(nx, ny)); } return n; }
 function townPotential(T) {
-  const R = Math.ceil(townRadius(T) + 6), p = { wood: 0, stone: 0, clay: 0, metal: 0 };
+  const R = Math.ceil(townRadius(T) + 6), p = { wood: 0, stone: 0, clay: 0, metal: 0, cloth: 0, glass: 0 };
   for (let y = Math.max(0, T.y - R); y <= Math.min(H - 1, T.y + R); y++) for (let x = Math.max(0, T.x - R); x <= Math.min(W - 1, T.x + R); x++) {
     if ((x - T.x) ** 2 + (y - T.y) ** 2 > R * R) continue;
     const i = idx(x, y);
@@ -67,8 +80,10 @@ function townPotential(T) {
     if (rocky(i)) p.stone++;
     if (M.ore[i]) p.metal++;
     if (clayey(i)) p.clay++;
+    if (grazing(i)) p.cloth++;
+    if (sandy(i)) p.glass++;
   }
-  return { wood: Math.min(1, p.wood / 45), stone: Math.min(1, p.stone / 14), clay: Math.min(1, p.clay / 12), metal: Math.min(1, p.metal / 4) };
+  return { wood: Math.min(1, p.wood / 45), stone: Math.min(1, p.stone / 14), clay: Math.min(1, p.clay / 12), metal: Math.min(1, p.metal / 4), cloth: Math.min(1, p.cloth / 40), glass: Math.min(1, p.glass / 8) };
 }
 // how good one extraction site is (0..1)
 function siteEff(B) {
@@ -78,6 +93,8 @@ function siteEff(B) {
     case 'quarry': return clamp(around(x, y, 2, i => rocky(i) ? 1 : 0) / 7, .35, 1);
     case 'claypit': return clamp(around(x, y, 2, i => clayey(i) ? 1 : 0) / 6, .35, 1);
     case 'mine': return .45 + .55 * Math.min(1, around(x, y, 2, i => M.ore[i] ? 1 : 0) / 2);
+    case 'pasture': return clamp(around(x, y, 2, i => grazing(i) ? 1 : 0) / 12, .3, 1);
+    case 'sandpit': return clamp(around(x, y, 2, i => sandy(i) ? 1 : 0) / 8, .35, 1);
   }
   return 1;
 }
@@ -88,10 +105,10 @@ function econDirty(T) { if (T && ECX[T.id]) ECX[T.id].m = -1e9; }
 function econCache(T) {
   let e = ECX[T.id];
   if (e && e.S === S && e.m <= S.month && S.month - e.m < 12) return e;
-  e = ECX[T.id] = { S, m: S.month, ex: [], n: {} };
+  e = ECX[T.id] = { S, m: S.month, ex: [], n: {}, done: {} };
   for (const id of T.bl) {
     const B = S.B[id]; if (!B) continue;
-    if (EXTRACT[B.type] || MAKERS[B.type]) { e.n[B.type] = (e.n[B.type] || 0) + 1; if (B.prog >= 1) e.ex.push(B.id); }
+    if (EXTRACT[B.type] || MAKERS[B.type] || CRAFT[B.type] || STORE_T[B.type]) { e.n[B.type] = (e.n[B.type] || 0) + 1; if (B.prog >= 1) { e.done[B.type] = (e.done[B.type] || 0) + 1; if (!STORE_T[B.type]) e.ex.push(B.id); } }
   }
   for (const id of e.ex) { const B = S.B[id]; if (EXTRACT[B.type]) B.ef = Math.round(siteEff(B) * 100) / 100; }
   T.pot = townPotential(T);
@@ -134,10 +151,13 @@ function costOf(B) {
       else if (t === 5) { add('stone', 14); add('metal', 6); add('goods', 4); }
       else if (t === 6) { add('stone', 18); add('metal', 18); add('goods', 10); }
       else if (t >= 7) { add('stone', 36); add('metal', 44); add('goods', 26); }
+      if (HCLOTH[t] && resOpen('cloth')) add('cloth', HCLOTH[t]); // curtains, rugs and bedding
+      if (HGLASS[t] && resOpen('glass')) add('glass', HGLASS[t]); // windows
       return c;
     case 'pod': case 'plaza': return c;
     case 'farm': add('wood', 1); return c;
-    case 'lumber': add('wood', 2); return c;
+    case 'lumber': case 'pasture': add('wood', 2); return c;
+    case 'sandpit': add('wood', 2); return c;
     case 'quarry': case 'claypit': add('wood', 3); return c;
   }
   const w = BT[B.type] ? BT[B.type].work : 8, main = w * .45;
@@ -146,6 +166,7 @@ function costOf(B) {
   else if (hasTech('concrete')) { add('stone', main * .6); add('metal', main * .25); add('goods', main * .15); }
   else add(hasTech('stone') ? 'stone' : 'wood', main);
   if (HEAVY[B.type] && hasTech('smelt')) add('metal', w * .12);
+  const x = FIT[B.type]; if (x) for (const r in x) if (resOpen(r)) add(r, x[r]);
   return c;
 }
 // called by mkBuilding / tryUpgrade
@@ -153,7 +174,7 @@ function econNewBuilding(B, T) {
   ensureEcon(T);
   if (B.type === 'house' ? B.tier >= 1 && B.tier <= 4 : matEligible(B.type, 0)) B.mat = chooseMat(T, B.type, B.tier);
   if (B.prog < 1) B.cost = costOf(B);
-  if (EXTRACT[B.type] || MAKERS[B.type]) econDirty(T);
+  if (EXTRACT[B.type] || MAKERS[B.type] || CRAFT[B.type] || STORE_T[B.type]) econDirty(T);
 }
 function econUpgrade(B, T) {
   ensureEcon(T);
@@ -162,7 +183,7 @@ function econUpgrade(B, T) {
 }
 function econComplete(B, T) {
   delete B.cost; delete B.sw;
-  if (EXTRACT[B.type] || MAKERS[B.type]) econDirty(T);
+  if (EXTRACT[B.type] || MAKERS[B.type] || CRAFT[B.type] || STORE_T[B.type]) econDirty(T);
   if (B.mat && B.type === 'house') {
     const mc = T.mc = T.mc || {};
     for (const k in mc) mc[k] *= .92;
@@ -201,28 +222,35 @@ function switchMat(T, B) {
 /* ---------- the monthly round: gather, cut, dig, make ---------- */
 function stepEcon(T) {
   ensureEcon(T);
-  const e = econCache(T), p = T.pot, tk = toolsK(), fl = { wood: 0, stone: 0, clay: 0, metal: 0, goods: 0 };
+  const e = econCache(T), p = T.pot, tk = toolsK(), fl = {};
+  for (const r of RES) fl[r] = 0;
   // people gathering what lies about (per year)
   const g = 1 + Math.sqrt(T.pop) / 25;
   fl.wood += 1.2 * p.wood * g;
   if (resOpen('stone')) fl.stone += .6 * p.stone * g;
   if (resOpen('clay')) fl.clay += .5 * p.clay * g;
   if (resOpen('metal')) { fl.metal += .25 * (.3 + p.metal) * g; fl.goods += .3 * g; }
+  if (resOpen('cloth')) fl.cloth += .25 * (.4 + p.cloth) * g; // spinning at home
+  if (resOpen('glass')) fl.glass += .12 * (.3 + p.glass) * g;
   const nat = lever('nature');
   for (const id of e.ex) {
     const B = S.B[id]; if (!B || B.prog < 1) continue;
     const ex = EX_INFO[B.type];
     if (ex) {
-      let out = ex.out * tk * (B.ef || .5);
+      let out = ex.out * tk * (B.ef || .5) * guildK(T, EXTRACT[B.type]);
       if (B.type === 'lumber') { if (nat === 'protect' || nat === 'wild') out *= .6; tendForest(B, nat); }
       fl[EXTRACT[B.type]] += out;
       if (B.type === 'mine') fl.stone += out * .4;
+    } else if (CRAFT[B.type]) {
+      const [r, n, feed] = CRAFT[B.type];
+      fl[r] += n * tk * ((e.n[feed] || 0) ? 1 : .4) * guildK(T, r); // no pastures or sand pits of its own: it buys some in
     } else {
-      const o = MAKERS[B.type] * tk;
-      fl.goods += o; if (B.type === 'fusion') fl.metal += o;
+      const o = MAKERS[B.type] * tk * (POWER_USE[B.type] ? gridK() : 1);
+      fl.goods += o * guildK(T, 'goods'); if (B.type === 'fusion') fl.metal += o;
     }
   }
   const cap = econCap(T), um = T.um || {}; T.use = T.use || {};
+  if (e.n.pasture && chance(.01)) herdPasture(T);
   for (const r of RES) {
     T.use[r] = (T.use[r] || 0) * .92 + (um[r] || 0) * 12 * .08; // what building eats, per year (smoothed)
     T.flow[r] = Math.round(fl[r] * 100) / 100;                   // per year
@@ -264,8 +292,39 @@ function tryEcon(T) {
     const B = mkBuilding(k, s.x, s.y, T); connectRoad(B);
     return true;
   }
+  for (const k of shuffle(Object.keys(CRAFT_INFO))) { // a weaver or a glassworks when the stores run low
+    const ci = CRAFT_INFO[k], r = CRAFT[k][0];
+    if (!hasTech(ci.tech) || T.pop < ci.min || (CULT.shun && (CULT.shun[k] || 0) >= .3)) continue;
+    const have = e.n[k] || 0, maxN = Math.min(ci.max, 1 + Math.floor((T.pop - ci.min) / ci.per));
+    if (have >= maxN || (have > 0 && T.res[r] > lo && !(T.short[r] > 2))) continue;
+    const s = findSite(T, ci.site) || findSite(T, 'edge'); if (!s || s.replaceFarm) continue;
+    const B = mkBuilding(k, s.x, s.y, T); connectRoad(B);
+    return true;
+  }
+  const shun = k => CULT.shun && (CULT.shun[k] || 0) >= .3;
+  // a town whose yards are full builds a warehouse, so nothing it makes goes to waste
+  if (hasTech('coin') && T.pop >= 250 && !shun('warehouse') && (e.n.warehouse || 0) < Math.min(3, 1 + Math.floor(T.pop / 4000))) {
+    const cap = econCap(T), full = RES.filter(r => resOpen(r) && T.res[r] >= cap * .95).length;
+    if (full >= 3) { const s = findSite(T, 'edge') || findSite(T, 'mid'); if (s && !s.replaceFarm) { connectRoad(mkBuilding('warehouse', s.x, s.y, T)); return true; } }
+  }
+  // a harbour town builds ships of its own
+  if (hasTech('masonry') && T.pop >= 500 && !e.n.shipyard && !shun('shipyard') && townHarbour(T)) {
+    const s = findSite(T, 'harbor'); if (s) { connectRoad(mkBuilding('shipyard', s.x, s.y, T, { dir: harbourSite(s.x, s.y) })); return true; }
+  }
   return false;
 }
+const yardN = T => econCache(T).done.shipyard || 0;
+function launchShips() {
+  if (S.year - (S.yardYr || -99) < 45) return;
+  const ys = builtOf('shipyard'); if (!ys.length || !chance(.12 * ys.length)) return;
+  const B = pick(ys), T = S.T[B.sid]; if (!T) return;
+  S.yardYr = S.year;
+  const k = shipKind(), what = { sail: 'a three-masted trader', steamer: 'a new steamer', freighter: 'a freighter', boxship: 'a container ship', hover: 'a hover-freighter' }[k];
+  const nm = pickFresh(SHIP_NAMES, 'ship');
+  chron('⚓', pick([`The shipyard of ${T.name} launches ${what}, the ${nm}. Half the town comes down to the water to watch.`, `${cap1(what)} slides down the slipway at ${T.name}. They name her the ${nm}.`, `The ${nm}, ${what} built at ${T.name}, sets out on her first voyage with a brass band on the quay.`]), { x: B.x, y: B.y });
+}
+// the herd on a pasture wanders about the meadow a little (cosmetic, but it keeps the grass short)
+function herdPasture(T) { const P = T.bl.map(id => S.B[id]).find(B => B && B.type === 'pasture' && B.prog >= 1); if (P) fx('herd', { x: P.x, y: P.y, n: 2 }); }
 
 /* ---------- trade: linked towns send what they have plenty of to those that are short ---------- */
 // towns trade by road (once there are wheels) or by sea (once both have a harbour)
@@ -281,7 +340,7 @@ function stepTrade() {
     const rich = ts.filter(A => A !== B && (roadLinked(A, B) || seaLinked(A, B))).map(T => [T, T.res[r] - econCap(T) * .55]).filter(a => a[1] > 0).sort((a, b) => b[1] - a[1]);
     if (!rich.length) continue;
     const [A, sur] = rich[0];
-    const n = Math.min(sur, def, 30); if (n < 3) continue;
+    const n = Math.min(sur, def, 30 + (seaLinked(A, B) ? 20 * (yardN(A) + yardN(B)) : 0)); if (n < 3) continue; // shipyards: bigger holds
     A.res[r] -= n; B.res[r] += n;
     A.exp[r] = (A.exp[r] || 0) + n;
     moves.push([A, B, r, n]);
@@ -297,8 +356,9 @@ function stepTrade() {
   }
   if (S.trade.log.length > 60) S.trade.log.splice(0, S.trade.log.length - 60);
 }
-const KNOWN_FOR = { wood: ['its timber', 'its woodcutters'], stone: ['its quarries', 'its stonemasons'], clay: ['its bricks', 'its potters'], metal: ['its iron', 'its smiths'], goods: ['its workshops', 'the things it makes'] };
+const KNOWN_FOR = { wood: ['its timber', 'its woodcutters'], stone: ['its quarries', 'its stonemasons'], clay: ['its bricks', 'its potters'], metal: ['its iron', 'its smiths'], goods: ['its workshops', 'the things it makes'], cloth: ['its cloth', 'its weavers'], glass: ['its glass', 'its glassblowers'] };
 function yearlyEcon() {
+  launchShips();
   // the Watcher asked for another material: a few old houses a year get rebuilt in it
   const want = LV_MAT[lever('material')];
   if (want) for (const T of towns()) {
@@ -329,7 +389,7 @@ function yearlyEcon() {
 function townSectors(T) {
   const s = { farming: 0, crafts: 0, industry: 0, learning: 0, faith: 0, trade: 0 };
   const K = { farm: ['farming', 1], vfarm: ['farming', 6], dock: ['farming', 1], granary: ['farming', 1], dome: ['farming', 4], mill: ['farming', 1],
-    lumber: ['crafts', 1.5], quarry: ['crafts', 1.5], claypit: ['crafts', 1.5], workshop: ['crafts', 2], mine: ['industry', 2], works: ['industry', 3], power: ['industry', 3], fusion: ['industry', 5], turbine: ['industry', 1], solar: ['industry', 1],
+    lumber: ['crafts', 1.5], quarry: ['crafts', 1.5], claypit: ['crafts', 1.5], workshop: ['crafts', 2], pasture: ['farming', 1], sandpit: ['crafts', 1], weaver: ['crafts', 2], glassworks: ['industry', 2], warehouse: ['trade', 2], shipyard: ['trade', 3], theatre: ['faith', 2], bathhouse: ['faith', 1], digsite: ['learning', 2], botanic: ['learning', 2], guildhall: ['crafts', 2], mine: ['industry', 2], works: ['industry', 3], power: ['industry', 3], fusion: ['industry', 5], turbine: ['industry', 1], solar: ['industry', 1],
     school: ['learning', 1.5], library: ['learning', 3], university: ['learning', 5], observatory: ['learning', 2], museum: ['learning', 2], antenna: ['learning', 1],
     shrine: ['faith', 2], monument: ['faith', 3], watchstone: ['faith', 3], market: ['trade', 2], station: ['trade', 2], airfield: ['trade', 2], hall: ['trade', 1], harbor: ['trade', 4], lighthouse: ['trade', 1], dock: ['farming', 1] };
   for (const id of T.bl) { const B = S.B[id]; if (!B || B.prog < 1) continue; const k = K[B.type]; if (k) s[k[0]] += k[1]; }

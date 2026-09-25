@@ -29,6 +29,7 @@ function deserialize(obj) {
   S.flags = S.flags || {}; S.flags.intro = 0;
   for (const k in S.B) { S.B[k].hid = 0; if (S.B[k].type === 'launchpad') S.B[k].rk = 1; }
   S.doctrines = S.doctrines || []; S.aiQueue = S.aiQueue || [];
+  if (!S.springs) S.springs = placeSprings(); // saves from before the hot springs
   if (S.rev == null) S.rev = 60;
   S.prayers = (S.prayers || []).filter(q => q.st === 'open'); S.prayers.forEach(q => { if (q.st === 'busy') q.st = 'open'; }); S.prayNext = null;
   // interpretations used to be cut at 300 characters; the full text is still in the Voice log
