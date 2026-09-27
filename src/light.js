@@ -139,12 +139,13 @@ const CAST_DIMS = {
   station: [.42, .24, 13, 0], clinic: [.32, .3, 14, 0], power: [.36, .28, 17, 0], turbine: [.05, .05, 58, 1], mast: [.12, .12, 60, 0],
   university: [.44, .36, 25, 0], antenna: [.2, .2, 20, 0], vfarm: [.34, .34, 37, 0], stadium: [.45, .45, 7, 1], museum: [.4, .34, 18, 0],
   launchpad: [.08, .08, 50, 1], fusion: [.4, .4, 21, 1], terraformer: [.2, .2, 66, 1], dome: [.42, .42, 18, 1], elevator: [.3, .3, 62, 0],
-  watertower: [.2, .2, 32, 1], sandpit: [.05, .05, 4, 0], weaver: [.28, .22, 12, 0], glassworks: [.26, .24, 18, 1], warehouse: [.42, .26, 12, 0], shipyard: [.2, .2, 20, 0], theatre: [.36, .3, 24, 0], bathhouse: [.3, .24, 10, 1], digsite: [.08, .08, 8, 0], botanic: [.34, .26, 14, 0], guildhall: [.2, .26, 30, 0]
+  watertower: [.2, .2, 32, 1], sandpit: [.05, .05, 4, 0], weaver: [.28, .22, 12, 0], glassworks: [.26, .24, 18, 1], warehouse: [.42, .26, 12, 0], shipyard: [.2, .2, 20, 0], theatre: [.36, .3, 24, 0], bathhouse: [.3, .24, 10, 1], digsite: [.08, .08, 8, 0], botanic: [.34, .26, 14, 0], guildhall: [.2, .26, 30, 0], shops: [.4, .34, 14, 0]
 };
 const MON_DIMS = { statue: [.14, .14, 24, 0], lantern: [.2, .2, 62, 0], spire: [.28, .28, 50, 0], harp: [.2, .2, 42, 0], gardens: [.4, .4, 38, 0], colossus: [.3, .3, 40, 1], hall: [.42, .34, 25, 0], clock: [.18, .18, 60, 0], orchard: [.3, .3, 20, 1], obelisk: [.12, .12, 60, 0] };
 const TREE_H = [16, 16, 22, 11, 11];
 function casterDims(B) {
-  const d = casterDims0(B), st = S.styles[B.style];
+  let d = casterDims0(B); const st = S.styles[B.style];
+  const J = d && houseJoin(B); if (J) { const e = J.lo && J.hi ? .5 : .43; d = J.a === 'u' ? [e, d[1], d[2], 0] : [d[0], e, d[2], 0]; } // a terrace casts one long shadow
   if (d && st && st.shape && B.type === 'house' && B.tier >= 2) { const hm = SHAPE_HM[st.shape] || 1; return [d[0], d[1], d[2] * hm, st.shape === 'round' || st.shape === 'organic' ? 1 : d[3]]; }
   return d;
 }

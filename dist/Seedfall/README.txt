@@ -202,6 +202,25 @@ HOW TOWNS LAY THEMSELVES OUT
   With a voice key, "winding lanes" or "plan everything" changes how new
   streets are laid out. Worlds saved before this update keep their old streets.
 
+QUARTERS, TERRACES AND REBUILDING
+  Nobody zones a Seedfall town but the town itself. Each one keeps a market
+  quarter round its square, homes around that, a works quarter out on one edge
+  once it has workshops (downwind of the houses, towards its raw materials and
+  away from the neighbours), and a green or two. It redraws them every couple
+  of decades as it grows. When clean power comes, the works quarter shrinks
+  and the old yards turn into homes.
+  The quarters only steer where things go; they never stop a town building.
+  Press Z to see them: blue market quarters, green homes, yellow works, teal
+  greens.
+  Now and then something that no longer fits its quarter comes down and
+  something better goes up: fields boxed in by houses, a works in the middle
+  of the homes, an old cottage on the square (it makes way for shops). Shops
+  go from shopfronts to arcades, department stores and, later, offices.
+  No two houses are quite alike: wings, porches, bay windows, turrets, kitchen
+  gardens, a wash of colour of their own, and flat roofs with tanks, domes and
+  awnings. Townhouses, rowhouses and flats on the same street join up into
+  terraces and blocks, and the towers each have a shape and a tint of glass.
+
 BOATS, SHIPS AND PLANES
   Fishing boats leave their piers in the morning, fish all day (you can see
   the nets go over the side) and come home at dusk, with a lantern lit.
@@ -226,6 +245,7 @@ KEYS
            each costs Reverence)
   6        speak to your people
   F        fullscreen
+  Z        zone view: the quarters each town has drawn for itself
   Space    pause
   Shift+D  debug card: leap 10, 20, 50 or 100 years ahead (the world really
            moves on and is saved; handy for seeing slow changes play out)
