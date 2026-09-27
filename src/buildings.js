@@ -25,6 +25,7 @@ function drawBuilding0(c, B, cx, cy, i, st) {
   switch (B.type) {
     case 'pod': return drawPod(c, B, cx, cy);
     case 'house': return drawHouse(c, B, cx, cy, st);
+    case 'shops': return drawShops(c, B, cx, cy, st);
     case 'farm': return drawFarm(c, B, cx, cy, i);
     case 'plaza': return drawPlaza(c, B, cx, cy, st);
     case 'well': {
@@ -527,11 +528,86 @@ function tieredBody(c, cx, cy, hw, hd, h, st, wc, glass) {
   }
   return [z, w, d];
 }
+/* ---------- houses: no two quite alike, and terraces where the street fills up ---------- */
+const hk = (B, n) => hash2(B.id, n, 131); // a house's own dice, the same on every reload
+const HTINT = new Map();
+function houseTint(st, B) { // a little colour of its own: limewash, ochre, a door-colour wash...
+  const k = (hk(B, 3) * 7) | 0; if (!k) return st;
+  const key = st.wall + st.roof + st.accent + k; let o = HTINT.get(key); if (o) return o;
+  const [col, f] = [null, ['#ffffff', .24], [st.accent, .17], ['#e6c393', .22], [st.roof, .13], ['#8f857f', .16], ['#f3d9c4', .2]][k];
+  o = Object.assign({}, st, { wall: mix(st.wall, col, f), roof: k === 4 ? shade(st.roof, .88) : k === 2 ? shade(st.roof, 1.07) : k === 5 ? mix(st.roof, '#7a6a60', .2) : st.roof });
+  if (HTINT.size > 600) HTINT.clear();
+  HTINT.set(key, o); return o;
+}
+function dsFlat() { return DS && (DS.roofK === 'flat' || DS.roofK === 'garden' || (!DS.roofK && DS.shape === 'square')); }
+// flat roofs get lived on: tanks, stair huts, awnings, pots, the odd little dome
+function roofBits(c, cx, cy, u0, v0, hw, hd, z, st, B) {
+  const k = (hk(B, 7) * 6) | 0, z1 = z + 1.3;
+  if (k === 0) { const [X, Y] = pt(cx, cy, u0 + hw * .45, v0 - hd * .4, 0); cyl(c, X, Y, .06, z1, 5, '#8a7d73'); }
+  else if (k === 1) box(c, cx, cy, u0 - hw * .45, v0 - hd * .45, .09, .08, z1, 4, shade(st.wall, .92));
+  else if (k === 2) { for (const [a, b] of [[-.1, -.08], [.1, -.08], [-.1, .08], [.1, .08]]) { const p = pt(cx, cy, u0 + a, v0 + b, z1); line(c, p[0], p[1], p[0], p[1] - 4, shade(st.trim, .9), .5); } flat(c, cx, cy, u0, v0, .12, .1, z1 + 4, st.accent); }
+  else if (k === 3) for (let n = 0; n < 3; n++) { const p = pt(cx, cy, u0 - hw * .6 + n * hw * .35, v0 + hd * .55, z1); circ(c, p[0], p[1] - 1, 1.2, leafC('#6db873')); }
+  else if (k === 4 && hw >= .22 && hd >= .22) { const [X, Y] = pt(cx, cy, u0 - hw * .2, v0 - hd * .2, 0); dome(c, X, Y, .11, z1, 4.5, st.roof); }
+}
+function porch(c, cx, cy, u0, v0, hd, st) { // a canopy on two posts by the door
+  for (const a of [-.1, .1]) { const p = pt(cx, cy, u0 + a, v0 + hd + .1, 0); line(c, p[0], p[1], p[0], p[1] - 4.5, shade(st.trim, .9), .6); }
+  box(c, cx, cy, u0, v0 + hd + .055, .13, .06, 4.5, .8, st.roof);
+}
+function awning(c, cx, cy, u0, v0, hw, hd, st, U) { // shopfronts: a striped awning over the ground floor
+  if (U) { box(c, cx, cy, u0, v0 + hd + .04, hw * .86, .045, 4.6, 1, st.accent); box(c, cx, cy, u0, v0 + hd + .002, hw * .9, .002, 0, 4.2, mix(st.wall, st.trim, .45)); }
+  else { box(c, cx, cy, u0 + hw + .04, v0, .045, hd * .86, 4.6, 1, st.accent); box(c, cx, cy, u0 + hw + .002, v0, .002, hd * .9, 0, 4.2, mix(st.wall, st.trim, .45)); }
+}
+function shopfront(B) { return B.tier >= 4 && hk(B, 12) < .7 && zoneAt(idx(B.x, B.y)) === Z_CORE; } // flats over shops in the market quarter
+
+// terraces: a townhouse, rowhouse or block of flats joins the neighbours that face the same street
+const ROW_T = t => t >= 3 && t <= 5;
+function houseAx(B) { // which way its street runs: 'u' (along x) or 'v' (along y); kept, so a row never flickers
+  if (B.ax) return B.ax;
+  const n = (dx, dy) => inb(B.x + dx, B.y + dy) && netTile(idx(B.x + dx, B.y + dy));
+  const a = n(0, 1) || n(0, -1), b = n(1, 0) || n(-1, 0);
+  return (B.ax = a && !b ? 'u' : b && !a ? 'v' : hk(B, 1) < .5 ? 'u' : 'v');
+}
+function rowStyleOK(B) { const st = S.styles[B.style]; return !(st && (st.shape === 'round' || st.shape === 'organic' || st.shape === 'tiered')); }
+function rowMate(B, x, y, a) {
+  if (!inb(x, y)) return false;
+  const C = S.B[M.bld[idx(x, y)]];
+  return !!C && C.type === 'house' && C.prog >= 1 && !C.hid && ROW_T(C.tier) && houseAx(C) === a && C.sid === B.sid && rowStyleOK(C) && surfZ(idx(x, y)) === surfZ(idx(B.x, B.y));
+}
+function houseJoin(B) {
+  if (B.type !== 'house' || B.prog < 1 || !ROW_T(B.tier) || !rowStyleOK(B)) return null;
+  const a = houseAx(B), dx = a === 'u' ? 1 : 0, dy = 1 - dx;
+  const lo = rowMate(B, B.x - dx, B.y - dy, a), hi = rowMate(B, B.x + dx, B.y + dy, a);
+  return lo || hi ? { a, lo, hi } : null;
+}
+function houseNbrDirty(B) { for (const [dx, dy] of N4) markDirtyXY(B.x + dx, B.y + dy); }
+function drawRow(c, B, cx, cy, st, J, hm, wc) {
+  const t = B.tier, U = J.a === 'u', r = hash2(U ? B.y : B.x, t * 7 + B.sid, 57); // one street, one roofline (more or less)
+  const eLo = J.lo ? .5 : .36, eHi = J.hi ? .5 : .36, o = (eHi - eLo) / 2, L = (eHi + eLo) / 2, D = t === 3 ? .28 : .34;
+  const u0 = U ? o : 0, v0 = U ? 0 : o, hw = U ? L : D, hd = U ? D : L;
+  const h = (t === 3 ? 12 + (r < .5 ? 0 : 3) + (hk(B, 9) < .3 ? 2.5 : 0) : t === 4 ? 18 + ((r * 5) % 1) * 5 + (hk(B, 9) < .25 ? 3 : 0) : 28 + r * 16) * hm;
+  box(c, cx, cy, u0, v0, hw, hd, 0, h, st.wall);
+  windows(c, cx, cy, u0, v0, hw, hd, 0, h, Math.max(1, Math.round(h / 6.4)), 3, wc);
+  c.strokeStyle = rgba(st.trim, .4); c.lineWidth = .6; c.beginPath(); // party walls show as a seam on the front
+  for (const [on, e] of [[J.lo, -.5], [J.hi, .5]]) if (on) { const a = U ? pt(cx, cy, e, hd, 0) : pt(cx, cy, hw, e, 0); c.moveTo(a[0], a[1]); c.lineTo(a[0], a[1] - h); }
+  c.stroke();
+  const shop = t >= 4 && shopfront(B);
+  if (shop) awning(c, cx, cy, u0, v0, hw, hd, st, U);
+  else if (U) door(c, cx, cy, u0 - L * .3, 0, hd, .09, 4.4, shade(st.trim, .9));
+  else poly(c, [pt(cx, cy, hw + .003, v0 + L * .3 - .045, 0), pt(cx, cy, hw + .003, v0 + L * .3 + .045, 0), pt(cx, cy, hw + .003, v0 + L * .3 + .045, 4.4), pt(cx, cy, hw + .003, v0 + L * .3 - .045, 4.4)], shade(st.trim, .9));
+  if (t === 5 && (r * 13) % 1 < .45) for (let z = 8; z < h - 2; z += 6) box(c, cx, cy, U ? u0 : u0 + hw + .015, U ? v0 + hd + .015 : v0, U ? hw * .9 : .03, U ? .03 : hd * .9, z, 1, st.accent); // balconies down the street
+  if (t >= 4) box(c, cx, cy, u0, v0, hw + .015, hd + .015, h, 1.4, shade(st.trim, 1.22)); // cornice
+  if (t === 3 || (t === 4 && r < .55)) roofGable(c, cx, cy, u0, v0, hw, hd, h + (t === 4 ? 1.4 : 0), t === 3 ? 6 : 4.5, st.roof, st.wall, U);
+  else roofBits(c, cx, cy, u0, v0, hw, hd, h, st, B);
+  if (t === 3 && dsFlat()) roofBits(c, cx, cy, u0, v0, hw, hd, h, st, B);
+}
+
 function drawHouse(c, B, cx, cy, st) {
-  const t = B.tier, v = B.var || 0, au = v < .5, wc = winCol(st, B);
+  const t = B.tier, v = B.var || 0, au = v < .5;
   const u0 = (v - .5) * .08, v0 = ((v * 7) % 1 - .5) * .08;
   if (t <= 1 && DS) { const sv = DS; DS = null; try { drawHouse(c, B, cx, cy, st); } finally { DS = sv; } return; }
+  st = houseTint(st, B); const wc = winCol(st, B);
   const shp = st.shape, hm = SHAPE_HM[shp] || 1, wm = SHAPE_WM[shp] || 1;
+  const J = houseJoin(B); if (J) return drawRow(c, B, cx, cy, st, J, hm, wc);
   if (shp === 'tiered' && t >= 3 && t <= 6) {
     const hw = [0, 0, 0, .34, .4, .4, .38][t], H0 = [0, 0, 0, 16, 22, 34 + ((v * 3) % 1) * 20, 60 + ((v * 5) % 1) * 50][t];
     const [z, w, d] = tieredBody(c, cx, cy, hw, hw, H0, st, wc, t === 6);
@@ -564,28 +640,40 @@ function drawHouse(c, B, cx, cy, st) {
       cone(c, cx + u0 * 16, cy - 5, .31, 10, st.roof); return;
     }
     case 2: {
-      const hw = au ? .3 : .22, hd = au ? .22 : .3;
-      box(c, cx, cy, u0, v0, hw, hd, 0, 7, st.wall);
-      door(c, cx, cy, u0 - hw * .3, v0, hd, .09, 4.4, shade(st.trim, .9));
-      windows(c, cx, cy, u0, v0, hw, hd, 0, 7, 1, 2, wc);
-      roofGable(c, cx, cy, u0, v0, hw, hd, 7, 6, st.roof, st.wall, au);
-      if (v > .3) box(c, cx, cy, u0 + hw * .5, v0 - hd * .4, .04, .04, 9, 6, '#8f6f62');
+      const wing = hk(B, 4) < .42, flatR = dsFlat();
+      let hw = (au ? .3 : .22) + (hk(B, 1) - .5) * .05, hd = (au ? .22 : .3) + (hk(B, 2) - .5) * .05, uu = u0, h = hk(B, 3) < .18 ? 9.5 : 7;
+      if (hk(B, 6) < .28) { flat(c, cx, cy, -.28, -.28, .16, .16, .4, '#8fc47f'); for (let n = 0; n < 4; n++) { const p = pt(cx, cy, -.38 + n * .07, -.2 - (n % 2) * .08, .5); circ(c, p[0], p[1], .9, FLOWERS[(n + (hk(B, 6) * 40 | 0)) % FLOWERS.length]); } } // a kitchen garden out the back
+      if (wing) { hw = Math.min(hw, .24); uu = .1; box(c, cx, cy, -.24, v0 - .04, .14, .15, 0, 5, st.wall); roofGable(c, cx, cy, -.24, v0 - .04, .14, .15, 5, 4, st.roof, st.wall, !au); } // an L-shaped wing
+      box(c, cx, cy, uu, v0, hw, hd, 0, h, st.wall);
+      door(c, cx, cy, uu - hw * .3, v0, hd, .09, 4.4, shade(st.trim, .9));
+      windows(c, cx, cy, uu, v0, hw, hd, 0, h, h > 8 ? 2 : 1, 2, wc);
+      roofGable(c, cx, cy, uu, v0, hw, hd, h, 6, st.roof, st.wall, au);
+      if (flatR) roofBits(c, cx, cy, uu, v0, hw, hd, h, st, B);
+      else if (v > .3) box(c, cx, cy, uu + hw * (hk(B, 8) < .5 ? .5 : -.5), v0 - hd * .4, .04, .04, h + 2, 6, '#8f6f62');
+      if (hk(B, 5) < .35) porch(c, cx, cy, uu - hw * .3, v0, hd, st);
       return;
     }
     case 3: {
-      const hw = .32, hd = .28;
-      box(c, cx, cy, 0, 0, hw, hd, 0, 13, st.wall); windows(c, cx, cy, 0, 0, hw, hd, 0, 13, 2, 3, wc);
-      door(c, cx, cy, -.1, 0, hd, .09, 4.4, shade(st.trim, .9));
-      if (v < .5) roofPyr(c, cx, cy, 0, 0, hw, hd, 13, 7, st.roof); else roofGable(c, cx, cy, 0, 0, hw, hd, 13, 7, st.roof, st.wall, v < .75);
+      const wing = hk(B, 4) < .35, flatR = dsFlat();
+      let hw = .32 + (hk(B, 1) - .5) * .04, hd = .28 + (hk(B, 2) - .5) * .04, uu = 0, h = hk(B, 3) < .25 ? 15.5 : 13;
+      if (wing) { hw = .26; uu = .08; box(c, cx, cy, -.3, -.06, .14, .18, 0, 8, st.wall); windows(c, cx, cy, -.3, -.06, .14, .18, 0, 8, 1, 1, wc); roofGable(c, cx, cy, -.3, -.06, .14, .18, 8, 4, st.roof, st.wall, false); }
+      box(c, cx, cy, uu, 0, hw, hd, 0, h, st.wall); windows(c, cx, cy, uu, 0, hw, hd, 0, h, 2, 3, wc);
+      door(c, cx, cy, uu - .1, 0, hd, .09, 4.4, shade(st.trim, .9));
+      if (hk(B, 5) < .3) box(c, cx, cy, uu, hd + .015, hw * .7, .03, 7, .9, st.accent); // a balcony rail
+      if (v < .5) roofPyr(c, cx, cy, uu, 0, hw, hd, h, 7, st.roof); else roofGable(c, cx, cy, uu, 0, hw, hd, h, 7, st.roof, st.wall, v < .75);
+      if (flatR) roofBits(c, cx, cy, uu, 0, hw, hd, h, st, B);
+      if (hk(B, 6) < .3) { box(c, cx, cy, uu + .1, hd + .06, .08, .06, 0, 8, st.wall); windows(c, cx, cy, uu + .1, hd + .06, .08, .06, 0, 8, 1, 1, wc); roofPyr(c, cx, cy, uu + .1, hd + .06, .08, .06, 8, 3, st.roof); } // a bay window
       return;
     }
     case 4: {
-      const hw = .38, hd = .36;
-      box(c, cx, cy, 0, 0, hw, hd, 0, 19, st.wall); windows(c, cx, cy, 0, 0, hw, hd, 0, 19, 3, 3, wc);
-      box(c, cx, cy, 0, 0, hw + .02, hd + .02, 19, 1.5, shade(st.trim, 1.25));
-      box(c, cx, cy, 0, hd + .02, hw, .03, 7, .8, st.accent);
-      if (v > .5) { box(c, cx, cy, -.15, -.1, .08, .08, 20.5, 5, shade(st.wall, .95)); }
-      else roofGable(c, cx, cy, 0, 0, hw, hd, 20.5, 5, st.roof, st.wall, true);
+      const hw = .38, hd = .36, h = hk(B, 3) < .3 ? 22 : 19, flatR = dsFlat();
+      if (hk(B, 4) < .3) { box(c, cx, cy, -.1, -.4, .28, .06, 0, 11, shade(st.wall, .95)); } // a lower back range
+      box(c, cx, cy, 0, 0, hw, hd, 0, h, st.wall); windows(c, cx, cy, 0, 0, hw, hd, 0, h, h > 20 ? 4 : 3, 3, wc);
+      box(c, cx, cy, 0, 0, hw + .02, hd + .02, h, 1.5, shade(st.trim, 1.25));
+      if (shopfront(B)) awning(c, cx, cy, 0, 0, hw, hd, st, true); else box(c, cx, cy, 0, hd + .02, hw, .03, 7, .8, st.accent);
+      if (v > .5 || flatR) { box(c, cx, cy, -.15, -.1, .08, .08, h + 1.5, 5, shade(st.wall, .95)); if (flatR) roofBits(c, cx, cy, 0, 0, hw, hd, h + 1.5, st, B); }
+      else roofGable(c, cx, cy, 0, 0, hw, hd, h + 1.5, 5, st.roof, st.wall, true);
+      if (hk(B, 5) < .22) { const [X, Y] = pt(cx, cy, hw - .02, hd - .02, 0); cyl(c, X, Y, .1, 0, h + 3, st.wall); cone(c, X, Y - h - 3, .13, 7, st.roof); } // a corner turret
       return;
     }
     case 5: {
@@ -611,19 +699,37 @@ function drawHouse(c, B, cx, cy, st) {
       return;
     }
     case 6: {
-      const h = 58 + ((v * 5) % 1) * 62, hw = .33, hd = .33;
-      box(c, cx, cy, 0, 0, hw, hd, 0, h * .82, st.glass);
+      const h = 58 + ((v * 5) % 1) * 62, form = (hk(B, 10) * 5) | 0, gk = (hk(B, 11) * 5) | 0;
+      if (gk) st = Object.assign({}, st, { glass: mix(st.glass, ['', '#ffffff', '#6fc8b8', '#e6c28a', '#8f9cf0'][gk], .28) }); // each tower has its own tint of glass
+      if (form === 1) { // a podium of shops at its feet
+        box(c, cx, cy, 0, 0, .45, .45, 0, 9, st.wall); windows(c, cx, cy, 0, 0, .45, .45, 0, 9, 1, 4, wc); awning(c, cx, cy, 0, 0, .45, .45, st, true);
+      }
+      let hw = form === 1 ? .28 : .33, hd = hw;
+      if (form === 2) { // stepped back as it climbs
+        box(c, cx, cy, 0, 0, .4, .4, 0, h * .35, st.glass); if (LT.lit) windows(c, cx, cy, 0, 0, .4, .4, 0, h * .35, Math.floor(h * .35 / 8), 4, st.glass, null, true);
+        box(c, cx, cy, 0, 0, .41, .41, h * .35, 1.2, st.wall); hw = hd = .27;
+      }
+      if (form === 3) { // banded: stone floors between the glass
+        box(c, cx, cy, 0, 0, hw, hd, 0, h * .82, st.wall);
+        for (let z = 3; z < h * .82 - 3; z += 7) box(c, cx, cy, 0, 0, hw + .004, hd + .004, z, 4, st.glass);
+        box(c, cx, cy, 0, 0, hw * .8, hd * .8, h * .82 - .5, 1, st.wall); roofPyr(c, cx, cy, 0, 0, hw * .8, hd * .8, h * .82 + .5, 10, st.roof);
+        const t0 = pt(cx, cy, 0, 0, h * .82 + 10); line(c, t0[0], t0[1], t0[0], t0[1] - 8, '#9aa3ad', .8);
+        return;
+      }
+      const zb = form === 2 ? h * .35 + 1.2 : form === 1 ? 9 : 0;
+      box(c, cx, cy, 0, 0, hw, hd, zb, h * .82 - zb, st.glass);
       box(c, cx, cy, 0, 0, hw * .78, hd * .78, h * .82, h * .18, shade(st.glass, 1.06));
       // mullions
       c.strokeStyle = rgba(st.trim, .45); c.lineWidth = .5;
       for (let k = 1; k < 4; k++) {
         const f = k / 4;
-        let a = pt(cx, cy, -hw + f * hw * 2, hd, 0), b = pt(cx, cy, -hw + f * hw * 2, hd, h * .82); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
-        a = pt(cx, cy, hw, hd - f * hd * 2, 0); b = pt(cx, cy, hw, hd - f * hd * 2, h * .82); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+        let a = pt(cx, cy, -hw + f * hw * 2, hd, zb), b = pt(cx, cy, -hw + f * hw * 2, hd, h * .82); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+        a = pt(cx, cy, hw, hd - f * hd * 2, zb); b = pt(cx, cy, hw, hd - f * hd * 2, h * .82); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
       }
-      for (let z = 8; z < h * .82; z += 8) { const a = pt(cx, cy, -hw, hd, z), b = pt(cx, cy, hw, hd, z), d = pt(cx, cy, hw, -hd, z); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.stroke(); }
-      if (LT.lit) windows(c, cx, cy, 0, 0, hw, hd, 0, h * .82, Math.floor(h * .82 / 8), 4, st.glass, null, true);
+      for (let z = zb + 8; z < h * .82; z += 8) { const a = pt(cx, cy, -hw, hd, z), b = pt(cx, cy, hw, hd, z), d = pt(cx, cy, hw, -hd, z); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.stroke(); }
+      if (LT.lit) windows(c, cx, cy, 0, 0, hw, hd, zb, h * .82 - zb, Math.floor((h * .82 - zb) / 8), 4, st.glass, null, true);
       box(c, cx, cy, 0, 0, hw * .8, hd * .8, h * .82 - .5, 1, st.wall);
+      if (form === 4) { const p = pt(cx, cy, 0, 0, h + .5); ell(c, p[0], p[1], 4.5, 2.2, '#5d646c'); c.strokeStyle = '#f0f0f0'; c.lineWidth = .5; c.beginPath(); c.moveTo(p[0] - 1.2, p[1] - 1); c.lineTo(p[0] - 1.2, p[1] + 1); c.moveTo(p[0] + 1.2, p[1] - 1); c.lineTo(p[0] + 1.2, p[1] + 1); c.moveTo(p[0] - 1.2, p[1]); c.lineTo(p[0] + 1.2, p[1]); c.stroke(); return; } // a helipad
       const t0 = pt(cx, cy, 0, 0, h); line(c, t0[0], t0[1], t0[0], t0[1] - 12, '#9aa3ad', .8);
       if (h > 90) emit(t0[0], t0[1] - 12, 4, '#ff5a5a', .9);
       return;

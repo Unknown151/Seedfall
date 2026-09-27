@@ -93,6 +93,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 | `streetmig` | A save made by `dist/`'s build loads in the current build. |
 | `needs` | Town needs, the cloth and glass chains, smoke and its clean-up, the culture sites, and older saves picking all of it up. |
 | `away` | Catch-up after time away: the 8 h and 250-year caps, the report card, the historian's letter (mocked). |
+| `zones` | Towns draw their quarters, works in the works quarter, houses off the greens, terraces that agree from both ends, redevelopment, shops, the Z view, tooltips, and an older save drawing its zones. |
 | `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, kept worlds (new, switch, forget), a `?fresh` scratch tab saving nothing, and file:// staying cloud-free. Needs the root `npm install`. |
 
 **Inspection tools:**
@@ -103,6 +104,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 - `econchron`: prints the economy chronicle.
 - `planmap`: dumps a top-down town layout to `planmap.json`.
 - `perf_mat`: cost of the material textures.
+- `houseshot`: screenshots of the biggest town at a few years (`FLAT=1` for flat roofs, `ZONES=1` adds the zone view).
 
 **Pacing baseline** (seeds 777, 999, 12345, 4242, 31337):
 
@@ -166,6 +168,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 | streets.js | Street plan (`M.plan`): organic lanes early, grid quarters from Masonry/Steam, `connectRoad`/`pavePath`, conversion of old saves' 4-grid streets |
 | econ.js | Timber, stone, clay, metal, goods, cloth and glass; extraction sites (incl. pastures and sand pits), crafts (`CRAFT`: weaver, glassworks), material choice, building costs, shortages, road and sea trade, "known for", Towns-tab readouts |
 | needs.js | Town needs (`NEEDS`: water, milling, health, power grid, culture, news), worked out every 3 months from the buildings (`refreshNeeds`, never saved), their effects (`needGrowthK`, `lifeBonus`, `gridK`, `migrate`) and `tryNeeds`, which builds for whatever is missing. Also smoke (`SMOKY`, `sootK`, `pollution`, the `SOOT` ground tint that `topColor` reads), hot springs (`S.springs`, `springAt`), and the culture sites: `tryCulture` (bathhouse, theatre, Maker dig, botanical garden, guild hall) and `yearlyCulture` |
+| zones.js | Zones each town draws for itself (`M.zone`: market core, homes, works quarter, greens) in `drawZones`, redrawn every 20 years or when outgrown (`yearlyZones`); `ZONE_OF`/`ZSC`/`zoneScore` feed `findSite`'s `zt` argument. Redevelopment (`redevelop`, `clearFields`, `tendGreens`), the `shops` building (`shopKind`, `drawShops`) and the Z overlay (`drawZoneView`) |
 | people.js | Person model: traits, quirks, families, relationships |
 | ai.js | Claude API (`aiFetch`, daily cap 80), world brief, tool schemas, `CULT` doctrines, `lever(k)`, `LV_KEYS`/`LV_TXT` |
 | levers.js | `applyLevers` (style, nature, growth, streets, materials, lights, weather, names...), customs lists, map labels, sky lanterns |
@@ -213,6 +216,8 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
   fast-forward isn't mistaken for time away. `test/away.mjs` covers it.
 - **Needs.** Needs are soft multipliers, never hard stops. `tryNeeds` runs before housing when a need is under 60%, and may rebuild over an old house (`placeProject`) when there's no plot. The power grid is valley-wide. Keep `needGrowthK` near 1 for a typical town, or the pacing drifts.
 - **Industry and culture.** Warehouses (`econCap`) and shipyards (bigger sea cargo in `stepTrade`, more ships via `shipCap`) live in econ.js/sea.js; `STORE_T` types are counted in `econCache` but make nothing. `SOOT` is recomputed once a year (`updateSoot`) and on world load; changed tiles are `markDirty`'d. Older saves get `S.springs` in `deserialize`.
+- **Zones.** `M.zone` is a saved map layer (older saves get zones drawn in `zonesOnLoad`). Zones are soft: `findSite(T, kind, extra, zt)` adds `zoneScore(zt, i)`, never filters, so pass the building type as `zt` from new callers. Redevelopment is rate-limited (one project per town every 4+ years, fields a bit faster); keep it that way or towns turn into permanent scaffolding.
+- **Houses and terraces.** `drawHouse` tints each house (`houseTint`) and rolls its extras from `hk(B, n)` (hashed from the id, so they're stable). Tier 3–5 houses on the same street join up (`houseJoin`: same axis `B.ax`, town, height of ground, not round styles) and are drawn by `drawRow` to the tile edge; data stays one building per tile. Anything that changes a house (`mkBuilding`, upgrade start, completion, `removeBuilding`) calls `houseNbrDirty` so the neighbours redraw. `casterDims` widens a joined house's shadow.
 - **Economy.** Building costs are paid per month of progress. With nothing in stock a building goes at
   35% speed; it never stops. Materials are chosen from local production. Trade needs a road (the wheel)
   or a harbour on both ends.

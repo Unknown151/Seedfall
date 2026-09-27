@@ -105,7 +105,7 @@ function removeBuilding(B) {
   const i = idx(B.x, B.y);
   M.bld[i] = 0; delete S.B[B.id]; CNT_M = -1;
   const T = S.T[B.sid]; if (T) { const k = T.bl.indexOf(B.id); if (k >= 0) T.bl.splice(k, 1); econDirty(T); }
-  markDirty(i);
+  markDirty(i); if (B.type === 'house') houseNbrDirty(B); // its terrace neighbours close the gap
 }
 function workFor(B) { return B.type === 'house' ? HT[B.up != null ? B.up : B.tier].work : (BT[B.type] ? BT[B.type].work : 10); }
 function bcount(T, type) { let n = 0; for (const id of T.bl) { const B = S.B[id]; if (B && B.type === type) n++; } return n; }
@@ -166,7 +166,7 @@ function nearWaterDir(x, y) {
   return null;
 }
 
-function findSite(T, kind, extra = 0) {
+function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it can prefer the right quarter
   const R = townRadius(T);
   const Rx = (kind === 'farm' || kind === 'fields' ? R + 4 : kind === 'ore' ? R + 5 : kind === 'shore' || kind === 'harbor' ? R + 3 : kind === 'wild' ? R + 7 : kind === 'forest' || kind === 'rock' || kind === 'clay' || kind === 'point' || kind === 'pasture' || kind === 'sand' || kind === 'spring' || kind === 'ruins' ? R + 6 : R + 1) + extra;
   const outer = kind === 'ore' || kind === 'shore' || kind === 'forest' || kind === 'rock' || kind === 'clay' || kind === 'harbor' || kind === 'point', high = kind === 'ore' || kind === 'rock';
@@ -210,7 +210,7 @@ function findSite(T, kind, extra = 0) {
       case 'farm': {
         if (d < 1.5) continue;
         const adjF = adjCount(x, y, j => M.bld[j] && S.B[M.bld[j]] && S.B[M.bld[j]].type === 'farm');
-        s += M.fert[i] * 1.4 - Math.abs(d - Math.max(2.5, R * 0.85)) * 0.4 + adjF * 0.9 - tree * 1.1 - adjB * 0.4 - (b === BIO.ROCK ? 4 : 0) - (b === BIO.BARREN && !hasTech('climate') ? 2 : 0);
+        s += M.fert[i] * 1.4 - (T.pop > 150 && (M.zone[i] === Z_CORE || M.zone[i] === Z_HOME || M.zone[i] === Z_WORKS) ? FARM_ZP : 0) - Math.abs(d - Math.max(2.5, R * 0.85)) * 0.4 + adjF * 0.9 - tree * 1.1 - adjB * 0.4 - (b === BIO.ROCK ? 4 : 0) - (b === BIO.BARREN && !hasTech('climate') ? 2 : 0);
         break;
       }
       case 'shore': { if (!nearWaterDir(x, y)) continue; s += -d * 0.8 + adjRoad; break; }
@@ -227,6 +227,7 @@ function findSite(T, kind, extra = 0) {
       case 'barren': { s += (b === BIO.BARREN || b === BIO.ROCK || b === BIO.HIGH ? 4 : 0) - Math.abs(d - R) * 0.5; break; }
       default: s += -d;
     }
+    if (zt) s += zoneScore(zt, i);
     if (replaceFarm && kind !== 'house' && kind !== 'backlot') continue;
     if (s > bs) { bs = s; best = { x, y, replaceFarm }; }
   }
@@ -431,15 +432,15 @@ function tryUpgrade(T, relaxed) {
     if (s > cs) { cs = s; cand = B; }
   }
   if (!cand) return false;
-  cand.up = cand.tier + 1; cand.prog = 0; econUpgrade(cand, T); markDirty(idx(cand.x, cand.y));
+  cand.up = cand.tier + 1; cand.prog = 0; econUpgrade(cand, T); markDirty(idx(cand.x, cand.y)); houseNbrDirty(cand);
   return true;
 }
 function tryHousing(T) {
   const lowTierExists = T.bl.some(id => { const B = S.B[id]; return B && B.type === 'house' && B.tier < maxHouseTier() - 1; });
   if (lowTierExists && bcount(T, 'house') > 5 && chance(0.55) && tryUpgrade(T)) return true;
-  let s = findSite(T, 'house') || findSite(T, 'house', 3);
-  if (!s && growStreets(T)) s = findSite(T, 'house');
-  if (!s) { s = findSite(T, 'backlot'); if (s) DBG.back++; } // squeezed in behind, with a track to the lane
+  let s = findSite(T, 'house', 0, 'house') || findSite(T, 'house', 3, 'house');
+  if (!s && growStreets(T)) s = findSite(T, 'house', 0, 'house');
+  if (!s) { s = findSite(T, 'backlot', 0, 'house'); if (s) DBG.back++; } // squeezed in behind, with a track to the lane
   if (!s && !bcount(T, 'house')) s = anyPlot(T); // a town with nowhere at all to live takes whatever it can
   if (s) {
     if (s.replaceFarm) removeBuilding(S.B[M.bld[idx(s.x, s.y)]]);
@@ -475,9 +476,9 @@ function tryService(T) {
     if (sv.t === 'airfield' && wcount('airfield') >= Math.ceil(towns().length / 2)) continue;
     if (sv.t === 'lighthouse' && (!townHarbour(T) || anycount('lighthouse') >= 3)) continue;
     if (have >= want) continue;
-    const s = findSite(T, sv.site === 'shore' ? 'shore' : sv.site === 'ore' ? 'ore' : sv.site);
+    const s = findSite(T, sv.site === 'shore' ? 'shore' : sv.site === 'ore' ? 'ore' : sv.site, 0, sv.t);
     if (!s) continue;
-    const B = mkBuilding(sv.t, s.x, s.y, T, sv.t === 'dock' ? { dir: nearWaterDir(s.x, s.y) } : sv.t === 'harbor' ? { dir: harbourSite(s.x, s.y) } : {});
+    const B = mkBuilding(sv.t, s.x, s.y, T, sv.t === 'dock' ? { dir: nearWaterDir(s.x, s.y) } : sv.t === 'harbor' ? { dir: harbourSite(s.x, s.y) } : sv.t === 'shops' ? { sub: shopKind() } : {});
     if (sv.t !== 'solar' && sv.t !== 'turbine') connectRoad(B);
     return true;
   }
@@ -485,7 +486,7 @@ function tryService(T) {
 }
 function placeProject(T, type, kinds, o = {}) {
   let s = null;
-  for (const k of kinds) { s = findSite(T, k) || findSite(T, k, 3); if (s) break; }
+  for (const k of kinds) { s = findSite(T, k, 0, type) || findSite(T, k, 3, type); if (s) break; }
   if (!s || s.replaceFarm) {
     const olds = T.bl.map(id => S.B[id]).filter(B => B && B.prog >= 1 && ((B.type === 'house' && B.tier <= 5) || B.type === 'farm'));
     if (!olds.length) return null;
@@ -618,6 +619,7 @@ const FIRST_TXT = {
   harbor: '{T} builds a harbour: stone quays, a crane, and a warehouse that smells of tar and oranges.',
   lighthouse: 'A lighthouse is lit on the point near {T}. Ships can find their way home in the dark now.',
   university: 'The University of {T} opens its doors.',
+  shops: 'Shops open on the square in {T}: bread, buttons, and a man who sells nothing but string.',
   antenna: 'A Weave relay goes up in {T}.',
   solar: 'Solar glass glitters outside {T}.',
   vfarm: 'A gene garden tower rises in {T}. A whole field of crops, stacked to the clouds.',
@@ -646,6 +648,7 @@ const FIRST_TXT = {
 function completeBuilding(B, T) {
   if (B.up != null) { B.tier = B.up; B.up = null; }
   B.style = S.styleIdx; B.built = yr();
+  if (B.type === 'house') houseNbrDirty(B); // joins a terrace, maybe
   econComplete(B, T);
   recalcTown(T);
   const key = B.type === 'house' ? 'house' + B.tier : B.type;
@@ -1086,6 +1089,7 @@ function simMonth() {
     stepCulture();
     yearlyEcon();
     yearlyNeeds();
+    yearlyZones();
     for (const T of towns()) cultureProject(T);
     if (S.age) for (const T of towns()) if (T.pop > 300 && chance(.12)) ageProject(T);
     if (hasTech('domes')) for (const T of towns()) if (chance(.2)) greenFields(T);

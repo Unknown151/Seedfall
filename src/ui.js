@@ -90,6 +90,7 @@ function onKey(e) {
   const k = e.key;
   if (k === 'c' || k === 'C') togglePanel();
   else if (k === 'h' || k === 'H' || k === '?') $('help').classList.toggle('show');
+  else if (k === 'z' || k === 'Z') { UI.zones = !UI.zones; toast(UI.zones ? 'Zone view: blue market quarters, green homes, yellow works, teal greens. The towns draw these themselves. Z again to hide.' : 'Zone view off.'); }
   else if (k === 'f' || k === 'F') { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => { }); else document.exitFullscreen(); }
   else if (k === ' ') { UI.paused = !UI.paused; document.body.classList.toggle('paused', UI.paused); e.preventDefault(); }
   else if (k >= '1' && k <= '6') selectTool(['rain', 'drop', 'inspire', 'starfall', 'bloom', 'speak'][+k - 1]);
@@ -154,6 +155,8 @@ function tipFor(i) {
   if (B && !B.hid) {
     const st = S.styles[B.style];
     let name = B.type === 'house' ? (B.mat && B.prog >= 1 ? cap1(MAT[B.mat].n) + ' ' + HT[B.tier].n.toLowerCase() : HT[B.tier].n) : B.name || BT[B.type].n;
+    if (B.type === 'shops') name = SHOP_N[B.sub || 0];
+    if (B.type === 'house' && B.prog >= 1 && houseJoin(B)) name += B.tier === 5 ? ' (part of a block)' : ' (in a terrace)';
     if (B.type === 'farm') name = `Fields of ${CROPS[(S.T[B.sid] || { crop: 0 }).crop].n}`;
     if (B.type === 'plaza') name = `${(S.T[B.sid] || {}).name || 'Town'} square`;
     h = `<b>${name}</b>${S.T[B.sid] && B.type !== 'plaza' ? ' · ' + S.T[B.sid].name : ''}<br><small>`;
@@ -163,6 +166,7 @@ function tipFor(i) {
       h += `${B.up != null ? 'Rebuilding as ' + (B.mat ? MAT[B.mat].n + ' ' : '') + HT[B.up].n.toLowerCase() : 'Under construction' + (B.mat ? ' in ' + MAT[B.mat].n : '')} · ${Math.round(B.prog * 100)}%${lack ? ` · short of ${RES_N[lack]}, going slowly` : ''}`;
     } else {
       h += `${st ? st.name + ' style · ' : ''}${B.mat && B.type !== 'house' ? MAT[B.mat].n + ' · ' : ''}built Year ${B.built}`;
+      if (zoneAt(i)) h += ` · ${ZONE_N[zoneAt(i)]}`;
       const ex = EX_INFO[B.type], T = S.T[B.sid];
       if (ex) { const out = ex.out * toolsK() * (B.ef || .5), q = B.ef || .5; h += `<br>${RES_IC[EXTRACT[B.type]]} about ${fmt1(out)} ${RES_N[EXTRACT[B.type]]} a year${B.type === 'mine' ? ', and some stone' : ''} · ${({ lumber: ['thick forest', 'thinning woods', 'few trees left'], quarry: ['good stone', 'fair stone', 'poor stone'], claypit: ['good clay', 'fair clay', 'thin clay'], mine: ['a rich seam', 'a fair seam', 'a thin seam'], pasture: ['lush grazing', 'fair grazing', 'thin grazing'], sandpit: ['fine sand', 'fair sand', 'gritty sand'] })[B.type][q > .7 ? 0 : q > .4 ? 1 : 2]}${B.type === 'pasture' ? ' · the wool feeds a weaver' : B.type === 'sandpit' ? ' · the sand feeds a glassworks' : ''}`; }
       else if (CRAFT[B.type]) { const [r, n, feed] = CRAFT[B.type], own = T && econCache(T).n[feed]; h += `<br>${RES_IC[r]} makes about ${fmt1(n * toolsK() * (own ? 1 : .4))} ${RES_N[r]} a year${own ? '' : ` (no ${BT[feed].n.toLowerCase()} of its own, so it buys some in)`}`; }

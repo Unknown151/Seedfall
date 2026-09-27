@@ -457,6 +457,7 @@ function drawFrame() {
     c.drawImage(SC, sx0 * RS, sy0 * RS, (sx1 - sx0) * RS, (sy1 - sy0) * RS, sx0, sy0, sx1 - sx0, sy1 - sy0);
     if (LIGHT.fade >= 0) { c.globalAlpha = smooth(clamp(LIGHT.fade, 0, 1)); c.drawImage(SC2, sx0 * RS, sy0 * RS, (sx1 - sx0) * RS, (sy1 - sy0) * RS, sx0, sy0, sx1 - sx0, sy1 - sy0); c.globalAlpha = 1; }
   }
+  if (UI.zones) drawZoneView(c);
   if (UI.tool && DYN.hover >= 0) drawTarget(c, DYN.hover);
   drawAgents(c);
   // cloud shadows (only when the sun casts them); they pass over people too

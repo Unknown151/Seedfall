@@ -129,7 +129,8 @@ const BT = {
   bathhouse: { n: 'Bathhouse', work: 14, h: 24 },
   digsite: { n: 'Maker Dig', work: 6, h: 16 },
   botanic: { n: 'Botanical Garden', work: 18, h: 26 },
-  guildhall: { n: 'Guild Hall', work: 16, h: 44 }
+  guildhall: { n: 'Guild Hall', work: 16, h: 44 },
+  shops: { n: 'Shops', work: 12, h: 42 }
 };
 
 // service buildings: when a town should build one
@@ -142,6 +143,7 @@ const SERV = [
   { t: 'school', tech: 'script', min: 60, per: 350, max: 3, site: 'center' },
   { t: 'workshop', tech: 'smelt', min: 60, per: 200, max: 3, site: 'mid' },
   { t: 'mill', tech: 'mills', min: 70, per: 180, max: 3, site: 'fields' },
+  { t: 'shops', tech: 'coin', min: 250, per: 900, max: 6, site: 'center' },
   { t: 'hall', tech: 'masonry', min: 110, per: 0, max: 1, site: 'center' },
   { t: 'harbor', tech: 'masonry', min: 200, per: 0, max: 1, site: 'harbor' },
   { t: 'lighthouse', tech: 'optics', min: 300, per: 0, max: 1, site: 'point' },

@@ -7,10 +7,10 @@ const NEEDS = [
   { k: 'mill', ic: '🌾', n: 'milling', tech: 'mills', tip: 'Each windmill grinds for about sixteen fields, and milled grain feeds a quarter more people.' },
   { k: 'health', ic: '⚕️', n: 'health', tech: 'medicine', tip: 'Clinics and bathhouses. Healthy towns grow faster and live longer.' },
   { k: 'energy', ic: '⚡', n: 'power', tech: 'electric', tip: 'One grid for the whole valley. Works, gene gardens and universities run slow without it.' },
-  { k: 'culture', ic: '🎭', n: 'culture', tech: 'stone', tip: 'Shrines, markets, the library, parks, monuments, theatres, museums, stadiums, gardens. People move to lively towns, and faith grows.' },
+  { k: 'culture', ic: '🎭', n: 'culture', tech: 'stone', tip: 'Shrines, markets, shops, the library, parks, monuments, theatres, museums, stadiums, gardens. People move to lively towns, and faith grows.' },
   { k: 'word', ic: '📡', n: 'news', tech: 'radio', tip: 'A radio mast or Weave relay in range. Research goes faster, and the Watcher’s words are remembered longer.' }
 ];
-const CULT_PTS = { theatre: 4, bathhouse: 2, botanic: 3, digsite: 1, guildhall: 1, shrine: 2, plaza: 1, market: 1, library: 2, park: 1, monument: 3, watchstone: 3, museum: 5, stadium: 4, dome: 2 };
+const CULT_PTS = { shops: 1, theatre: 4, bathhouse: 2, botanic: 3, digsite: 1, guildhall: 1, shrine: 2, plaza: 1, market: 1, library: 2, park: 1, monument: 3, watchstone: 3, museum: 5, stadium: 4, dome: 2 };
 const POWER_OUT = { power: 12, turbine: 3, solar: 4, fusion: 40 };
 const POWER_USE = { works: 2, university: 2, vfarm: 2, dome: 2, station: 1, airfield: 1, stadium: 1, antenna: 1, museum: 1 };
 const WELL_N = 70, TOWER_N = 900, MILL_K = .25, MILL_FIELDS = 16;
@@ -136,7 +136,7 @@ function tryNeeds(T) {
   const shun = k => CULT.shun && (CULT.shun[k] || 0) >= .3;
   const put = (type, kinds, rebuild) => { // rebuild: with no free plot, it goes up over an old house or field
     if (shun(type)) return null;
-    for (const k of kinds) { const s = findSite(T, k); if (s && !s.replaceFarm) { const B = mkBuilding(type, s.x, s.y, T); if (type !== 'solar' && type !== 'turbine') connectRoad(B); return B; } }
+    for (const k of kinds) { const s = findSite(T, k, 0, type); if (s && !s.replaceFarm) { const B = mkBuilding(type, s.x, s.y, T); if (type !== 'solar' && type !== 'turbine') connectRoad(B); return B; } }
     return rebuild ? placeProject(T, type, []) : null;
   };
   if (v.water != null && v.water < .85) {
@@ -265,10 +265,10 @@ function tryCulture(T) {
   const shun = k => CULT.shun && (CULT.shun[k] || 0) >= .3;
   const put = (type, s, o) => { if (!s || s.replaceFarm || shun(type)) return false; const B = mkBuilding(type, s.x, s.y, T, o || {}); connectRoad(B); return true; };
   if (hasTech('masonry') && T.pop > 150 && !bcount(T, 'bathhouse') && put('bathhouse', findSite(T, 'spring'))) return true;
-  if (hasTech('print') && T.pop > 500 && bcount(T, 'theatre') < (T.pop > 8000 ? 2 : 1) && put('theatre', findSite(T, 'center') || findSite(T, 'mid'))) return true;
+  if (hasTech('print') && T.pop > 500 && bcount(T, 'theatre') < (T.pop > 8000 ? 2 : 1) && put('theatre', findSite(T, 'center', 0, 'theatre') || findSite(T, 'mid', 0, 'theatre'))) return true;
   if (hasTech('print') && T.pop > 200 && !bcount(T, 'digsite') && put('digsite', findSite(T, 'ruins'))) return true;
-  if (hasTech('optics') && T.pop > 900 && !bcount(T, 'botanic') && anycount('botanic') < Math.ceil(towns().length / 2) && put('botanic', findSite(T, 'mid') || findSite(T, 'edge'))) return true;
-  if (hasTech('coin') && T.pop > 400 && guildOf(T) && !bcount(T, 'guildhall') && put('guildhall', findSite(T, 'center') || findSite(T, 'mid'))) return true;
+  if (hasTech('optics') && T.pop > 900 && !bcount(T, 'botanic') && anycount('botanic') < Math.ceil(towns().length / 2) && put('botanic', findSite(T, 'mid', 0, 'botanic') || findSite(T, 'edge', 0, 'botanic'))) return true;
+  if (hasTech('coin') && T.pop > 400 && guildOf(T) && !bcount(T, 'guildhall') && put('guildhall', findSite(T, 'center', 0, 'guildhall') || findSite(T, 'mid', 0, 'guildhall'))) return true;
   return false;
 }
 function yearlyCulture() {

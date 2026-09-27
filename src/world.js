@@ -11,10 +11,10 @@ function newMap() {
   return {
     elev: new Uint8Array(n), water: new Uint8Array(n), bio: new Uint8Array(n), tree: new Uint8Array(n), ttype: new Uint8Array(n),
     fert: new Uint8Array(n), ore: new Uint8Array(n), ruin: new Uint8Array(n), road: new Uint8Array(n), rail: new Uint8Array(n),
-    bld: new Int32Array(n), wild: new Uint8Array(n), plan: new Uint8Array(n)
+    bld: new Int32Array(n), wild: new Uint8Array(n), plan: new Uint8Array(n), zone: new Uint8Array(n)
   };
 }
-const MAP_KEYS = ['elev', 'water', 'bio', 'tree', 'ttype', 'fert', 'ore', 'ruin', 'road', 'rail', 'bld', 'wild', 'plan'];
+const MAP_KEYS = ['elev', 'water', 'bio', 'tree', 'ttype', 'fert', 'ore', 'ruin', 'road', 'rail', 'bld', 'wild', 'plan', 'zone'];
 
 function surfZ(i) { const w = M.water[i]; return w === 1 ? SEAZ : w === 2 ? M.elev[i] * EH - 3 : M.elev[i] * EH; }
 function landZ(i) { return M.water[i] === 1 ? 2 * EH : M.elev[i] * EH; }

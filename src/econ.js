@@ -297,7 +297,7 @@ function tryEcon(T) {
     if (!hasTech(ci.tech) || T.pop < ci.min || (CULT.shun && (CULT.shun[k] || 0) >= .3)) continue;
     const have = e.n[k] || 0, maxN = Math.min(ci.max, 1 + Math.floor((T.pop - ci.min) / ci.per));
     if (have >= maxN || (have > 0 && T.res[r] > lo && !(T.short[r] > 2))) continue;
-    const s = findSite(T, ci.site) || findSite(T, 'edge'); if (!s || s.replaceFarm) continue;
+    const s = findSite(T, ci.site, 0, k) || findSite(T, 'edge', 0, k); if (!s || s.replaceFarm) continue;
     const B = mkBuilding(k, s.x, s.y, T); connectRoad(B);
     return true;
   }
@@ -305,7 +305,7 @@ function tryEcon(T) {
   // a town whose yards are full builds a warehouse, so nothing it makes goes to waste
   if (hasTech('coin') && T.pop >= 250 && !shun('warehouse') && (e.n.warehouse || 0) < Math.min(3, 1 + Math.floor(T.pop / 4000))) {
     const cap = econCap(T), full = RES.filter(r => resOpen(r) && T.res[r] >= cap * .95).length;
-    if (full >= 3) { const s = findSite(T, 'edge') || findSite(T, 'mid'); if (s && !s.replaceFarm) { connectRoad(mkBuilding('warehouse', s.x, s.y, T)); return true; } }
+    if (full >= 3) { const s = findSite(T, 'edge', 0, 'warehouse') || findSite(T, 'mid', 0, 'warehouse'); if (s && !s.replaceFarm) { connectRoad(mkBuilding('warehouse', s.x, s.y, T)); return true; } }
   }
   // a harbour town builds ships of its own
   if (hasTech('masonry') && T.pop >= 500 && !e.n.shipyard && !shun('shipyard') && townHarbour(T)) {
