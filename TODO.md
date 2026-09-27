@@ -22,6 +22,7 @@ only, or a few invited emails.
   - `claim:<id>`: the session id of the browser that owns the world.
   - `bak:<id>:<day>`: one backup a day, expiring after 14 days.
   - `voice:<id>:<day>`: the voice call counter.
+  - `world:<id>:<wid>`: a kept world (at most 20), metadata `{ planet, year, pop, savedAt, gz }`.
   - KV's free tier allows ~1,000 writes a day, so the game uploads at most every 2.5 minutes (plus on hide).
 
 ### Worker API
@@ -33,6 +34,8 @@ only, or a few invited emails.
 | `PUT /api/save` | Body is the save. Headers `If-Match: <rev>`, `X-Seedfall-Session`, `X-Seedfall-Info: {year, planet, pop}`, `X-Seedfall-Gzip: 1`. Returns the new rev, or **409** with the current meta if another device saved in between or has claimed the world. |
 | `POST /api/claim` | Body `{ session }`. Makes this browser the owner; the other device's next save gets 409. |
 | `POST /api/voice` | Proxies to the Anthropic Messages API with the Worker secret `ANTHROPIC_API_KEY`. Allows only the models in `MODELS` (kept in step with `AI_MODELS`; the build checks), caps `max_tokens` and the body size, and enforces 80 calls a day. |
+| `GET /api/worlds` | `{ worlds: [{ wid, planet, year, pop, savedAt }], max }`: the kept worlds. |
+| `GET` / `PUT` / `DELETE /api/worlds/<wid>` | One kept world. PUT takes the same body and info headers as `/api/save` (no rev, no claim) and answers **409** when a new one would go over 20. |
 
 ### How the game behaves in cloud mode
 
@@ -49,7 +52,10 @@ only, or a few invited emails.
   redirect, since fetches use `redirect: 'manual'`) or answers 401. The banner says "Signed out", the game
   keeps saving locally, and after logging in the local progress uploads.
 - **Bringing a world over.** "Load save.json…" on the welcome card and in the panel footer (a plain file
-  input) loads a save.json from disk and uploads it.
+  input) loads a save.json from disk and uploads it. The world it replaces is kept first.
+- **Kept worlds.** "Worlds…" in the footer lists the kept worlds to switch to or forget, and starts new
+  ones. Whatever gets replaced is uploaded to the list first; if that fails, nothing changes.
+- **Scratch worlds.** `?fresh` never saves or claims anything, so testing on the live site is safe.
 - **Voice.** `aiFetch` posts the same body to `/api/voice`, with no key and no direct-browser header. The
   Voice setup screen says the voice runs through the server and has no key field.
 

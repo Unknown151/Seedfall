@@ -47,8 +47,9 @@ npm run dev               # local Worker at http://127.0.0.1:8787 with a fake lo
   are hoisted, but top-level `const`s from later files are only usable at runtime.
 - **Duplicate function names fail the build.** A duplicate would silently shadow the earlier one. That
   has bitten twice: `stepPeople` vs `stepAgents` stopped anyone dying, and `workFor` vs `jobPlace`.
-- **URL flags.** Open `seedfall.html` directly. `?seed=N&fresh` makes a new world, `&nointro` skips the
-  landing, and `&dev` adds an fps readout and opens the debug card.
+- **URL flags.** Open `seedfall.html` directly. `?seed=N&fresh` makes a scratch world (`SCRATCH`): it never
+  saves anywhere (IndexedDB, folder or cloud) and never claims the cloud world, so it's safe on the live
+  site. `&nointro` skips the landing, and `&dev` adds an fps readout and opens the debug card.
 - **Debug card.** Shift+D (or `?dev`) shows +10/+20/+50/+100 year leaps. They run through `runYears` (the same
   sliced runner as catch-up, so the page stays responsive), save afterwards, and "what happened?" opens the
   report card with the highlights.
@@ -92,7 +93,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 | `streetmig` | A save made by `dist/`'s build loads in the current build. |
 | `needs` | Town needs, the cloth and glass chains, smoke and its clean-up, the culture sites, and older saves picking all of it up. |
 | `away` | Catch-up after time away: the 8 h and 250-year caps, the report card, the historian's letter (mocked). |
-| `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, and file:// staying cloud-free. Needs the root `npm install`. |
+| `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, kept worlds (new, switch, forget), a `?fresh` scratch tab saving nothing, and file:// staying cloud-free. Needs the root `npm install`. |
 
 **Inspection tools:**
 
@@ -118,7 +119,8 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 ## Hosting (seedfall.rsvn.dk)
 
 - **Worker** `worker/index.js` with config `wrangler.jsonc`. It serves `public/` as static assets and only
-  runs code for `/api/*`: `GET /api/me`, `GET/PUT /api/save`, `POST /api/claim` and `POST /api/voice`.
+  runs code for `/api/*`: `GET /api/me`, `GET/PUT /api/save`, `POST /api/claim`, `POST /api/voice`, and the
+  kept worlds (`GET /api/worlds`, `GET/PUT/DELETE /api/worlds/<wid>`).
   The rules are in the comments there and in TODO.md.
 - **Deploys.** Workers Builds deploys on every push to `main`, with build command `node build.mjs --public`
   and deploy command `npx wrangler deploy`.
@@ -130,6 +132,8 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
   - `claim:<id>` records which browser owns the world.
   - `bak:<id>:<day>` is a daily backup with a 14-day TTL.
   - `voice:<id>:<day>` counts voice calls.
+  - `world:<id>:<wid>` is a kept world (at most 20), with metadata {planet, year, pop, savedAt, gz}. The wid
+    is `seed-created`.
   - The id is a hash of the email. Autosave no more than every ~2 minutes, because the KV free tier
     allows about 1,000 writes a day.
 - **The Anthropic key** is the Worker secret `ANTHROPIC_API_KEY`, never in the page. Local dev uses
@@ -140,6 +144,10 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
   only if the world moved. IndexedDB keeps a copy plus `cloud: {email, rev}` (the rev it continues). A 409
   stops *all* saving and shows the take-over banner; a redirect or 401 means signed out (local saves only).
   `/api` fetches use `redirect: 'manual'`, because Access redirects cross-origin to its login page.
+- **Kept worlds.** On the site the footer button is "Worlds…" (`openWorlds`). Starting a new world, switching,
+  or loading a save.json first uploads the current one to `world:<id>:<wid>` (`keepWorld`); if that fails,
+  nothing changes. Switching skips catch-up. From `file://` the button is still "New world…", and the old
+  world goes to the folder's `worlds\`.
 - **Tested locally:** save round trip, both conflict cases (409), a forged, expired or wrong-audience JWT
   (rejected), the voice model allowlist and the daily counter.
 

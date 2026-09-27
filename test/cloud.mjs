@@ -95,13 +95,21 @@ try {
 
   // 2) round trip, with a planet name headers can't carry as-is
   const cA = await newCtx(), cB = await newCtx();
-  const A = await open(cA, 'A', '?seed=777&fresh&nointro');
+  const A = await open(cA, 'A'); // the save.json world from step 1
+  // a new world from Worlds…: the old one goes into the list first
+  await A.keyboard.press('c'); await A.click('#bNew'); await A.waitForSelector('#worlds.show');
+  ok(await A.textContent('#bNew') === 'Worlds…', 'the footer button is Worlds… on the site');
+  await A.click('#wlNew'); await A.waitForSelector('#confirm.show'); await A.click('#cYes');
+  await A.waitForFunction(() => S.seed !== 31337, null, { timeout: 20000 });
+  let w = await (await fetch(BASE + 'api/worlds')).json();
+  ok(w.worlds.length === 1 && w.worlds[0].year >= 120 && w.worlds[0].wid.startsWith('31337-'), 'a new world keeps the old one in the list', JSON.stringify(w.worlds));
+  await A.keyboard.press('c');
   await A.evaluate(async () => { SF.ff(60); S.planet = 'Østerlund’s Rest ✨'; await saveAll(true); });
   let a = await st(A), s = await server();
   ok(s.meta.rev === 2 && s.meta.planet === a.planet && s.meta.year === a.yr && s.meta.gz === 1, 'save round trip: PUT gzipped with info', JSON.stringify(s.meta));
   const B = await open(cB, 'B');
   let bb = await st(B);
-  ok(bb.seed === 777 && bb.yr === a.yr && bb.planet === a.planet, 'a second browser opens the same world', `year ${bb.yr}, ${bb.planet}`);
+  ok(bb.seed === a.seed && bb.yr === a.yr && bb.planet === a.planet, 'a second browser opens the same world', `year ${bb.yr}, ${bb.planet}`);
   ok(!/sk-ant|test-key/.test(s.txt) && !/"key"/.test(s.txt), 'no API key in the cloud save');
 
   // 3) two devices: B opened last, so A's next save is refused and A offers to take over
@@ -204,6 +212,34 @@ try {
   await A.evaluate(() => { SF.weather('clear', 9999); SF.hour(13); });
   await A.keyboard.press('c'); await A.waitForTimeout(1500);
   await A.screenshot({ path: path.join(here, 'cloud_panel.png') });
+
+  // 9) kept worlds: step 8's save.json replaced Østerlund, so Østerlund is in the list. Switch back, then forget the other
+  w = await (await fetch(BASE + 'api/worlds')).json();
+  ok(w.worlds.some(x => x.planet === 'Østerlund’s Rest ✨'), 'loading a save.json keeps the world it replaced', w.worlds.map(x => x.planet + ' ' + x.year).join(', '));
+  await A.click('#bNew'); await A.waitForSelector('#wlList [data-sw]');
+  ok(await A.$$eval('#wlList .wl-row', l => l.length) === 1, 'the list leaves out the world you are in');
+  await A.screenshot({ path: path.join(here, 'cloud_worlds.png') });
+  await A.click('#wlList [data-sw]'); await A.waitForSelector('#confirm.show'); await A.click('#cYes');
+  await A.waitForFunction(() => S.planet === 'Østerlund’s Rest ✨' && !CLOUD.busy && CLOUD.last > Date.now() - 8000, null, { timeout: 20000 });
+  { const me = await st(A), m = (await server()).meta; ok(m.planet === 'Østerlund’s Rest ✨' && m.year === me.yr, 'switching loads the kept world and saves it to the cloud', `Year ${me.yr}`); }
+  ok(await A.evaluate(() => Date.now() - S.lastLive < 10000 && !CATCH && !$('away').classList.contains('show')), 'a world taken off the shelf does not catch up');
+  await A.click('#bNew'); await A.waitForSelector('#wlList [data-fg]');
+  await A.click('#wlList [data-fg]'); await A.waitForSelector('#confirm.show'); await A.click('#cYes');
+  await A.waitForTimeout(1500);
+  w = await (await fetch(BASE + 'api/worlds')).json();
+  ok(w.worlds.length === 1 && !w.worlds.some(x => x.wid.startsWith('31337-')), 'forget deletes a kept world', w.worlds.map(x => x.planet).join(', '));
+  await A.keyboard.press('Escape');
+
+  // 10) a scratch world (?fresh) saves nothing and doesn't take the world from the tab that owns it
+  const rev1 = (await server()).meta.rev;
+  const D = watch(await (await newCtx()).newPage(), 'D');
+  await D.goto(BASE + '?seed=5&fresh&nointro'); await ready(D);
+  await D.evaluate(async () => { SF.ff(30); await saveAll(true); await saveAll(); });
+  await D.waitForTimeout(1000);
+  const dd = await D.evaluate(async () => ({ scratch: SCRATCH, cloud: CLOUD.on, foot: $('ftext').textContent, local: !!(await IDB.get('save')) }));
+  ok(dd.scratch && dd.cloud && /^Scratch world/.test(dd.foot) && !dd.local && (await server()).meta.rev === rev1, 'a ?fresh world is a scratch world: nothing saved anywhere', dd.foot);
+  await A.evaluate(async () => { SF.ff(1); await saveAll(true); });
+  ok(!(await st(A)).conflict && (await server()).meta.rev === rev1 + 1, 'the owning tab keeps saving, no take-over banner');
 } catch (e) { fails++; console.log('FAIL exception', e.stack || e); }
 
 ok(!errs.length, 'no page errors', errs.join(' | '));

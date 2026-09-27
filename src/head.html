@@ -166,6 +166,14 @@ select{font:inherit;font-size:12px;padding:4px 6px;border-radius:7px;border:1px 
 .card .acts .btn{padding:10px 16px;font-size:13.5px}
 .card .fine{font-size:12px;color:var(--ink3);margin-top:16px}
 #away .card{max-height:calc(100vh - 60px);overflow:auto}
+.wl{display:flex;flex-direction:column;gap:6px;margin-top:10px;max-height:46vh;overflow:auto}
+.wl-row{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.wl-row span{flex:1;min-width:0}
+.wl-row b{display:block;font-size:14px}
+.wl-row small{font-size:12px;color:var(--ink3)}
+.wl-row .btn{padding:5px 10px;font-size:12.5px}
+.wl-row .btn:disabled,#wlNew:disabled{opacity:.45;cursor:default}
+.wl-empty{font-size:13px;color:var(--ink3);padding:6px 2px}
 .away-letter{font-family:Georgia,serif;font-size:14.5px;line-height:1.6;color:var(--ink);background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:12px 0;white-space:pre-wrap}
 .away-letter:empty{display:none}
 .away-letter b{display:block;font-size:15.5px;margin-bottom:6px}
@@ -394,6 +402,14 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
   <div id="awayLetter" class="away-letter"></div>
   <ul id="awayList" class="away-list"></ul>
   <div class="acts"><button class="btn primary" id="awayOk">Carry on</button></div>
+</div></div>
+
+<div class="modal" id="worlds"><div class="card">
+  <h2>Your worlds</h2>
+  <p id="wlNow"></p>
+  <div id="wlList" class="wl"></div>
+  <div class="acts"><button class="btn primary" id="wlNew">Start a new world</button><button class="btn" id="wlClose" style="margin-left:auto">Close</button></div>
+  <div class="fine" id="wlFine"></div>
 </div></div>
 
 <div class="modal" id="confirm"><div class="card">

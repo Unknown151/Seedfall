@@ -102,8 +102,10 @@ async function folderFlush(txtFn) {
 }
 
 // force: true = push to the cloud now, 'hidden' = the tab was just hidden (cloud if 30 s have passed)
+// ?seed=N&fresh opens a scratch world: for testing, so nothing is ever saved (not to the cloud, the browser or a folder)
+let SCRATCH = false;
 async function saveAll(force) {
-  if (!S || S.flags.intro) return;
+  if (!S || S.flags.intro || SCRATCH) return;
   if (CLOUD.conflict) return; // another device owns the world now: writing anything here would only clobber it
   S.savedAt = Date.now();
   if (FOLDER.ok) await folderFlush(() => JSON.stringify(serialize()));
@@ -170,6 +172,8 @@ function showBanner(denied) {
 function hideBanner() { const b = $('banner'); b.classList.remove('show'); b.onclick = null; }
 function renderFolderStatus() {
   const el = $('fstat'), tx = $('ftext'), bt = $('bFolder');
+  $('bNew').textContent = CLOUD.on ? 'Worlds…' : 'New world…';
+  if (SCRATCH) { el.className = 'warn'; tx.textContent = 'Scratch world (?fresh) · nothing is saved'; tx.title = 'Reload without ?fresh to get back to your own world.'; bt.style.display = 'none'; return; }
   if (CLOUD.on) {
     const bad = CLOUD.conflict || CLOUD.out || CLOUD.err;
     el.className = bad ? 'warn' : CLOUD.last ? 'ok' : '';
@@ -350,7 +354,8 @@ async function cloudLoadFile(welcome) {
   const fs = await pickSaveFile();
   if (fs === null) return false;
   if (fs === false) { toast('That file isn’t a Seedfall save.'); return false; }
-  if (!welcome && S && !(await choose('Load this world?', `${saveDesc(fs.planet, fs.year)} will replace ${saveDesc(S.planet, yr())} here and in the cloud. The cloud keeps a daily backup for two weeks.`, 'Load it', 'Cancel'))) return false;
+  if (!welcome && S && !(await choose('Load this world?', `${saveDesc(fs.planet, fs.year)} takes over here and in the cloud. ${saveDesc(S.planet, yr())} is kept in your list of worlds (Worlds… in the panel).`, 'Load it', 'Cancel'))) return false;
+  if (!welcome && S && !(await keepWorld())) return false; // never lose the world it replaces
   if (CLOUD.conflict) { CLOUD.conflict = false; hideBanner(); } // loading a file on purpose is a take-over too
   try { const c = await cloudGet(true); CLOUD.rev = c ? c.meta.rev : null; } catch (e) { } // and it replaces whatever is there
   deserialize(fs); startWorld(false);
@@ -358,3 +363,74 @@ async function cloudLoadFile(welcome) {
   await cloudOwn(true);
   return true;
 }
+
+/* ---------- kept worlds (cloud only): a new world, a loaded save.json or a switch keeps the old world ---------- */
+const worldId = () => `${S.seed}-${S.created || 0}`;
+async function cloudArchive() {
+  S.savedAt = Date.now();
+  const txt = JSON.stringify(serialize()), gz = typeof CompressionStream === 'function';
+  const h = { 'content-type': gz ? 'application/octet-stream' : 'application/json', 'x-seedfall-gzip': gz ? '1' : '0', 'x-seedfall-info': asciiJson({ year: yr(), planet: S.planet || '', pop: Math.round(totalPop()) }) };
+  const r = await cloudApi('worlds/' + worldId(), { method: 'PUT', headers: h, body: gz ? await gzip(txt) : txt }, 60000);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+}
+// keep the current world before something replaces it; false (and a toast) if that isn't possible
+async function keepWorld() {
+  if (!CLOUD.on || SCRATCH || !S || S.flags.intro) return true;
+  try { await cloudArchive(); return true; }
+  catch (e) { toast(`Couldn’t keep a copy of ${S.planet || 'this world'} (${e.message}), so nothing was changed.`); return false; }
+}
+async function cloudWorlds() { const r = await cloudApi('worlds'); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status); return j; }
+async function cloudFetchWorld(wid) {
+  const r = await cloudApi('worlds/' + wid); if (!r.ok) throw new Error('HTTP ' + r.status);
+  let meta = {}; try { meta = JSON.parse(r.headers.get('x-seedfall-meta') || '{}'); } catch (e) { }
+  const buf = await r.arrayBuffer();
+  return parseSave(meta.gz ? await gunzip(buf) : new TextDecoder().decode(buf));
+}
+function openWorlds() {
+  if (!CLOUD.on) { // file://: the old way, archived to the save folder if there is one
+    confirmBox('Start a new world?', `${S.planet || 'This world'} will be archived${FOLDER.ok ? ' to the worlds folder' : ''} and a new pod will fall somewhere else.`, () => newWorld(randSeed(), true));
+    return;
+  }
+  $('worlds').classList.add('show'); renderWorlds();
+}
+async function renderWorlds() {
+  const box = $('wlList'), busy = CLOUD.out || CLOUD.conflict;
+  $('wlNow').innerHTML = SCRATCH ? 'This is a scratch world (opened with <b>?fresh</b>), so nothing here is saved. Reload without ?fresh to get back to your own world.' : `Now: <b>${esc(S.planet || 'An unnamed world')}</b>, Year ${yr()}, ${fmtInt(totalPop())} people.`;
+  $('wlNew').disabled = SCRATCH || busy;
+  $('wlFine').textContent = busy ? (CLOUD.out ? 'Signed out: reload to log in before switching worlds.' : 'This world is open on another device: take over first.') : 'Starting a new world, switching or loading a save.json always keeps the world you leave.';
+  box.innerHTML = '<div class="wl-empty">Looking for your other worlds…</div>';
+  let j; try { j = await cloudWorlds(); } catch (e) { box.innerHTML = `<div class="wl-empty">Couldn’t list your worlds (${esc(e.message)}).</div>`; return; }
+  const ws = (j.worlds || []).filter(w => SCRATCH || w.wid !== worldId()).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  box.innerHTML = ws.length ? ws.map(w => `<div class="wl-row"><span><b>${esc(w.planet || 'An unnamed world')}</b><small>Year ${w.year || 0} · ${fmtInt(w.pop || 0)} people · kept ${w.savedAt ? agoStr(w.savedAt) : ''}</small></span><button class="btn" data-sw="${esc(w.wid)}"${SCRATCH || busy ? ' disabled' : ''}>Switch</button><button class="btn" data-fg="${esc(w.wid)}" title="Forget this world"${busy ? ' disabled' : ''}>×</button></div>`).join('') : '<div class="wl-empty">No other worlds kept yet.</div>';
+  box.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => switchWorld(ws.find(w => w.wid === b.dataset.sw)));
+  box.querySelectorAll('[data-fg]').forEach(b => b.onclick = () => forgetWorld(ws.find(w => w.wid === b.dataset.fg)));
+}
+async function worldsNew() {
+  $('worlds').classList.remove('show');
+  if (!(await choose('Start a new world?', `${S.planet || 'This world'} is kept in your list of worlds, and a new pod will fall somewhere else.`, 'Start a new world', 'Cancel'))) return;
+  if (!(await keepWorld())) return;
+  await newWorld(randSeed());
+  toast('A new pod is falling. The old world is safe in your list.');
+}
+async function switchWorld(w) {
+  if (!w) return;
+  $('worlds').classList.remove('show');
+  if (!(await choose(`Switch to ${w.planet || 'that world'}?`, `${saveDesc(w.planet, w.year, w.savedAt)} takes over here and in the cloud. ${S.planet || 'This world'} is kept in your list.`, 'Switch', 'Cancel'))) return;
+  let fs; try { fs = await cloudFetchWorld(w.wid); } catch (e) { toast(`Couldn’t open that world (${e.message}).`); return; }
+  if (!fs) { toast('That kept world won’t open.'); return; }
+  if (!(await keepWorld())) return;
+  deserialize(fs); S.lastLive = Date.now(); // it was on the shelf, not away: no catch-up
+  startWorld(false);
+  toast(`Welcome back to ${S.planet || 'your world'}.`);
+  await saveAll(true);
+}
+async function forgetWorld(w) {
+  if (!w) return;
+  $('worlds').classList.remove('show');
+  if (!(await choose(`Forget ${w.planet || 'that world'}?`, `The kept copy of ${saveDesc(w.planet, w.year)} is deleted for good.`, 'Forget it', 'Keep it'))) { openWorlds(); return; }
+  try { const r = await cloudApi('worlds/' + w.wid, { method: 'DELETE' }); if (!r.ok) throw new Error('HTTP ' + r.status); toast(`${w.planet || 'That world'} is forgotten.`); }
+  catch (e) { toast(`Couldn’t forget it (${e.message}).`); }
+  openWorlds();
+}
+function bindWorlds() { $('wlNew').onclick = worldsNew; $('wlClose').onclick = () => $('worlds').classList.remove('show'); }

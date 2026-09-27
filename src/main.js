@@ -156,14 +156,14 @@ SF.pray = k => { const c = prayerCandidates().filter(x => !k || x[0] === k); if 
 SF.season = s => { LIGHT.forceSeason = s ? Object.assign({ autumn: 0, winter: 0, spring: 0 }, s) : null; LIGHT.seasonT = 0; LIGHT.chk = 0; };
 
 async function boot() {
-  initView(); initStatic(); initLight(); bindUI(); bindAI(); bindFaith(); bindAway(); bindDebug();
+  initView(); initStatic(); initLight(); bindUI(); bindAI(); bindFaith(); bindAway(); bindDebug(); bindWorlds();
   if (DEV) $('fps').style.display = 'block';
   try { await IDB.open(); } catch (e) { }
   try { await aiLoad(); } catch (e) { }
   const cloud = await cloudDetect(); // served by the Worker and logged in: saves go to the cloud (file:// never is)
   if (QS.has('seed') && QS.has('fresh')) {
+    SCRATCH = true; // a scratch world for testing: never saved, and it never claims the real world from another tab
     newState(+QS.get('seed')); if (QS.has('nointro')) { S.flags.intro = 0; introChronicle(); } else { const pod = Object.values(S.B).find(B => B.type === 'pod'); if (pod) pod.hid = 1; } startWorld(true);
-    if (cloud && !CLOUD.out) { try { const c = await cloudGet(true); CLOUD.rev = c ? c.meta.rev : null; } catch (e) { } cloudOwn(false); } // asked for a fresh world, so it replaces the cloud's
     return;
   }
   if (cloud) {
@@ -208,7 +208,7 @@ async function boot() {
 setInterval(() => { if (S && RUNNING) saveAll(); }, 45000);
 setInterval(() => { if (S && RUNNING) aiMaybeGossip(); }, 30000);
 document.addEventListener('visibilitychange', () => { if (document.hidden && S && RUNNING) saveAll('hidden'); else lastT = 0; });
-addEventListener('beforeunload', () => { if (S && RUNNING && !CLOUD.conflict) { S.savedAt = Date.now(); try { IDB.set('save', JSON.stringify(serialize())); } catch (e) { } } });
+addEventListener('beforeunload', () => { if (S && RUNNING && !CLOUD.conflict && !SCRATCH) { S.savedAt = Date.now(); try { IDB.set('save', JSON.stringify(serialize())); } catch (e) { } } });
 boot();
 </script>
 </body>
