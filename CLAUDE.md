@@ -108,6 +108,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 - `perf_mat`: cost of the material textures.
 - `praysample`: prints sample prayers, answers and give-ups at a few points in history.
 - `roadshot`: close-ups of the biggest town's streets at a few years, with a count of each surface.
+- `glpick`: the 3D preview's pointing and clicking: tooltips, the top of a tall building picking that building, following a person, a nudge landing where you click.
 - `glshot`: screenshots of the 3D preview (`?gl`) at noon, turned, evening and night, plus the time to build every chunk. `node glshot.mjs [seed] [year] [noon,night...]`.
 - `houseshot`: screenshots of the biggest town at a few years (`FLAT=1` for flat roofs, `ZONES=1` adds the zone view).
 
@@ -183,7 +184,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 | agents.js | A* navigation, walkers with daily schedules, vehicles, caravans, trade wagons, occlusion sprites, depth-sorted `drawAgents`, building animations (mill, turbine, chop, dig, crane, beam...) |
 | sea.js | Water bodies, harbours, sea routes, ships by era (sail, steamer, freighter, boxship, hover), fishing boats (out at dawn, home at dusk), ferries, lighthouse beams |
 | air.js | Planes that use airfields: apron, taxi, roll, climb, cruise, final approach, land, park |
-| gl.js | **Proof of concept (branch `claude/poc-3d`):** the world in real 3D with WebGL2, only with `?gl`. Chunks of 8×8 tiles are built by running the normal art with `GLB` set, which makes the render.js primitives emit triangles (2D-only strokes are skipped); terrain, roads, trees, lamps and people are built here. Per-pixel sun or moon with a 2048² shadow map, sky/ground ambient, bounce light, lit windows, and up to 64 nearby street lamps as point lights. Keys R, N, T; drag and wheel. Tooltips and the nudge tools don't work in this view yet |
+| gl.js | **Proof of concept (branch `claude/poc-3d`):** the world in real 3D with WebGL2, only with `?gl`. Chunks of 8×8 tiles are built by running the normal art with `GLB` set, which makes the render.js primitives emit triangles (2D-only strokes are skipped); terrain, roads, trees, lamps and people are built here. Per-pixel sun or moon with a 2048² shadow map, sky/ground ambient, bounce light, lit windows, and up to 64 nearby street lamps as point lights. Keys R, N, T; drag and wheel. Picking: every vertex carries an id (tile index + 1, or `GPID` + walker index), a half-size id pass is drawn when the pointer moves and one pixel is read back, so tooltips (`glTip`), the hover glow (`uHi`) and clicks (`glClick`: nudges land on that tile, a person opens their card and the camera follows) hit exactly what's under the pointer |
 | ui.js | Panel and tabs (Chronicle, Towns, People, Lore, Voice), tooltips (`tipFor`), HUD |
 | persist.js | `serialize`/`deserialize` plus migrations, IndexedDB, folder saves (save.json, chronicle.md, stats.csv, dated backups), cloud saves (`CLOUD`, only when served by the Worker) |
 | main.js | Frame loop, pace (`relaxed` 5 min/yr, `normal` 3 min/yr, `brisk` 1 min/yr, `preview` 4 s/yr), dev hooks |
