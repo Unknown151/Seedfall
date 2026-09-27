@@ -31,68 +31,7 @@ function stepFaith(dt) {
   stepPrayers();
 }
 
-/* ---------- prayers ---------- */
-const PRAYERS = {
-  rain: [
-    p => S.drought > 0 ? `The ${crop(p)} fields are cracking in the heat. One good rain, please.` : `If it rained on ${town(p)} this week, I'd stop complaining about everything else. For a while.`,
-    p => S.drought > 0 ? `My ${crop(p)} are wilting and the well tastes of dust. Rain for ${town(p)}?` : `The ${crop(p)} could use a drink. So could I, but mostly the ${crop(p)}.`,
-    p => `I told the whole market it would rain before harvest. Please don't make a liar of me.`
-  ],
-  bloom: [
-    p => `Could the hills around ${town(p)} flower again? My grandmother used to love them.`,
-    p => `I dream of mossbacks grazing in a meadow full of flowers. Just outside ${town(p)} would be perfect.`,
-    p => S.era >= 4 ? `It's all roads and roofs around ${town(p)} now. A little wild green, please?` : `I've been ${p.q.hobby} all spring and there's nothing left to look at. Something growing, please?`
-  ],
-  inspire: [
-    p => `${spouse(p)} and I have hoped for a child for years. If you're listening, Watcher...`,
-    p => `Our house is too quiet. ${spouse(p)} says you'll hear us if we ask nicely.`,
-    p => `${spouse(p)} has already carved a cradle. Please don't let it gather dust.`
-  ],
-  drop: [
-    p => `I've been stuck on the same problem for ${ri(3, 9)} winters. A hint. Any hint.`,
-    p => `The Archive's pages on this are torn. Could you send the missing bit?`,
-    p => `Everyone in ${town(p)} says I'm close. I don't feel close. Help?`
-  ],
-  starfall: [
-    p => /smith|mason|machin/.test(p.role) ? `They say starmetal rings like a bell. I'd give anything to work it once.` : `Show us a falling star over ${town(p)}. The children have never seen one.`,
-    p => `A sign in the sky, please, so ${town(p)} stops arguing about whether you're real.`,
-    p => `I've counted every star over ${town(p)}. I'd like one to come a bit closer.`
-  ],
-  name: [
-    (p, q) => `Our little one was born under your sky. Would you choose a name?`,
-    (p, q) => `${spouse(p)} wants to call the baby ${S.P[q.child] ? S.P[q.child].first : 'something odd'}. I'd rather you chose.`
-  ],
-  town: [
-    (p, q) => `We've built ${S.T[q.tid].name}'s first houses, but nobody likes the name. What should we call our home?`,
-    (p, q) => `The settlers keep arguing about what to call this place. You decide, Watcher. Please.`
-  ],
-  ask: [
-    p => `Should I give up ${p.q.hobby} and take my work more seriously?`,
-    p => p.riv.length && S.P[p.riv[0]] ? `${S.P[p.riv[0]].first} and I haven't spoken in years. Should I be the one to make up?` : `Is it silly that I'm afraid of ${p.q.fear}?`,
-    p => `Everyone in ${town(p)} knows about my ${p.q.gp}. Should I stop?`,
-    p => `What should ${town(p)} build next? The council has been arguing since spring.`,
-    p => `You've heard me say ${p.q.says} a thousand times. Am I wrong?`
-  ]
-};
-const OUTCOME = {
-  rain: [p => `Rain falls on ${town(p)}, just where ${p.first} prayed for it. ${p.first} stands in it until soaked.`, p => `${p.name} swears the rain came the moment the prayer was finished. The ${crop(p)} recover within the week.`],
-  bloom: [p => `The land around ${town(p)} is in flower. ${p.first} brings the whole family to see it.`, p => `${p.name} leaves a ${p.q.food} on the nearest high place to thank the Watcher for the flowers.`],
-  inspire: [p => `${p.first} and ${spouse(p)} tell everyone their child was sent by the Watcher. Nobody argues.`],
-  drop: [p => `In the gift pod ${p.name} finds exactly the missing piece. ${town(p)} hears the shouting from the workshop.`, p => `${p.name} opens the gift pod, reads the data crystal twice, and doesn't sleep for three days.`],
-  starfall: [p => `${p.name} watches the star come down and runs all the way to the crater.`, p => /smith|mason|machin/.test(p.role) ? `${p.name} works the starmetal for a month. The result rings like a bell.` : `${town(p)} watches the star fall all night. ${p.first} is unbearable about it for years.`],
-  ask: [(p, a) => `${p.name} hears an answer on the wind: “${a}” They take it very seriously.`, (p, a) => `${p.name} gets a reply from the Watcher: “${a}” ${town(p)} talks of nothing else for a week.`]
-};
-const EXPIRE = {
-  rain: p => `${p.name} stops waiting for rain and digs a new well instead.`,
-  bloom: p => `${p.name} gives up waiting and plants a flower bed by the door.`,
-  drop: p => `${p.name} solves the problem alone in the end, a bit grumpily.`,
-  inspire: p => `${p.first} and ${spouse(p)} get a loamhound pup instead. It helps.`,
-  starfall: p => `${p.name} keeps watching the sky. Maybe next year.`
-};
-const town = p => (S.T[p.sid] || {}).name || 'the valley';
-const crop = p => { const T = S.T[p.sid]; return T ? CROPS[T.crop % CROPS.length].n : 'sunroot'; };
-const spouse = p => (p.sp && S.P[p.sp] ? S.P[p.sp].first : 'my love');
-
+/* ---------- prayers (the words live in prayers.js) ---------- */
 function prayerCandidates() {
   const L = living().filter(p => adult(p) && S.T[p.sid]); if (!L.length) return [];
   const out = [], ix = townIndex();
@@ -118,7 +57,7 @@ function newPrayer() {
   const cand = prayerCandidates(); if (!cand.length) return;
   const [k, , p, ex] = wpick(cand.map(c => [c, c[1]]));
   const q = Object.assign({ id: (S.prayN = (S.prayN || 0) + 1), k, pid: p.id, tid: p.sid, t0: S.playSec, exp: S.playSec + rf(28, 45) * 60, st: 'open' }, ex || {});
-  q.text = pick(PRAYERS[k])(p, q);
+  q.text = prayText(k, p, q);
   q.rw = PRAY_TOOL[k] ? Math.round(COST[k] * 1.5 + 8) : k === 'ask' ? 24 : 20;
   if (k === 'town') S.T[q.tid].asked = 1;
   S.prayers.push(q);
@@ -141,7 +80,7 @@ function stepPrayers() {
     if (!prayerValid(q)) { q.st = 'gone'; q.tEnd = S.playSec; ch = true; continue; }
     if (S.playSec > q.exp) {
       q.st = 'gone'; q.tEnd = S.playSec; ch = true;
-      const p = S.P[q.pid]; if (EXPIRE[q.k] && chance(.35)) chron('🕯️', EXPIRE[q.k](p), { T: S.T[p.sid], nocap: true });
+      const p = S.P[q.pid], t = chance(.35) && prayEnd(EXPIRE, q.k, p); if (t) chron('🕯️', t, { T: S.T[p.sid], nocap: true });
     }
   }
   const n0 = S.prayers.length;
@@ -163,8 +102,8 @@ function answered(q, extra) {
   S.prayOk = (S.prayOk || 0) + 1;
   if (!p.deeds.includes('a prayer the Watcher answered')) p.deeds.push('a prayer the Watcher answered');
   if (chance(.3)) p.q.tag = 'Heard by the Watcher';
-  const o = OUTCOME[q.k];
-  if (o && q.k !== 'ask') chron('🙏', pick(o)(p), { T, cap: `${p.first}'s prayer is answered` });
+  const o = OUTCOME[q.k] && OUTCOME[q.k].length;
+  if (o && q.k !== 'ask') chron('🙏', prayEnd(OUTCOME, q.k, p), { T, cap: `${p.first}'s prayer is answered` });
   gainRev(q.rw + (extra || 0), `${p.first} is grateful`);
   UIDIRTY.prayers = true; UIDIRTY.people = true;
   faithRecalc();
@@ -205,7 +144,7 @@ function answerWithWords(q, text) {
 }
 function offlineAnswer(q, p, text) {
   const a = text.length > 110 ? text.slice(0, 107) + '…' : text;
-  chron('🕯️', pick(OUTCOME.ask)(p, /[.!?…]$/.test(a) ? a : a + '.'), { T: S.T[p.sid], cap: `${p.first} gets an answer` });
+  chron('🕯️', prayEnd(OUTCOME, 'ask', p, /[.!?…]$/.test(a) ? a : a + '.'), { T: S.T[p.sid], cap: `${p.first} gets an answer` });
   q.st = 'open'; answered(q);
 }
 

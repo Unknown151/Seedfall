@@ -94,6 +94,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 | `needs` | Town needs, the cloth and glass chains, smoke and its clean-up, the culture sites, and older saves picking all of it up. |
 | `away` | Catch-up after time away: the 8 h and 250-year caps, the report card, the historian's letter (mocked). |
 | `zones` | Towns draw their quarters, works in the works quarter, houses off the greens, terraces that agree from both ends, redevelopment, shops, the Z view, tooltips, and an older save drawing its zones. |
+| `prayers` | Prayer words at three points in history: all well-formed (no `undefined`, lowercase sentence starts or overlong cards), 40+ different out of 60 per kind, early ones free of radios and seedships and late ones mentioning them. |
 | `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, kept worlds (new, switch, forget), a `?fresh` scratch tab saving nothing, and file:// staying cloud-free. Needs the root `npm install`. |
 
 **Inspection tools:**
@@ -104,6 +105,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 - `econchron`: prints the economy chronicle.
 - `planmap`: dumps a top-down town layout to `planmap.json`.
 - `perf_mat`: cost of the material textures.
+- `praysample`: prints sample prayers, answers and give-ups at a few points in history.
 - `houseshot`: screenshots of the biggest town at a few years (`FLAT=1` for flat roofs, `ZONES=1` adds the zone view).
 
 **Pacing baseline** (seeds 777, 999, 12345, 4242, 31337):
@@ -172,6 +174,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 | people.js | Person model: traits, quirks, families, relationships |
 | ai.js | Claude API (`aiFetch`, daily cap 80), world brief, tool schemas, `CULT` doctrines, `lever(k)`, `LV_KEYS`/`LV_TXT` |
 | levers.js | `applyLevers` (style, nature, growth, streets, materials, lights, weather, names...), customs lists, map labels, sky lanterns |
+| prayers.js | The words of prayers: `prayCtx` (era band, season, weather, drought, smoke, needs, family, age), `PRAY_OPEN` + `PRAYERS[kind]` + `PRAY_CLOSE` pieces (each returns null when it doesn't fit), `OUTCOME`/`EXPIRE`, and `prayText`/`prayEnd`, which skip recently used pieces (`S.prayRecent`) |
 | faith.js | Reverence (costs replace cooldowns), prayers (templated or Claude-written), answering |
 | dyn.js | `DYN` (per-frame, never saved), camera, particles, clouds and sky, FX dispatch, `drawFrame` order (static, agents, planes in the air, clouds, grade, sky, night light + lighthouse beams) |
 | agents.js | A* navigation, walkers with daily schedules, vehicles, caravans, trade wagons, occlusion sprites, depth-sorted `drawAgents`, building animations (mill, turbine, chop, dig, crane, beam...) |

@@ -99,6 +99,9 @@ REVERENCE AND PRAYERS
   Grateful people give back more Reverence than the answer cost, and every
   answered prayer raises the limit and the rate a little. Ignore a prayer (or
   close it with ×) and nothing bad happens; they just sort it out themselves.
+  Prayers fit the one praying and the world around them: the season and the
+  weather, a drought, a smoky town, a new baby, an old rivalry, a telescope, a
+  seedship crew list. Hundreds of ways of asking, and of how it turns out.
 
 SKY, WEATHER AND SEASONS
   Day and night: C > Sky picks the clock.
