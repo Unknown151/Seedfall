@@ -41,6 +41,7 @@ function computeBB(i) {
 }
 
 function markDirty(i) {
+  if (GL3.on) glDirty(i);
   const a0 = BB.x0[i], b0 = BB.y0[i], a1 = BB.x1[i], b1 = BB.y1[i];
   const h0 = CH[i];
   computeBB(i); TV[i]++;
@@ -106,6 +107,7 @@ function renderAll() {
 /* ---------- primitives ---------- */
 function pt(cx, cy, u, v, z) { return [cx + (u - v) * 16, cy + (u + v) * 8 - z]; }
 function poly(c, p, col) {
+  if (GLB) return; // flat 2D shapes have no depth to give the 3D view
   c.fillStyle = col; c.beginPath(); c.moveTo(p[0][0], p[0][1]);
   for (let k = 1; k < p.length; k++) c.lineTo(p[k][0], p[k][1]);
   c.closePath(); c.fill();
@@ -114,6 +116,7 @@ function poly(c, p, col) {
 let DS = null, DM = null; // DM: the material of the building being drawn (timber, stone, brick, adobe)
 function dsRound() { return DS && (DS.shape === 'round' || DS.shape === 'organic'); }
 function box(c, cx, cy, u0, v0, hw, hd, z0, h, col, top) {
+  if (GLB) return glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top);
   if (dsRound()) { const [X, Y] = pt(cx, cy, u0, v0, 0); cyl(c, X, Y, Math.max(hw, hd) * 1.08, z0, h, col, top); return; }
   const P = (u, v, z) => pt(cx, cy, u0 + u, v0 + v, z);
   poly(c, [P(-hw, hd, z0), P(hw, hd, z0), P(hw, hd, z0 + h), P(-hw, hd, z0 + h)], shade(col, LT.fL));
@@ -138,11 +141,13 @@ function matLines(c, P, hw, hd, z0, h) {
   c.strokeStyle = DM === 'wood' ? 'rgba(70,40,20,.2)' : DM === 'brick' ? 'rgba(250,230,210,.18)' : 'rgba(60,55,70,.16)'; c.lineWidth = DM === 'brick' ? .3 : .35; c.stroke();
 }
 function flat(c, cx, cy, u0, v0, hw, hd, z, col) {
+  if (GLB) return glFlat(cx, cy, u0, v0, hw, hd, z, col);
   if (dsRound() && Math.abs(hw - hd) < .12) { const [X, Y] = pt(cx, cy, u0, v0, z), r = Math.max(hw, hd); ell(c, X, Y, r * 22.6, r * 11.3, col[0] === '#' ? topC(shade(col, LT.fG)) : col); return; }
   const P = (u, v) => pt(cx, cy, u0 + u, v0 + v, z);
   poly(c, [P(-hw, -hd), P(hw, -hd), P(hw, hd), P(-hw, hd)], col[0] === '#' ? topC(shade(col, LT.fG)) : col);
 }
 function cylWindows(c, cx, cy, u0, v0, r, z0, h, floors, n, col, onlyLit) {
+  if (GLB) return glCylWindows(cx, cy, u0, v0, r, z0, h, floors, n, col);
   const fh = h / floors, lit = LT.lit, hx = (cx * 8) | 0, hy = (cy * 8) | 0;
   for (let f = 0; f < floors; f++) {
     const zb = z0 + f * fh + fh * .32, wh = fh * .42;
@@ -157,6 +162,7 @@ function cylWindows(c, cx, cy, u0, v0, r, z0, h, floors, n, col, onlyLit) {
   }
 }
 function windows(c, cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col, colR, onlyLit) {
+  if (GLB) { if (!onlyLit || true) glWindows(cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col); return; }
   if (dsRound()) { cylWindows(c, cx, cy, u0, v0, Math.max(hw, hd) * 1.08 + .004, z0, h, floors, Math.min(cols + 1, 5), col, onlyLit); return; }
   const fh = h / floors, lit = LT.lit, cL = shade(col, LT.fWL), cR = colR ? shade(colR, LT.fWR) : shade(col, q2(.8 * LT.fWR / .8));
   const hx = (cx * 8) | 0, hy = (cy * 8) | 0;
@@ -176,6 +182,7 @@ function windows(c, cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col, colR, only
   }
 }
 function door(c, cx, cy, u0, v0, hd, w, h, col) {
+  if (GLB) return glDoor(cx, cy, u0, v0, hd, w, h, col);
   if (dsRound()) { u0 += hd * .74; v0 = v0 + hd * .74 - hd; }
   let dc = col;
   if (LT.lit && hash2((cx * 4) | 0, (cy * 4) | 0, 91) < LT.lit + .15) {
@@ -202,6 +209,7 @@ function dsRoof(c, cx, cy, u0, v0, hw, hd, z, rh, col) {
 }
 function roofGable(c, cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
   if (DS && dsRoof(c, cx, cy, u0, v0, hw, hd, z, rh, col)) return;
+  if (GLB) return glGable(cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU);
   const o = 0.05, P = (u, v, zz) => pt(cx, cy, u0 + u, v0 + v, zz), r = rh / 19.6;
   if (alongU) {
     poly(c, [P(-hw - o, -hd - o, z), P(hw + o, -hd - o, z), P(hw + o, 0, z + rh), P(-hw - o, 0, z + rh)], topC(shade(col, lf(0, -r, hd))));
@@ -215,12 +223,14 @@ function roofGable(c, cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
 }
 function roofPyr(c, cx, cy, u0, v0, hw, hd, z, rh, col) {
   if (DS && dsRoof(c, cx, cy, u0, v0, hw, hd, z, rh, col)) return;
+  if (GLB) return glPyr(cx, cy, u0, v0, hw, hd, z, rh, col);
   const o = 0.04, P = (u, v, zz) => pt(cx, cy, u0 + u, v0 + v, zz), r = rh / 19.6;
   const A = P(-hw - o, -hd - o, z), B = P(hw + o, -hd - o, z), C = P(hw + o, hd + o, z), D = P(-hw - o, hd + o, z), T = P(0, 0, z + rh);
   poly(c, [A, B, T], topC(shade(col, lf(0, -r, hd)))); poly(c, [D, A, T], topC(shade(col, lf(-r, 0, hw))));
   poly(c, [D, C, T], topC(shade(col, lf(0, r, hd)))); poly(c, [C, B, T], topC(shade(col, lf(r, 0, hw))));
 }
 function cone(c, x, y, r, h, col) {
+  if (GLB) return glCone(x, y, r, h, col);
   const rx = r * 22.6, ry = r * 11.3;
   const g = c.createLinearGradient(x - rx, 0, x + rx, 0);
   g.addColorStop(0, topC(shade(col, lf(-.6, .6, .55)))); g.addColorStop(.5, topC(shade(col, lf(.6, .6, .55)))); g.addColorStop(1, topC(shade(col, lf(.6, -.6, .55))));
@@ -228,6 +238,7 @@ function cone(c, x, y, r, h, col) {
 }
 const CYL_N = [[0, -.707, .707], [.146, 0, 1], [.5, .707, .707], [.854, 1, 0], [1, .707, -.707]];
 function cyl(c, x, y, r, z0, h, col, top) {
+  if (GLB) return glCyl(x, y, r, z0, h, col, top);
   const rx = r * 22.6, ry = r * 11.3, yb = y - z0, yt = y - z0 - h;
   const g = c.createLinearGradient(x - rx, 0, x + rx, 0);
   for (const [s, nx, ny] of CYL_N) g.addColorStop(s, shade(col, lf(nx, ny, 0)));
@@ -235,14 +246,15 @@ function cyl(c, x, y, r, z0, h, col, top) {
   c.fillStyle = topC(top || shade(col, LT.fT)); c.beginPath(); c.ellipse(x, yt, rx, ry, 0, 0, TAU); c.fill();
 }
 function dome(c, x, y, r, z0, h, col, alpha = 1) {
+  if (GLB) return glDome(x, y, r, z0, h, col);
   const rx = r * 22.6, ry = r * 11.3, yb = y - z0;
   const g = c.createRadialGradient(x + rx * .42 * LT.hx, yb - h * (.62 - .12 * LT.hy), 1, x, yb - h * .3, rx * 1.25);
   g.addColorStop(0, topC(shade(col, q2(LT.fT + .18)))); g.addColorStop(.5, shade(col, q2(LT.fT - .07))); g.addColorStop(1, shade(col, q2(LT.fR - .04)));
   c.globalAlpha = alpha; c.fillStyle = g; c.beginPath(); c.ellipse(x, yb, rx, h, 0, Math.PI, TAU, false); c.ellipse(x, yb, rx, ry, 0, 0, Math.PI, false); c.closePath(); c.fill(); c.globalAlpha = 1;
 }
-function line(c, x0, y0, x1, y1, col, w) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); }
-function circ(c, x, y, r, col) { c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
-function ell(c, x, y, rx, ry, col) { c.fillStyle = col; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill(); }
+function line(c, x0, y0, x1, y1, col, w) { if (GLB) return; c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); }
+function circ(c, x, y, r, col) { if (GLB) return; c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
+function ell(c, x, y, rx, ry, col) { if (GLB) return; c.fillStyle = col; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill(); }
 
 /* ---------- terrain ---------- */
 const STRATA = ['#a77a60', '#bb8f70', '#94705f', '#ad8671', '#86665b', '#9a7666'];

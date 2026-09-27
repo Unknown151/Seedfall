@@ -19,6 +19,7 @@ function startWorld(isNew) {
   UIDIRTY.chron = UIDIRTY.stats = UIDIRTY.tools = true;
   UIDIRTY.prayers = true; FAITH.shown = '';
   renderHUD(); renderTools(); renderFolderStatus(); faithRecalc(); renderFaith();
+  if (QS.has('gl')) { if (!GL3.on) glInit(); else for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); }
   if (!RUNNING) { RUNNING = true; requestAnimationFrame(frame); }
 }
 async function newWorld(seed, archive) {
@@ -50,10 +51,8 @@ function frame(now) {
   if (frameN++ % 45 === 0) syncWalkers();
   updateDyn(dt);
   stepCamera(dt);
-  lightTick(dt);
-  flushDirty();
-  drawFrame();
-  updateTip();
+  if (GL3.on) glFrame(dt); // the 3D preview (?gl) draws the world itself
+  else { lightTick(dt); flushDirty(); drawFrame(); updateTip(); }
   uiT += dt;
   if (uiT > .5) { uiT = 0; renderHUD(); renderTools(); renderFaith(); if (UI.panel) renderPanel(false); }
   if (DEV) { fpsN++; if (now - fpsT > 1000) { $('fps').textContent = `${fpsN} fps · y${S.year.toFixed(1)} · walkers ${DYN.walkers.length} · parts ${DYN.parts.length}`; fpsN = 0; fpsT = now; } }
