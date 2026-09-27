@@ -253,10 +253,38 @@ function glInit() {
   GL3.dyn = gl.createBuffer();
   for (let k = 0; k < GNC * GNC; k++) { GL3.chunks[k] = { buf: gl.createBuffer(), n: 0, lamps: [] }; GL3.dirty.add(k); }
   // looking round: drag to turn, wheel to zoom; R, N and T for rotation, time of day and the next town
-  c.addEventListener('pointerdown', e => { if (e.button !== 0) return; GL3.drag = [e.clientX, e.clientY, GL3.cam.yaw, GL3.cam.pitch, false]; c.setPointerCapture(e.pointerId); });
-  c.addEventListener('pointermove', e => { GL3.pickReq = true; const d = GL3.drag; if (!d) return; if (!d[4] && Math.abs(e.clientX - d[0]) + Math.abs(e.clientY - d[1]) > 4) { d[4] = true; GL3.cam.auto = false; } if (d[4]) { GL3.cam.yaw = d[2] - (e.clientX - d[0]) * .006; GL3.cam.pitch = clamp(d[3] + (e.clientY - d[1]) * .004, .2, 1.45); } });
-  c.addEventListener('pointerup', e => { const d = GL3.drag; GL3.drag = null; if (d && !d[4]) glClick(e.clientX, e.clientY); });
-  c.addEventListener('pointerleave', () => { GL3.hover = 0; $('tip').style.opacity = 0; });
+  // mouse: drag turns, a click acts. Touch: one finger turns, two fingers pinch to zoom and move to pan, a tap shows what's there
+  const P = GL3.ptrs = new Map(); let pinch = null;
+  const touchy = e => e.pointerType === 'touch' || e.pointerType === 'pen';
+  c.addEventListener('pointerdown', e => {
+    if (e.button !== 0 && !touchy(e)) return;
+    GL3.touched = touchy(e);
+    UI.lastMove = performance.now(); UI.mouse.x = e.clientX; UI.mouse.y = e.clientY;
+    P.set(e.pointerId, [e.clientX, e.clientY]); try { c.setPointerCapture(e.pointerId); } catch (er) { }
+    if (P.size === 1) GL3.drag = [e.clientX, e.clientY, GL3.cam.yaw, GL3.cam.pitch, false, touchy(e)];
+    else { GL3.drag = null; const [a, b] = [...P.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: GL3.cam.zoom, m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], tx: GL3.cam.tx, tz: GL3.cam.tz }; GL3.cam.auto = false; GL3.follow = null; GL3.goto = null; }
+  });
+  c.addEventListener('pointermove', e => {
+    UI.lastMove = performance.now(); if (!touchy(e) || P.size < 2) { UI.mouse.x = e.clientX; UI.mouse.y = e.clientY; }
+    GL3.pickReq = !touchy(e); if (P.has(e.pointerId)) P.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pinch && P.size >= 2) { // zoom by the spread of the fingers, pan by where their middle goes
+      const [a, b] = [...P.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      GL3.cam.zoom = clamp(pinch.z * pinch.d / Math.max(20, d), 3, 44);
+      const k = GL3.cam.zoom * 2 / innerHeight, dx = (m[0] - pinch.m[0]) * k, dy = (m[1] - pinch.m[1]) * k / Math.sin(GL3.cam.pitch), cy = Math.cos(GL3.cam.yaw), sy = Math.sin(GL3.cam.yaw);
+      GL3.cam.tx = pinch.tx - dx * cy - dy * sy; GL3.cam.tz = pinch.tz + dx * sy - dy * cy;
+      return;
+    }
+    const d = GL3.drag; if (!d) return;
+    if (!d[4] && Math.abs(e.clientX - d[0]) + Math.abs(e.clientY - d[1]) > (d[5] ? 10 : 4)) { d[4] = true; GL3.cam.auto = false; }
+    if (d[4]) { GL3.cam.yaw = d[2] - (e.clientX - d[0]) * .006; GL3.cam.pitch = clamp(d[3] + (e.clientY - d[1]) * .004, .2, 1.45); }
+  });
+  const up = e => {
+    P.delete(e.pointerId); if (P.size < 2) pinch = null;
+    const d = GL3.drag; GL3.drag = null;
+    if (e.type === 'pointerup' && d && !d[4]) { if (d[5]) { GL3.tapAt = [e.clientX, e.clientY]; GL3.pickReq = true; GL3.pickT = 0; } else glClick(e.clientX, e.clientY); } // a tap waits for the pick under the finger
+  };
+  c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+  c.addEventListener('pointerleave', e => { if (!touchy(e)) { GL3.hover = 0; $('tip').style.opacity = 0; } });
   c.addEventListener('wheel', e => { GL3.cam.zoom = clamp(GL3.cam.zoom * Math.exp(e.deltaY * .001), 3, 44); e.preventDefault(); }, { passive: false });
   addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -267,7 +295,9 @@ function glInit() {
   });
   const hint = document.createElement('div'); hint.id = 'glHint';
   hint.style.cssText = 'position:fixed;right:16px;top:14px;max-width:430px;line-height:1.45;z-index:5;padding:8px 12px;border-radius:12px;background:rgba(255,251,245,.82);box-shadow:0 4px 18px rgba(60,40,60,.15);font:12.5px "Segoe UI",system-ui,sans-serif;color:#2b2833';
-  hint.innerHTML = '<b>3D preview</b> (proof of concept) · drag to turn · wheel to zoom · <b>R</b> auto-rotate · <b>N</b> time of day · <b>T</b> next town · point at anything to see what it is, click a person to follow them';
+  hint.innerHTML = (matchMedia('(pointer: coarse)').matches ? '<b>3D preview</b> · drag to turn · pinch to zoom · two fingers to move · tap anything to see what it is' : '<b>3D preview</b> (proof of concept) · drag to turn · wheel to zoom · <b>R</b> auto-rotate · <b>N</b> time of day · <b>T</b> next town · point at anything to see what it is, click a person to follow them') + ' <span id="glHideHint" style="cursor:pointer;opacity:.6">✕</span>';
+  hint.querySelector('#glHideHint').onclick = () => hint.remove();
+  if (innerWidth < 700) { hint.style.cssText += ';top:auto;right:12px;left:12px;bottom:150px;max-width:none;font-size:12px'; setTimeout(() => hint.remove(), 15000); } // phones: above the tool bar, and not for long
   document.body.appendChild(hint);
   glFocusTown();
   return true;
@@ -342,13 +372,14 @@ function glFrame(dt) {
     gl.readPixels(mx, my, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     GL3.hover = px[0] + px[1] * 256 + px[2] * 65536; GL3.hoverT = performance.now();
+    if (GL3.tapAt) { const t = GL3.tapAt; GL3.tapAt = null; UI.lastMove = performance.now(); GL3.touched = true; if (UI.tool || GL3.hover >= GPID) glClick(t[0], t[1]); } // a tap: show what's there (a person or a nudge acts too)
   }
   glTip();
 }
 // the tooltip for whatever the pointer is on: the same cards as the 2D view
 function glTip() {
   const tip = $('tip'), id = GL3.hover || 0, now = performance.now();
-  if (!id || GL3.drag && GL3.drag[4] || now - UI.lastMove > 2500 || document.querySelector('.modal.show') || document.elementFromPoint(UI.mouse.x, UI.mouse.y) !== GL3.c) { tip.style.opacity = 0; DYN.hover = -1; return; }
+  if (!id || GL3.drag && GL3.drag[4] || now - UI.lastMove > (GL3.touched ? 6000 : 2500) || document.querySelector('.modal.show') || document.elementFromPoint(UI.mouse.x, UI.mouse.y) !== GL3.c) { tip.style.opacity = 0; DYN.hover = -1; return; }
   if (id >= GPID) {
     const wk = DYN.walkers[id - GPID], p = wk && S.P[wk.pid]; if (!p) { tip.style.opacity = 0; return; }
     showPersonTip(p, UI.mouse.x, UI.mouse.y); UI.tipTile = -1; return;
@@ -382,4 +413,20 @@ function glPeople() {
     GLB.id = 0; for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; glBoxW(p[0], p[1], .09, p[2] * ZS, 4 * ZS, c.col || '#c0392b'); glBoxW(p[0], p[1], .06, p[2] * ZS + 4 * ZS, 2.2 * ZS, '#dfe7ef'); }
   } catch (e) { } finally { GLB = null; }
   return new Float32Array(v);
+}
+
+/* ---------- switching between the 2D and 3D views (the preview build starts in 3D) ---------- */
+const GL_DEFAULT = true; // proof-of-concept preview only: a merged build would start in 2D
+function glWanted() { if (QS.has('2d')) return false; if (QS.has('gl')) return true; try { const v = localStorage.getItem('sf3d'); if (v) return v === '1'; } catch (e) { } return GL_DEFAULT; }
+function glToggle() {
+  const want = !GL3.on; try { localStorage.setItem('sf3d', want ? '1' : '0'); } catch (e) { }
+  if (want) { if (!GL3.gl) glInit(); else { GL3.on = true; GL3.c.style.display = 'block'; $('view').style.display = 'none'; for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); } }
+  else { GL3.on = false; GL3.c.style.display = 'none'; $('view').style.display = 'block'; const h = $('glHint'); if (h) h.remove(); $('tip').style.opacity = 0; renderAll(); relightNow(); }
+  glBtn();
+}
+function glBtn() {
+  let b = $('glBtn');
+  if (!b) { b = document.createElement('button'); b.id = 'glBtn'; b.onclick = glToggle; b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:6;padding:8px 14px;border:0;border-radius:12px;background:rgba(255,251,245,.9);box-shadow:0 4px 18px rgba(60,40,60,.18);font:600 13px "Segoe UI",system-ui,sans-serif;color:#2b2833;cursor:pointer'; document.body.appendChild(b); }
+  if (innerWidth < 700) b.style.bottom = '104px'; // clear of the tool bar on a phone
+  b.textContent = GL3.on ? 'Switch to 2D' : 'Try it in 3D';
 }

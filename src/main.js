@@ -19,7 +19,8 @@ function startWorld(isNew) {
   UIDIRTY.chron = UIDIRTY.stats = UIDIRTY.tools = true;
   UIDIRTY.prayers = true; FAITH.shown = '';
   renderHUD(); renderTools(); renderFolderStatus(); faithRecalc(); renderFaith();
-  if (QS.has('gl')) { if (!GL3.on) glInit(); else for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); }
+  if (glWanted()) { if (!GL3.on) glInit(); else for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); }
+  glBtn();
   if (!RUNNING) { RUNNING = true; requestAnimationFrame(frame); }
 }
 async function newWorld(seed, archive) {
