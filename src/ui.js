@@ -182,7 +182,7 @@ function tipFor(i) {
     if (M.tree[i]) extra.push(TREE_NAME[M.ttype[i]] || 'Trees');
     if (M.ruin[i]) extra.push(M.ruin[i] === 2 ? 'Maker ruins (studied)' : 'Maker ruins');
     if (springAt(i)) extra.push('a hot spring');
-    if (M.road[i]) extra.push(w ? 'bridge' : 'road');
+    if (M.road[i]) extra.push(w ? (rcls(i) >= 3 ? 'stone bridge' : 'bridge') : R_NAME[M.road[i]] || 'road');
     if (M.rail[i]) extra.push('railway');
     if (M.wild[i] === 2) extra.push('starfall crater');
     if (M.wild[i] === 3 && !M.tree[i]) extra.push('tree stumps');

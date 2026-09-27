@@ -36,6 +36,7 @@ function deserialize(obj) {
   for (const e of S.aiLog || []) { const d = e.kind === 'words' && e.input && e.doc && S.doctrines.find(x => x.id === e.doc); if (d && e.input.interpretation) e.summary = d.summary = clean(e.input.interpretation, 700); }
   recomputeCulture();
   if (!o0.map.plan) legacyStreets(); // saved before towns planned their own streets
+  if ((S.roadV || 1) < 2) { for (let i = 0; i < W * H; i++) { const r = M.road[i]; if (r === 5) M.road[i] = R_GLOW; else if (r === 4) M.road[i] = R_ASPHALT; } S.roadV = 2; } // old road tiers become surfaces
   for (const k in S.P) ensurePerson(S.P[k]);
   if (S.P[S.founder]) S.P[S.founder].fl = 0;
 }

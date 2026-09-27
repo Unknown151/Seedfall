@@ -53,7 +53,7 @@ function shortCap(t) { const s = t.split(/[.:;!]/)[0]; return s.length > 58 ? s.
 function newState(seed) {
   const g = genWorld(seed);
   S = {
-    v: 1, seed, created: Date.now(), savedAt: 0, playSec: 0,
+    v: 1, roadV: 2, seed, created: Date.now(), savedAt: 0, playSec: 0,
     year: 0, month: 0, map: g.M, B: {}, nextB: 1, T: {}, nextT: 1, P: {}, nextP: 1,
     tech: { done: {}, cur: 0, pts: 0 }, era: 0, age: null, ageN: 0, ageUsed: {},
     styles: [Object.assign({}, STYLES0[0])], styleIdx: 0,
@@ -237,7 +237,7 @@ function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it c
 
 /* ---------- roads ---------- */
 function roadTier() { return hasTech('hover') ? 5 : hasTech('motor') ? 4 : hasTech('masonry') ? 3 : hasTech('wheel') ? 2 : 1; }
-function upgradeRoads() { const t = roadTier(); for (let i = 0; i < W * H; i++) if (M.road[i] && M.road[i] !== t) { M.road[i] = t; markDirty(i); } }
+function laySurf() { return hasTech('hover') ? R_GLOW : hasTech('motor') ? R_ASPHALT : hasTech('wheel') ? R_GRAVEL : R_DIRT; } // what a brand-new road is laid as; paving comes later (paveTown)
 function astar(a, b, costFn) {
   const g = new Float32Array(W * H).fill(1e9), prev = new Int32Array(W * H).fill(-1), closed = new Uint8Array(W * H);
   const bx = b % W, by = (b / W) | 0;
@@ -292,10 +292,10 @@ function planIntertownRoads() {
 }
 function stepRoadQ() {
   const q = S.roadQ[0]; if (!q) return;
-  const t = roadTier();
+  const t = laySurf();
   for (let n = 0; n < 3 && q.k < q.path.length; n++, q.k++) {
     const i = q.path[q.k]; if (M.bld[i]) continue;
-    if (M.road[i] < t) { M.road[i] = t; M.tree[i] = 0; M.wild[i] = 0; markDirty(i); }
+    if (!M.road[i] || (M.road[i] < t && M.road[i] <= R_GRAVEL)) { M.road[i] = t; M.tree[i] = 0; M.wild[i] = 0; markDirty(i); } // (a paved street keeps its paving)
   }
   if (q.k >= q.path.length) {
     S.roadQ.shift();
@@ -374,7 +374,7 @@ function planBridges(T) {
     if (s > bs) { bs = s; best = c; }
   }
   if (!best) return;
-  const t = roadTier();
+  const t = laySurf();
   for (const j of [best.a, best.i, best.b]) { if (!M.road[j] && !M.bld[j]) { M.road[j] = t; M.tree[j] = 0; M.wild[j] = 0; markDirty(j); } }
   if (M.water[best.i] && !M.road[best.i]) { M.road[best.i] = t; markDirty(best.i); }
   for (const j of [best.a, best.b]) roadLink(j, [best.i, best.a, best.b]);
@@ -402,7 +402,7 @@ function roadLink(s, skip) {
     q = nq;
   }
   if (found < 0) return;
-  const t = roadTier();
+  const t = laySurf();
   for (let i = prev.get(found); i !== s && i >= 0; i = prev.get(i)) if (!M.road[i]) { M.road[i] = t; M.tree[i] = 0; M.wild[i] = 0; markDirty(i); }
 }
 
@@ -777,7 +777,6 @@ function completeTech(i) {
   chron('💡', `${p.id === S.founder ? p.name : whoOf(p, t.era > 0 ? T : null)} ${t.txt}. (${t.name})`, { T, k: t.era >= 7 ? 'major' : '', cap: t.name });
   if (t.era > S.era) newEra(t.era);
   // side effects
-  const rt = roadTier(); if (towns().length && Object.keys(S.B).length) { for (let k = 0; k < W * H; k++) if (M.road[k] && M.road[k] < rt) { upgradeRoads(); break; } }
   if (t.id === 'optics' && !S.moons) {
     S.moons = [placeName(S.lang).split(' ')[0], placeName(S.lang).split(' ')[0]];
     chron('🔭', `Through the new lenses the two moons have mountains. They are named ${S.moons[0]} and ${S.moons[1]}.`);
@@ -1056,7 +1055,7 @@ function simMonth() {
   const newYear = S.month % 12 === 0;
   // vault decanting
   if (S.vault > 0 && S.year >= 2 && chance(0.1 + (S.year > 12 ? 0.05 : 0))) { S.vault--; S.T[1] && (S.T[1].pop += 1); }
-  for (const T of towns()) { growTown(T); stepEcon(T); buildTown(T); planTown(T); if (newYear) { planBridges(T); planFerries(T); } }
+  for (const T of towns()) { growTown(T); stepEcon(T); buildTown(T); planTown(T); if (newYear) { planBridges(T); planFerries(T); } if (S.month % 3 === T.id % 3) paveTown(T); }
   if (S.month % 3 === 0) stepTrade();
   stepResearch();
   stepAIQueue();
