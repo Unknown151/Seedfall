@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 const here = path.dirname(fileURLToPath(import.meta.url));
-const ORDER = ['util', 'data', 'world', 'render', 'buildings', 'light', 'sim', 'streets', 'econ', 'people', 'ai', 'levers', 'faith', 'dyn', 'agents', 'sea', 'air', 'ui', 'persist'];
+const ORDER = ['util', 'data', 'world', 'render', 'buildings', 'light', 'sim', 'streets', 'econ', 'needs', 'people', 'ai', 'levers', 'faith', 'dyn', 'agents', 'sea', 'air', 'ui', 'persist'];
 let out = fs.readFileSync(path.join(here, 'src/head.html'), 'utf8');
 for (const f of ORDER) out += fs.readFileSync(path.join(here, 'src', f + '.js'), 'utf8') + '\n';
 out += fs.readFileSync(path.join(here, 'src/main.js'), 'utf8');

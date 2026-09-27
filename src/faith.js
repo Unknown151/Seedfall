@@ -13,7 +13,7 @@ function faithRecalc() {
   const shrines = wcount('shrine') + wcount('watchstone') * 3;
   FAITH.max = Math.round(120 + Math.min(12, shrines) * 12 + Math.min(80, Object.keys(S.tech.done).length * 2) + Math.min(60, (S.prayOk || 0) * 3));
   let dv = 0; for (const d of S.doctrines || []) dv += d.str;
-  FAITH.rate = 1.2 + .6 * Math.log10(totalPop() + 1) + .3 * Math.min(8, shrines) + Math.min(2, dv * .5) + Math.min(1.5, (S.prayOk || 0) * .05);
+  FAITH.rate = 1.2 + .6 * Math.log10(totalPop() + 1) + .3 * Math.min(8, shrines) + Math.min(2, dv * .5) + Math.min(1.5, (S.prayOk || 0) * .05) + cultureFaith();
 }
 function gainRev(n, why) {
   if (!S || S.flags.intro) return;

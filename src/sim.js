@@ -13,7 +13,7 @@ function lifeExp() { return 66 + (hasTech('medicine') ? 14 : 0) + (hasTech('gene
 function addPerson(role, sid, age = 0, o = {}) {
   const par = o.parents || [];
   const first = firstNm(S.lang), last = par.length ? pick(par).last : lastNm(S.lang);
-  const p = { id: S.nextP++, name: first + ' ' + last, first, last, born: S.year - age, life: lifeExp(), died: null, sid, role, deeds: [] };
+  const p = { id: S.nextP++, name: first + ' ' + last, first, last, born: S.year - age, life: lifeExp() + (age ? 0 : lifeBonus(S.T[sid])), died: null, sid, role, deeds: [] };
   S.P[p.id] = p;
   if (par.length) p.st = rollStats(role, par);
   ensurePerson(p);
@@ -65,6 +65,7 @@ function newState(seed) {
     settings: { pace: 'normal', captions: true, sky: 'hour', weather: true, shadows: true }, rev: 30, prayers: []
   };
   M = S.map;
+  S.springs = placeSprings();
   CULT = { tb: {}, bld: {}, ev: {}, lv: {}, shun: {}, rs: 0, bs: 0 };
   const L = g.land;
   const f = addPerson('founder', 1, 29);
@@ -119,14 +120,15 @@ function farmYield() {
 }
 function recalcTown(T) {
   let house = 0, food = 3, fy = farmYield() * (S.drought > 0 ? 0.8 : 1);
+  const gk = gridK(), mk = hasTech('mills') ? 1 + MILL_K * millShare(T) : 1; // milled grain goes further
   for (const id of T.bl) {
     const B = S.B[id]; if (!B) continue;
     if (B.type === 'pod') { house += 3; food += 8; continue; }
     if (B.prog < 1) continue;
     if (B.type === 'house') house += HT[B.tier].cap;
-    else if (B.type === 'farm') food += fy;
+    else if (B.type === 'farm') food += fy * mk;
     else if (B.type === 'dock') food += 8 + Object.keys(S.tech.done).length * 0.45;
-    else if (B.type === 'vfarm') food += 900 + (S.ageN || 0) * 30;
+    else if (B.type === 'vfarm') food += (900 + (S.ageN || 0) * 30) * (.6 + .4 * gk);
     else if (B.type === 'granary') food += 6;
     else if (B.type === 'dome') food += 60;
   }
@@ -166,7 +168,7 @@ function nearWaterDir(x, y) {
 
 function findSite(T, kind, extra = 0) {
   const R = townRadius(T);
-  const Rx = (kind === 'farm' ? R + 4 : kind === 'ore' ? R + 5 : kind === 'shore' || kind === 'harbor' ? R + 3 : kind === 'wild' ? R + 7 : kind === 'forest' || kind === 'rock' || kind === 'clay' || kind === 'point' ? R + 6 : R + 1) + extra;
+  const Rx = (kind === 'farm' || kind === 'fields' ? R + 4 : kind === 'ore' ? R + 5 : kind === 'shore' || kind === 'harbor' ? R + 3 : kind === 'wild' ? R + 7 : kind === 'forest' || kind === 'rock' || kind === 'clay' || kind === 'point' || kind === 'pasture' || kind === 'sand' || kind === 'spring' || kind === 'ruins' ? R + 6 : R + 1) + extra;
   const outer = kind === 'ore' || kind === 'shore' || kind === 'forest' || kind === 'rock' || kind === 'clay' || kind === 'harbor' || kind === 'point', high = kind === 'ore' || kind === 'rock';
   const front = kind === 'house' || kind === 'center' || kind === 'mid' || kind === 'edge'; // must face a street
   let best = null, bs = -1e9;
@@ -179,13 +181,13 @@ function findSite(T, kind, extra = 0) {
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const d = dist(x, y, T.x, T.y); if (d > Rx) continue;
     const i = idx(x, y);
-    if (M.water[i] || M.ruin[i] || M.road[i] || M.rail[i] || M.plan[i]) continue;
+    if (M.water[i] || M.ruin[i] || M.road[i] || M.rail[i] || M.plan[i] || springAt(i)) continue;
     const b = M.bio[i];
     if (b === BIO.SNOW) continue;
     let replaceFarm = false;
     if (M.bld[i]) {
       const B = S.B[M.bld[i]];
-      if (allowFarmReplace && B && B.type === 'farm' && B.sid === T.id && d < farmR && B.prog >= 1) replaceFarm = true; else continue; // the town grows over its old fields
+      if (allowFarmReplace && B && (B.type === 'farm' || B.type === 'pasture') && B.sid === T.id && d < farmR && B.prog >= 1) replaceFarm = true; else continue; // the town grows over its old fields
     }
     if (OWN[i] !== T.id) continue;
     if (front && !fronts(x, y)) continue;
@@ -204,6 +206,7 @@ function findSite(T, kind, extra = 0) {
       case 'edge': s += -Math.abs(d - R) * 1.2 + adjRoad * .5 - tree * .5; break;
       case 'flatedge': { let fl = 0; for (const [dx, dy] of N8) { const nx = x + dx, ny = y + dy; if (inb(nx, ny) && M.elev[idx(nx, ny)] === M.elev[i] && !M.water[idx(nx, ny)]) fl++; } if (fl < 7) continue; s += -Math.abs(d - R) - tree; break; }
       case 'high': s += M.elev[i] * 1.6 - d * 0.5 - tree * .5; break;
+      case 'fields': { const nf = around(x, y, 3, j => M.bld[j] && S.B[M.bld[j]] && S.B[M.bld[j]].type === 'farm' ? 1 : 0); if (nf < 2) continue; s += nf * .8 + M.elev[i] * .5 - d * .3 - tree; break; } // a windmill among the fields
       case 'farm': {
         if (d < 1.5) continue;
         const adjF = adjCount(x, y, j => M.bld[j] && S.B[M.bld[j]] && S.B[M.bld[j]].type === 'farm');
@@ -216,6 +219,10 @@ function findSite(T, kind, extra = 0) {
       case 'ore': { if (!(M.ore[i] || b === BIO.ROCK)) continue; s += -d * 0.6 + M.ore[i] * 3 + around(x, y, 1, j => M.ore[j]) * .8; break; }
       case 'forest': { if (tree) continue; const n = around(x, y, 2, j => M.bld[j] ? 0 : M.tree[j]); if (n < 5) continue; s += n * .5 - d * .35 + adjRoad * .4; break; }
       case 'rock': { const n = around(x, y, 1, j => rocky(j) ? 1 : 0); if (!rocky(i) && n < 3) continue; s += n * .9 - d * .45 - tree; break; }
+      case 'pasture': { if (!grazing(i) || d < R * .6) continue; s += around(x, y, 1, j => grazing(j) ? 1 : 0) * .6 - d * .3 - tree; break; }
+      case 'sand': { if (!sandy(i)) continue; s += around(x, y, 1, j => sandy(j) ? 1 : 0) * .5 - d * .45; break; }
+      case 'spring': { if (!nearSpring(x, y)) continue; s += -d * .4 - tree; break; }
+      case 'ruins': { if (!around(x, y, 1, j => M.ruin[j] ? 1 : 0) || around(x, y, 3, j => M.bld[j] && S.B[M.bld[j]] && S.B[M.bld[j]].type === 'digsite' ? 1 : 0)) continue; s += -d * .3 - tree; break; }
       case 'clay': { if (!clayey(i)) continue; s += around(x, y, 1, j => clayey(j) ? 1 : 0) * .6 - d * .5 - tree + (b === BIO.SAND ? 1 : 0); break; }
       case 'barren': { s += (b === BIO.BARREN || b === BIO.ROCK || b === BIO.HIGH ? 4 : 0) - Math.abs(d - R) * 0.5; break; }
       default: s += -d;
@@ -261,7 +268,7 @@ function roadCost(i, j) {
   if (M.water[j] === 2) return M.road[j] ? .5 : hasTech('bridges') ? 7 : 10; // footbridges before stone arches
   const de = Math.abs(M.elev[j] - M.elev[i]);
   if (de > 1 && M.water[i] === 0) return 1e9;
-  return (M.road[j] ? 0.35 : 1.2) + de * 1.5 + (M.tree[j] ? 0.8 : 0) + (M.rail[j] ? 1 : 0);
+  return (M.road[j] ? 0.35 : 1.2) + de * 1.5 + (M.tree[j] ? 0.8 : 0) + (M.rail[j] ? 1 : 0) + (springAt(j) ? 8 : 0);
 }
 function railCost(i, j) {
   if (M.bld[j]) { const B = S.B[M.bld[j]]; return B && B.type === 'station' ? 1 : 1e9; }
@@ -558,6 +565,8 @@ function planTown(T) {
     if (hasTech('hydro') && !bcount(T, 'farm')) { const s = findSite(T, 'farm'); if (s) { mkBuilding('farm', s.x, s.y, T); return; } }
   }
   if (chance(.25) && tryEcon(T)) return;
+  if (chance(needUrgent(T) ? .45 : .12) && tryNeeds(T)) return; // a town short of something sees to it before more houses
+  if (chance(.04) && tryCulture(T)) return;
   const needF = T.pop > T.cap.food * 0.75, needH = T.pop > T.cap.house * 0.75;
   if ((needH || chance(.08)) && frontageCount(T) < wantFrontage(T)) growStreets(T);
   if (needF && needH) { if (T.cap.food < T.cap.house ? tryFood(T) : tryHousing(T)) return; }
@@ -620,7 +629,19 @@ const FIRST_TXT = {
   terraformer: 'A climate engine starts breathing near {T}. The rust flats will be green one day.',
   dome: 'A garden dome is finished in {T}. It rains inside it on Tuesdays.',
   elevator: 'The Space Elevator is finished at {T}. A thread to the sky, and a queue to ride it.',
-  watchstone: 'A Watchstone is raised above {T}, facing the sky. For the Watcher.'
+  watchstone: 'A Watchstone is raised above {T}, facing the sky. For the Watcher.',
+  pasture: 'Mossbacks are fenced into a pasture outside {T}. Their wool is soft and faintly green.',
+  sandpit: 'Sand is dug from the dunes near {T} and carted off to be melted into glass.',
+  weaver: 'A weaving house opens in {T}. The first bolt of mossback cloth is the colour of spring moss.',
+  warehouse: '{T} builds a warehouse. For the first time there is more room than stuff.',
+  theatre: 'The first theatre opens in {T}. The opening night runs four hours over, and nobody minds.',
+  bathhouse: '{T} builds a bathhouse over the hot spring. The old people of the town move in, more or less.',
+  digsite: 'Scholars from {T} start a proper dig at the Maker stones, with string, trowels and a great deal of patience.',
+  botanic: 'A botanical garden opens in {T}: a glasshouse of Earth plants and valley plants, side by side.',
+  guildhall: 'The first guild hall goes up in {T}. Apprentices queue at the door on the first morning.',
+  shipyard: 'A shipyard opens on the waterfront of {T}. The first keel is laid on a cold spring morning.',
+  glassworks: 'The glassworks of {T} fires up. Windows with real glass in them, at last.',
+  watertower: '{T} raises a water tower. Every street gets a tap, and the queues at the wells are gone.'
 };
 function completeBuilding(B, T) {
   if (B.up != null) { B.tier = B.up; B.up = null; }
@@ -638,13 +659,14 @@ function completeBuilding(B, T) {
   } else if (B.type === 'monument') chron('🏛️', `${B.name} is completed in ${T.name}.`, { x: B.x, y: B.y, k: 'major' });
   if (B.type === 'monument' || B.type === 'watchstone' || B.type === 'shrine') gainRev(B.type === 'shrine' ? 5 : 12, B.type === 'monument' ? B.name : B.type === 'shrine' ? 'a new shrine' : 'the Watchstone');
   if (B.type === 'elevator') S.sky.elevator = 1;
+  if (B.type === 'guildhall') { const r = T.guild = guildOf(T); if (r) chron('🛠️', `The Guild of ${GUILD[r]} of ${T.name} is founded. ${cap1(RES_N[r])} from ${T.name} is the best in the valley now, and they will tell you so.`, { x: B.x, y: B.y }); }
   if (B.type === 'station') planRails();
 }
 
 function growTown(T) {
   recalcTown(T);
   const cap = Math.min(T.cap.house, T.cap.food);
-  const r = (0.045 + (hasTech('medicine') ? 0.01 : 0)) * (S.drought > 0 ? 0.6 : 1) * (1 + .3 * (CULT.bs || 0)) * (lever('growth') === 'stay_small' ? .55 : 1);
+  const r = (0.045 + (hasTech('medicine') ? 0.01 : 0)) * (S.drought > 0 ? 0.6 : 1) * (1 + .3 * (CULT.bs || 0)) * (lever('growth') === 'stay_small' ? .55 : 1) * needGrowthK(T);
   if (S.year >= 17 || T.id !== 1) {
     if (T.pop < cap) T.pop += Math.max(0.02, T.pop * r / 12 * (1 - T.pop / Math.max(1, cap)));
     else T.pop -= (T.pop - cap) * 0.04;
@@ -679,7 +701,7 @@ function tryFound() {
       if (M.water[j]) water++; else if (!M.bld[j] && !M.road[j] && !M.plan[j] && Math.abs(M.elev[j] - M.elev[i]) <= 1) { ok++; fert += M.fert[j]; }
     }
     if (ok < (forced ? 16 : 22)) continue;
-    const s = ok * .4 + fert * .25 + (water > 0 && water < 12 ? 6 : 0) - dp * .15 + rnd() * 4;
+    const s = ok * .4 + fert * .25 + (water > 0 && water < 12 ? 6 : 0) - dp * .15 + rnd() * 4 + ((S.springs || []).some(o => dist(o.x, o.y, x, y) < 6) ? 5 : 0); // settlers like a hot spring
     if (s > bs) { bs = s; best = { x, y }; }
   }
   if (!best) { if (!forced) S.lastFound = S.year - 15; else PT.at = S.year + 3; return; }
@@ -713,11 +735,11 @@ function techCost(i) {
 // expected cumulative research by year (calibrated against typical growth)
 function expectedRP(y) { return 0.012 * Math.pow(y, 2.45) + 3 * y; }
 function researchRate() {
-  const pop = totalPop();
+  const pop = totalPop(), gk = gridK();
   let m = 1;
   for (const k in S.B) {
     const B = S.B[k]; if (B.prog < 1) continue;
-    if (B.type === 'school') m += .2; else if (B.type === 'library') m += .45; else if (B.type === 'university') m += .9; else if (B.type === 'observatory') m += .3; else if (B.type === 'antenna') m += .3;
+    if (B.type === 'school') m += .2; else if (B.type === 'library') m += .45; else if (B.type === 'university') m += .9 * gk; else if (B.type === 'observatory') m += .3; else if (B.type === 'antenna') m += .3; else if (B.type === 'mast') m += .15;
   }
   m = Math.min(m, 6);
   if (S.age) { const th = AGE_THEMES.find(a => a.k === S.age.k); if (th && th.research) m *= th.research; }
@@ -922,7 +944,7 @@ function invBand() { return S.era <= 2 ? 0 : S.era <= 3 ? 1 : S.era <= 4 ? 2 : S
 function sportNow() { return SPORTS[Math.min(5, invBand())]; }
 const EVENTS = [
   { k: 'harvest', w: 5, when: () => hasTech('sunroot'), run() { const T = randTown(); const c = CROPS[T.crop].n; T.pop *= 1.015; chron('🌾', pick([`A bumper ${c} harvest in ${T.name}.`, `${T.name} brings in a heavy, sweet crop of ${c} this year.`, `The granaries of ${T.name} are full to the rafters.`]), { T }); } },
-  { k: 'festival', w: 4, when: () => S.year > 25, run() { const T = randTown(); const ex = (S.extraFestAt || []).filter(f => f.from <= S.year).map(f => f.n); const f = pickFresh(FESTIVALS.concat(ex, ex), 'fest'); chron('🎆', `${T.name} celebrates ${f}.`, { T }); fx('fireworks', { x: T.x, y: T.y }); gainRev(4, 'a festival'); } },
+  { k: 'festival', w: 4, when: () => S.year > 25, run() { const T = festTown(); const ex = (S.extraFestAt || []).filter(f => f.from <= S.year).map(f => f.n); const f = pickFresh(FESTIVALS.concat(ex, ex), 'fest'); chron('🎆', `${T.name} celebrates ${f}.`, { T }); fx('fireworks', { x: T.x, y: T.y }); gainRev(4, 'a festival'); } },
   { k: 'art', w: 3, when: () => hasTech('kiln'), run() { const T = randTown(); const p = cast('artist', T, q => q.st.cft + q.st.wit + (q.role === 'artist' ? 3 : 0), { minAge: 16 }); const a = pickFresh(ARTWORKS, 'art'); p.deeds.push(a); chron('🎨', `${whoOf(p, T)} makes ${a}.`, { T }); } },
   { k: 'song', w: 2, when: () => S.year > 12, run() { const T = randTown(); chron('🎵', `A song called “The ${pick(SONG_A)} ${pick(SONG_B)}” spreads from ${T.name} to every hearth.`, { T }); } },
   { k: 'invent', w: 3, when: () => S.year > 15, run() { const T = randTown(); const p = cast('inventor', T, q => q.st.cur + q.st.cft + (q.role === 'inventor' ? 3 : 0), { minAge: 14 }); const th = pickFresh(INVENTIONS[invBand()], 'inv'); p.deeds.push(th); chron('🔧', `${whoOf(p, T)} invents ${th}.`, { T }); } },
@@ -945,7 +967,8 @@ const EVENTS = [
   { k: 'moon', w: 3, once: 1, when: () => hasTech('rocketry') && S.moons, run() { chron('🌘', `Colonists walk on ${S.moons[0]}. They leave a flag and a small jar of valley soil.`, { k: 'major' }); } },
   { k: 'seedship', w: 1.5, when: () => hasTech('seedships') && S.year - S.lastSeedship > 50, run() { S.lastSeedship = S.year; const sh = pick(SHIP_NAMES), st = pick(STARS); chron('🚀', `The seedship ${sh} departs for ${st}, carrying a vault of sleeping children and a copy of this chronicle.`, { k: 'major' }); fx('seedship', {}); } },
   { k: 'lore', w: 1, when: () => S.lore < LORE.length && S.year > 400 && S.ruins.every(r => M.ruin[idx(r.x, r.y)] !== 1), run() { revealLore(null); } },
-  { k: 'election', w: .6, run() { electAnnounce(randTown()); } }
+  { k: 'election', w: .6, run() { electAnnounce(randTown()); } },
+  { k: 'play', w: 2, when: () => wcount('theatre') > 0, run() { const B = pick(builtOf('theatre')), T = B && S.T[B.sid]; if (!T) return; const p = cast('artist', T, q => q.st.wit + q.st.cft + (q.role === 'artist' ? 3 : 0), { minAge: 18 }); const pl = pickFresh(PLAYS, 'play'); p.deeds.push(`“${pl}”`); chron('🎭', `The theatre of ${T.name} stages “${pl}”, by ${p.name}. ${pick(['It runs for a year.', 'Half the audience cries.', 'Nobody agrees what the ending means.', 'The critics hate it; everyone else loves it.', 'The mossback in the second act steals the show.'])}`, { x: B.x, y: B.y }); gainRev(3, 'a premiere'); } }
 ];
 function rollEvent() {
   const theme = S.age ? AGE_THEMES.find(a => a.k === S.age.k) : null;
@@ -1062,6 +1085,7 @@ function simMonth() {
     stepRelations();
     stepCulture();
     yearlyEcon();
+    yearlyNeeds();
     for (const T of towns()) cultureProject(T);
     if (S.age) for (const T of towns()) if (T.pop > 300 && chance(.12)) ageProject(T);
     if (hasTech('domes')) for (const T of towns()) if (chance(.2)) greenFields(T);

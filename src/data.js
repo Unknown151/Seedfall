@@ -117,7 +117,19 @@ const BT = {
   terraformer: { n: 'Climate Engine', work: 50, h: 84, anim: 'mist' },
   dome: { n: 'Garden Dome', work: 40, h: 36 },
   elevator: { n: 'Space Elevator', work: 200, h: 90, anim: 'tether' },
-  monument: { n: 'Monument', work: 30, h: 80 }
+  monument: { n: 'Monument', work: 30, h: 80 },
+  watertower: { n: 'Water Tower', work: 14, h: 44 },
+  pasture: { n: 'Mossback Pasture', work: 4, h: 12 },
+  sandpit: { n: 'Sand Pit', work: 4, h: 10 },
+  weaver: { n: 'Weaving House', work: 10, h: 22 },
+  glassworks: { n: 'Glassworks', work: 16, h: 34, smoke: 1 },
+  warehouse: { n: 'Warehouse', work: 12, h: 22 },
+  shipyard: { n: 'Shipyard', work: 22, h: 34 },
+  theatre: { n: 'Theatre', work: 22, h: 40 },
+  bathhouse: { n: 'Bathhouse', work: 14, h: 24 },
+  digsite: { n: 'Maker Dig', work: 6, h: 16 },
+  botanic: { n: 'Botanical Garden', work: 18, h: 26 },
+  guildhall: { n: 'Guild Hall', work: 16, h: 44 }
 };
 
 // service buildings: when a town should build one
@@ -129,7 +141,7 @@ const SERV = [
   { t: 'market', tech: 'loom', min: 45, per: 400, max: 2, site: 'center' },
   { t: 'school', tech: 'script', min: 60, per: 350, max: 3, site: 'center' },
   { t: 'workshop', tech: 'smelt', min: 60, per: 200, max: 3, site: 'mid' },
-  { t: 'mill', tech: 'mills', min: 70, per: 180, max: 3, site: 'high' },
+  { t: 'mill', tech: 'mills', min: 70, per: 180, max: 3, site: 'fields' },
   { t: 'hall', tech: 'masonry', min: 110, per: 0, max: 1, site: 'center' },
   { t: 'harbor', tech: 'masonry', min: 200, per: 0, max: 1, site: 'harbor' },
   { t: 'lighthouse', tech: 'optics', min: 300, per: 0, max: 1, site: 'point' },

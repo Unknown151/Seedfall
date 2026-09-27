@@ -18,7 +18,7 @@ function hpop() {
   for (;;) { let c = 2 * k + 1; if (c >= n) break; if (c + 1 < n && HP.f[c + 1] < HP.f[c]) c++; if (HP.f[c] >= f) break; HP.f[k] = HP.f[c]; HP.i[k] = HP.i[c]; k = c; }
   HP.f[k] = f; HP.i[k] = i; return top;
 }
-const OUTDOOR = { plaza: 1, park: 1, farm: 1, pod: 1, lumber: 1, quarry: 1, claypit: 1 };
+const OUTDOOR = { plaza: 1, park: 1, farm: 1, pod: 1, lumber: 1, quarry: 1, claypit: 1, pasture: 1, sandpit: 1 };
 // mode 0 = on foot, 1 = vehicle (roads only), 2 = caravan (cross-country)
 function navCost(j, from, mode, goal) {
   if (j === goal) return 1;
@@ -89,9 +89,9 @@ function pickOf(T, types) {
   for (const t of types) { const a = ix[t] || []; if (r < a.length) return a[r]; r -= a.length; }
   return 0;
 }
-const WORK_TYPES = ['farm', 'farm', 'lumber', 'quarry', 'claypit', 'harbor', 'workshop', 'mill', 'mine', 'works', 'market', 'school', 'library', 'clinic', 'dock', 'power', 'station', 'university', 'hall', 'vfarm', 'granary', 'museum', 'observatory', 'airfield'];
+const WORK_TYPES = ['farm', 'farm', 'digsite', 'botanic', 'guildhall', 'warehouse', 'shipyard', 'pasture', 'sandpit', 'weaver', 'glassworks', 'watertower', 'lumber', 'quarry', 'claypit', 'harbor', 'workshop', 'mill', 'mine', 'works', 'market', 'school', 'library', 'clinic', 'dock', 'power', 'station', 'university', 'hall', 'vfarm', 'granary', 'museum', 'observatory', 'airfield'];
 const ERRANDS = ['market', 'well', 'granary', 'shrine', 'library', 'clinic', 'museum', 'hall', 'dock', 'station', 'plaza', 'pod', 'market'];
-const LEISURE = ['park', 'park', 'plaza', 'market', 'stadium', 'dock', 'museum', 'monument', 'shrine', 'pod', 'dome', 'observatory'];
+const LEISURE = ['theatre', 'bathhouse', 'botanic', 'park', 'park', 'plaza', 'market', 'stadium', 'dock', 'museum', 'monument', 'shrine', 'pod', 'dome', 'observatory'];
 const ROLE_WORK = [
   [/farm|herder|forager|gene|terraform|dome keeper/, ['farm', 'vfarm', 'dome']],
   [/heal|midwife|herbal|nurse|doctor|counsel/, ['clinic', 'shrine']],
@@ -100,9 +100,9 @@ const ROLE_WORK = [
   [/scribe|printer|cartograph|storyteller|journalist|research|scientist|data weaver|sage/, ['library', 'university', 'school']],
   [/star-watcher|astronomer|seedship|ring surveyor/, ['observatory', 'launchpad', 'antenna']],
   [/magistrate|diplomat|surveyor/, ['hall', 'plaza']],
-  [/ferry|fisher|sailor|docker|boat/, ['harbor', 'dock']],
+  [/ferry|fisher|sailor|docker|boat/, ['harbor', 'dock', 'shipyard']],
   [/radio|broadcaster|comedian/, ['mast', 'antenna']],
-  [/singer|performer|artist/, ['museum', 'stadium', 'market', 'plaza']],
+  [/singer|performer|artist/, ['theatre', 'museum', 'stadium', 'market', 'plaza']],
   [/pilot/, ['airfield']],
   [/rail/, ['station', 'works']],
   [/factory/, ['works']],

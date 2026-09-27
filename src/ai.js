@@ -355,7 +355,7 @@ function recomputeCulture() {
 function stepCulture() {
   for (const d of S.doctrines || []) {
     const was = d.str;
-    d.str *= .996;
+    d.str *= .996 + .0025 * (hasTech('radio') ? refreshNeeds().word : 0); // news keeps the words alive
     if (was >= .15 && d.str < .15 && d.ai) {
       const T = pick(towns());
       chron('🍂', `${d.name} is mostly forgotten now. Only a few old people in ${T.name} still say the words at weddings.`, { T, nocap: true });

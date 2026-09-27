@@ -63,16 +63,17 @@ function edgeWater(from) { // somewhere out past the edge of the map, on the sam
 function edgeOut(i) { const x = i % W, y = (i / W) | 0; return x === 0 ? [-1, 0] : x === W - 1 ? [1, 0] : y === 0 ? [0, -1] : [0, 1]; }
 
 /* ---------- ships ---------- */
+const shipCap = () => 7 + Math.min(3, builtOf('shipyard').length); // shipyards put more ships on the water
 function shipKind() { return hasTech('hover') ? 'hover' : hasTech('computing') ? 'boxship' : hasTech('electric') ? 'freighter' : hasTech('steam') ? 'steamer' : 'sail'; }
 function spawnShip(fromB, toB, r) {
-  if (DYN.ships.length >= 7) return null;
+  if (DYN.ships.length >= shipCap()) return null;
   const hs = harbours(); if (!hs.length) return null;
   const home = fromB || pick(hs);
   const sh = { kind: shipKind(), r: r || pick(['wood', 'stone', 'clay', 'metal', 'goods']), col: pick(['#b8554a', '#3f6e8c', '#3d6b4f', '#8a5a3c', '#5b5f8a']), path: null, s: 0, st: 'moor', at: home.id, until: DYN.t + rf(10, 22), to: toB ? toB.id : 0, hx: -home.dir[1], hy: home.dir[0], id: rnd() };
   DYN.ships.push(sh); return sh;
 }
 function arriveShip() { // a ship from over the horizon heading for one of the harbours
-  const hs = harbours(); if (!hs.length || DYN.ships.length >= 7) return;
+  const hs = harbours(); if (!hs.length || DYN.ships.length >= shipCap()) return;
   const B = pick(hs), m = moorTile(B), e = edgeWater(m); if (e < 0) return;
   const path = seaRoute(e, m); if (!path || path.length < 4) return;
   const [ox, oy] = edgeOut(e), pre = [];
@@ -97,7 +98,7 @@ function stepShips(dt) {
   // keep a few ships about
   if (hs.length && DYN.t > (DYN.nextShip || 0)) {
     DYN.nextShip = DYN.t + rf(35, 80);
-    const want = Math.min(6, 1 + Math.round(hs.length * 1.5));
+    const yards = Math.min(3, builtOf('shipyard').length), want = Math.min(6 + yards, 1 + Math.round(hs.length * 1.5) + yards);
     if (DYN.ships.length < want) { if (chance(.5)) arriveShip(); else { const sh = spawnShip(); if (sh) { if (DYN.slot[sh.at]) { sh.gone = 1; } else DYN.slot[sh.at] = sh; } } }
   }
   for (const sh of DYN.ships) {

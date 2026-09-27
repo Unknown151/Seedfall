@@ -405,12 +405,14 @@ function emitters(dt) {
     const rate = (B.type === 'terraformer' ? 1.2 : d.smoke * .5) * dt;
     if (!chance(rate)) continue;
     if (B.type === 'workshop') { const [x, y] = pt(cx, cy, .16, -.14, 21); addPart(x, y, rf(2, 5), rf(-9, -5), rf(3, 5), '#e2ddd8', .45, 'smoke', 1.6); }
-    else if (B.type === 'works') { const [x, y] = pt(cx, cy, .28, -.18, 43); addPart(x, y, rf(3, 7), rf(-11, -6), rf(4, 7), hasTech('electric') ? '#f1efec' : '#cfc9c4', .5, 'smoke', 2.2); }
-    else if (B.type === 'power') { for (const u of [-.16, .16]) { const [x, y] = pt(cx, cy, u, -.2, 37); addPart(x, y, rf(2, 6), rf(-10, -6), rf(4, 6), '#f4f2ef', .5, 'smoke', 2.4); } }
+    else if (B.type === 'works') { const [x, y] = pt(cx, cy, .28, -.18, 43); addPart(x, y, rf(3, 7), rf(-11, -6), rf(4, 7), sootK() >= .5 ? '#a8a29d' : '#f1efec', .5, 'smoke', 2.2); }
+    else if (B.type === 'power') { for (const u of [-.16, .16]) { const [x, y] = pt(cx, cy, u, -.2, 37); addPart(x, y, rf(2, 6), rf(-10, -6), rf(4, 6), sootK() >= .5 ? '#b3ada8' : '#f4f2ef', .5, 'smoke', 2.4); } }
+    else if (B.type === 'glassworks') { const [x, y] = pt(cx, cy, .2, -.16, 24); addPart(x, y, rf(2, 5), rf(-9, -5), rf(3, 5), '#e6ddd6', .45, 'smoke', 1.8); }
     else if (B.type === 'claypit') { const [x, y] = pt(cx, cy, .3, -.2, hasTech('brick') ? 15 : 7); addPart(x, y, rf(1, 4), rf(-8, -5), rf(3, 5), '#e6ddd6', .4, 'smoke', 1.5); }
     else if (B.type === 'terraformer') { const [x, y] = pt(cx, cy, 0, 0, 70); addPart(x, y, rf(-6, 6), rf(-8, -3), rf(5, 8), '#cfeff0', .35, 'mist', 3); }
     else if (B.type === 'launchpad' && B.rk) { const [x, y] = pt(cx, cy, 0, 0, 4); addPart(x + rf(-3, 3), y, rf(-4, 4), rf(-5, -2), rf(2, 3), '#f4f2ef', .35, 'smoke', 2); }
   }
+  springSteam(dt);
   // water glints
   if (chance(dt * 6)) {
     const i = ri(0, W * H - 1);
