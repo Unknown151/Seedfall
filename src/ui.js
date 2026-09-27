@@ -106,7 +106,7 @@ function onKey(e) {
   else if (k === 'Home' || k === '0') { CAM.manualUntil = 0; CAM.focusUntil = 0; CAM.nextTour = 0; toast('Camera handed back.'); }
   else if (k === '+' || k === '=') { CAM.tz = clamp(CAM.tz * 1.25, minZoom(), 4); CAM.manualUntil = DYN.t + 90; }
   else if (k === '-') { CAM.tz = clamp(CAM.tz / 1.25, minZoom(), 4); CAM.manualUntil = DYN.t + 90; }
-  else if (DEV && k === 'P') { SF.ff(50); toast('+50 years'); }
+  else if (k === 'D' && e.shiftKey) toggleDebug();
 }
 let toastT = 0;
 function toast(t) { const el = $('toast'); el.textContent = t; el.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => el.style.opacity = 0, 3500); }

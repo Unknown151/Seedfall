@@ -48,7 +48,10 @@ npm run dev               # local Worker at http://127.0.0.1:8787 with a fake lo
 - **Duplicate function names fail the build.** A duplicate would silently shadow the earlier one. That
   has bitten twice: `stepPeople` vs `stepAgents` stopped anyone dying, and `workFor` vs `jobPlace`.
 - **URL flags.** Open `seedfall.html` directly. `?seed=N&fresh` makes a new world, `&nointro` skips the
-  landing, and `&dev` adds an fps readout.
+  landing, and `&dev` adds an fps readout and opens the debug card.
+- **Debug card.** Shift+D (or `?dev`) shows +10/+20/+50/+100 year leaps. They run through `runYears` (the same
+  sliced runner as catch-up, so the page stays responsive), save afterwards, and "what happened?" opens the
+  report card with the highlights.
 - **Dev hooks (on `window.SF`).**
   - Time: `SF.ff(years)` fast-forwards, `SF.hour(h)` pins the clock (null means live).
   - Environment: `SF.weather(kind, secs)`, `SF.season({...})`.

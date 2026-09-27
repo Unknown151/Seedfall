@@ -61,6 +61,23 @@ ok(r.shown && !seen, 'ten minutes away: a report card, but no letter (not worth 
 
 await p.click('#awayOk');
 ok(!(await p.isVisible('#away.show')), 'Carry on closes it');
+
+// the debug card: Shift+D, then leap ahead
+await p.keyboard.press('Shift+D');
+ok(await p.isVisible('#dbg.show'), 'Shift+D opens the debug card');
+for (const n of [10, 50]) {
+  const y0 = await p.evaluate(() => yr());
+  await p.click(`#dbg [data-leap="${n}"]`);
+  await p.waitForFunction(() => !CATCH && /years:/.test($('dbgMsg').textContent), null, { timeout: 120000 });
+  const y1 = await p.evaluate(() => yr());
+  ok(y1 - y0 === n, `+${n} leaps ${n} years`, await p.textContent('#dbgMsg'));
+}
+await p.evaluate(() => { SF.weather('clear', 9999); SF.hour(13); }); await p.waitForTimeout(1500);
+await p.screenshot({ path: 'debug_card.png' });
+await p.click('#dbgWhat');
+ok(await p.isVisible('#away.show') && /^A leap of 50 years: Year \d+ → \d+/.test(await p.textContent('#awayWhen')), '“what happened?” shows the highlights', await p.textContent('#awayWhen'));
+await p.click('#awayOk'); await p.click('#dbgX');
+ok(!(await p.isVisible('#dbg.show')), '× hides it');
 console.log('ERR', errs.join(' | ') || 'none');
 await b.close();
 process.exit(fails || errs.length ? 1 : 0);

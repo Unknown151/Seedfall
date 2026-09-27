@@ -70,29 +70,33 @@ function maybeCatchUp() {
   const secs = Math.min(away, AWAY_CAP), yrs = Math.min(CATCH_MAX_YR, secs / (PACE[S.settings.pace] || 180));
   if (yrs >= .25) catchUp(away, secs, yrs);
 }
-function catchUp(away, secs, yrs) {
-  const n = Math.round(yrs * 12), c0 = S.chronN, y0 = yr(), p0 = Math.round(totalPop()), t0 = Object.keys(S.tech.done).length;
+// run the sim forward yrs years in 40 ms slices, so the page stays responsive; used by catch-up and the debug leaps
+function runYears(yrs, progress, done) {
+  const n = Math.round(yrs * 12), d = { y0: yr(), c0: S.chronN, p0: Math.round(totalPop()), t0: Object.keys(S.tech.done).length };
   CATCH = { done: 0 };
-  $('awayWhen').textContent = `You were gone ${fmtAway(away)}. Catching up…`;
-  $('awayLetter').textContent = ''; $('awayList').innerHTML = ''; $('away').classList.add('show');
   const step = () => {
     const t = performance.now();
     FAST = true;
-    while (CATCH.done < n && performance.now() - t < 40) { simMonth(); CATCH.done++; } // in slices, so the page stays responsive
+    while (CATCH.done < n && performance.now() - t < 40) { simMonth(); CATCH.done++; }
     FAST = false; FXQ.length = 0;
-    if (CATCH.done < n) { $('awayWhen').textContent = `You were gone ${fmtAway(away)}. Catching up… Year ${yr()}`; return setTimeout(step, 0); }
+    if (CATCH.done < n) { progress(yr()); return setTimeout(step, 0); }
     CATCH = null; S.lastLive = Date.now();
     syncWalkers(); faithRecalc();
     UIDIRTY.chron = UIDIRTY.stats = UIDIRTY.tools = UIDIRTY.lore = UIDIRTY.people = UIDIRTY.prayers = true;
-    awayReport({ away, secs, y0, y1: yr(), p0, p1: Math.round(totalPop()), ideas: Object.keys(S.tech.done).length - t0, ev: S.chron.filter(e => e.n > c0) });
+    done(Object.assign(d, { y1: yr(), p1: Math.round(totalPop()), ideas: Object.keys(S.tech.done).length - d.t0, ev: S.chron.filter(e => e.n > d.c0) }));
     saveAll();
   };
   setTimeout(step, 0);
 }
+function catchUp(away, secs, yrs) {
+  $('awayWhen').textContent = `You were gone ${fmtAway(away)}. Catching up…`;
+  $('awayLetter').textContent = ''; $('awayList').innerHTML = ''; $('away').classList.add('show');
+  runYears(yrs, y => { $('awayWhen').textContent = `You were gone ${fmtAway(away)}. Catching up… Year ${y}`; }, d => awayReport(Object.assign(d, { away, secs })));
+}
+function leapBits(d) { const b = [`Year ${d.y0} → ${d.y1}`, d.p0 === d.p1 ? `${fmtInt(d.p1)} people` : `${fmtInt(d.p0)} → ${fmtInt(d.p1)} people`]; if (d.ideas > 0) b.push(`${d.ideas} new idea${d.ideas > 1 ? 's' : ''}`); return b.join(' · '); }
 function awayReport(d) {
-  const kept = d.secs < d.away - 60 ? ` The world kept going for ${fmtAway(d.secs)} of it` : ' The world kept going';
-  const bits = [`Year ${d.y0} → ${d.y1}`, d.p0 === d.p1 ? `${fmtInt(d.p1)} people` : `${fmtInt(d.p0)} → ${fmtInt(d.p1)} people`]; if (d.ideas > 0) bits.push(`${d.ideas} new idea${d.ideas > 1 ? 's' : ''}`);
-  $('awayWhen').textContent = `You were gone ${fmtAway(d.away)}.${kept}: ${bits.join(' · ')}.`;
+  if (d.away == null) $('awayWhen').textContent = `A leap of ${d.y1 - d.y0} years: ${leapBits(d)}.`;
+  else $('awayWhen').textContent = `You were gone ${fmtAway(d.away)}.${d.secs < d.away - 60 ? ` The world kept going for ${fmtAway(d.secs)} of it` : ' The world kept going'}: ${leapBits(d)}.`;
   // the highlights: every new era, then the big moments spread over the whole stretch
   const big = d.ev.filter(e => e.k === 'major' || e.k === 'era'), rest = d.ev.filter(e => !(e.k === 'major' || e.k === 'era'));
   let pick = big.filter(e => e.k === 'era');
@@ -107,6 +111,26 @@ function awayReport(d) {
   }
 }
 function bindAway() { $('awayOk').onclick = () => $('away').classList.remove('show'); }
+
+/* ---------- debug card (Shift+D, or ?dev): leap ahead to see slow changes play out ---------- */
+let LEAP = null; // the last leap, for "What happened?"
+function toggleDebug(on) { $('dbg').classList.toggle('show', on != null ? on : !$('dbg').classList.contains('show')); }
+function leap(n) {
+  if (!S || CATCH) return;
+  if (S.flags.intro) { toast('Let the pod land first.'); return; }
+  const btns = document.querySelectorAll('#dbg [data-leap]'); btns.forEach(b => b.disabled = true);
+  $('dbgMsg').textContent = `Leaping ${n} years…`;
+  runYears(n, y => { $('dbgMsg').textContent = `Leaping ${n} years… Year ${y}`; }, d => {
+    LEAP = d; btns.forEach(b => b.disabled = false);
+    $('dbgMsg').innerHTML = `+${n} years: ${esc(leapBits(d))} · <a href="#" id="dbgWhat">what happened?</a>`;
+    $('dbgWhat').onclick = e => { e.preventDefault(); $('awayLetter').textContent = ''; awayReport(LEAP); $('away').classList.add('show'); };
+  });
+}
+function bindDebug() {
+  document.querySelectorAll('#dbg [data-leap]').forEach(b => b.onclick = () => leap(+b.dataset.leap));
+  $('dbgX').onclick = () => toggleDebug(false);
+  if (DEV) toggleDebug(true);
+}
 
 SF.ff = function (years) {
   const wasIntro = S.flags.intro;
@@ -132,7 +156,7 @@ SF.pray = k => { const c = prayerCandidates().filter(x => !k || x[0] === k); if 
 SF.season = s => { LIGHT.forceSeason = s ? Object.assign({ autumn: 0, winter: 0, spring: 0 }, s) : null; LIGHT.seasonT = 0; LIGHT.chk = 0; };
 
 async function boot() {
-  initView(); initStatic(); initLight(); bindUI(); bindAI(); bindFaith(); bindAway();
+  initView(); initStatic(); initLight(); bindUI(); bindAI(); bindFaith(); bindAway(); bindDebug();
   if (DEV) $('fps').style.display = 'block';
   try { await IDB.open(); } catch (e) { }
   try { await aiLoad(); } catch (e) { }
