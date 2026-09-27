@@ -26,6 +26,13 @@ export default {
         case 'PUT /api/save': return putSave(request, env, who);
         case 'POST /api/claim': return claim(request, env, who);
         case 'POST /api/voice': return voice(request, env, who);
+        case 'GET /api/worlds': return listWorlds(env, who);
+      }
+      const wm = url.pathname.match(/^\/api\/worlds\/([\w.-]{1,60})$/);
+      if (wm) {
+        if (request.method === 'GET') return getWorld(env, who, wm[1]);
+        if (request.method === 'PUT') return putWorld(request, env, who, wm[1]);
+        if (request.method === 'DELETE') { await env.SAVES.delete(`world:${who.id}:${wm[1]}`); return json({ ok: true }); }
       }
       return json({ error: 'no such thing' }, 404);
     } catch (e) {
@@ -121,6 +128,31 @@ async function claim(request, env, who) {
   const { session } = await request.json();
   if (!session || String(session).length > 80) return json({ error: 'no session' }, 400);
   await env.SAVES.put('claim:' + who.id, String(session));
+  return json({ ok: true });
+}
+
+/* ---------- kept worlds: starting a new world (or switching) keeps the old one here ---------- */
+// world:<id>:<wid>, where wid is the game's own "<seed>-<created>" id; metadata { planet, year, pop, savedAt, gz }
+const WORLD_MAX = 20;
+async function worldKeys(env, who) { const r = await env.SAVES.list({ prefix: `world:${who.id}:` }); return r.keys; }
+async function listWorlds(env, who) {
+  const keys = await worldKeys(env, who);
+  return json({ worlds: keys.map(k => Object.assign({ wid: k.name.slice(k.name.lastIndexOf(':') + 1) }, k.metadata || {})), max: WORLD_MAX });
+}
+async function getWorld(env, who, wid) {
+  const { value, metadata } = await env.SAVES.getWithMetadata(`world:${who.id}:${wid}`, { type: 'arrayBuffer' });
+  if (!value) return json({ error: 'no such world' }, 404);
+  return new Response(value, { status: 200, headers: { 'x-seedfall-meta': asciiJson(metadata || {}), 'cache-control': 'no-store', 'content-type': 'application/octet-stream' } });
+}
+async function putWorld(request, env, who, wid) {
+  if ((+request.headers.get('content-length') || 0) > MAX_SAVE) return json({ error: 'save too big' }, 413);
+  const keys = await worldKeys(env, who), key = `world:${who.id}:${wid}`;
+  if (!keys.some(k => k.name === key) && keys.length >= WORLD_MAX) return json({ error: `you already keep ${WORLD_MAX} worlds; forget one first` }, 409);
+  const body = await request.arrayBuffer();
+  if (body.byteLength > MAX_SAVE) return json({ error: 'save too big' }, 413);
+  let info = {}; try { info = JSON.parse(request.headers.get('x-seedfall-info') || '{}'); } catch (e) { }
+  const meta = { planet: String(info.planet || '').slice(0, 60), year: +info.year || 0, pop: +info.pop || 0, savedAt: Date.now(), gz: request.headers.get('x-seedfall-gzip') === '1' ? 1 : 0 };
+  await env.SAVES.put(key, body, { metadata: meta });
   return json({ ok: true });
 }
 

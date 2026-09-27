@@ -166,6 +166,14 @@ select{font:inherit;font-size:12px;padding:4px 6px;border-radius:7px;border:1px 
 .card .acts .btn{padding:10px 16px;font-size:13.5px}
 .card .fine{font-size:12px;color:var(--ink3);margin-top:16px}
 #away .card{max-height:calc(100vh - 60px);overflow:auto}
+.wl{display:flex;flex-direction:column;gap:6px;margin-top:10px;max-height:46vh;overflow:auto}
+.wl-row{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.wl-row span{flex:1;min-width:0}
+.wl-row b{display:block;font-size:14px}
+.wl-row small{font-size:12px;color:var(--ink3)}
+.wl-row .btn{padding:5px 10px;font-size:12.5px}
+.wl-row .btn:disabled,#wlNew:disabled{opacity:.45;cursor:default}
+.wl-empty{font-size:13px;color:var(--ink3);padding:6px 2px}
 .away-letter{font-family:Georgia,serif;font-size:14.5px;line-height:1.6;color:var(--ink);background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:12px 0;white-space:pre-wrap}
 .away-letter:empty{display:none}
 .away-letter b{display:block;font-size:15.5px;margin-bottom:6px}
@@ -201,6 +209,16 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--line);border-botto
 .vx pre{font:11px/1.45 Consolas,"Cascadia Mono",monospace;background:rgba(43,40,51,.06);border-radius:8px;padding:8px 9px;margin:6px 0;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;user-select:text}
 .doc q{display:block;font-family:Georgia,serif;font-style:italic;margin:3px 0 4px;color:var(--ink)}
 .doc .dm{color:var(--ink3);margin-top:3px}
+#dbg{position:fixed;left:16px;bottom:52px;display:none;align-items:center;gap:6px;flex-wrap:wrap;max-width:520px;padding:8px 10px;border-radius:12px;
+  background:var(--glass);backdrop-filter:blur(12px);box-shadow:var(--shadow);font-size:12px;color:var(--ink2);z-index:6}
+#dbg.show{display:flex}
+#dbg b{color:var(--ink);font-weight:650;margin-right:2px}
+#dbg .btn{padding:4px 9px;font-size:12px}
+#dbg .btn:disabled{opacity:.45;cursor:default}
+#dbg #dbgX{margin-left:auto;padding:2px 8px}
+#dbg #dbgMsg{flex-basis:100%;font-size:11.5px;color:var(--ink3)}
+#dbg #dbgMsg:empty{display:none}
+#dbg a{color:var(--accent)}
 #fps{position:fixed;left:8px;bottom:6px;font:11px monospace;color:#333;display:none}
 body.night #hud{background:rgba(32,30,44,.74);box-shadow:0 4px 18px rgba(0,0,0,.28),0 0 0 1px rgba(255,255,255,.06)}
 /* reverence */
@@ -315,6 +333,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
 <input type="file" id="fLoad" accept=".json,application/json" hidden>
 <div id="toast"></div>
 <div id="fps"></div>
+<div id="dbg"><b>Debug</b> Leap ahead <button class="btn" data-leap="10">+10</button><button class="btn" data-leap="20">+20</button><button class="btn" data-leap="50">+50</button><button class="btn" data-leap="100">+100</button> years<button class="btn" id="dbgX" title="Hide (Shift+D)">×</button><div id="dbgMsg"></div></div>
 
 <div class="modal" id="welcome"><div class="card">
   <h1>Seedfall</h1>
@@ -338,6 +357,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
     <span>🪨</span><span>Towns build from what their land gives: timber by the woods, stone under the crags, brick by the river. C › Towns shows their stores and what they are known for.</span>
     <span><kbd>6</kbd></span><span>Speak to your people. With a voice key (Voice… in the panel) they actually try to understand you, and your words can reshape how they build, grow, light their nights and even the weather.</span>
     <span><kbd>F</kbd></span><span>Fullscreen</span>
+    <span><kbd>Shift</kbd>+<kbd>D</kbd></span><span>Debug: leap 10, 20, 50 or 100 years ahead, to see slow changes play out</span>
     <span><kbd>Space</kbd></span><span>Pause / resume</span>
     <span><kbd>Home</kbd></span><span>Hand the camera back</span>
     <span><kbd>Esc</kbd></span><span>Cancel / close</span>
@@ -382,6 +402,14 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
   <div id="awayLetter" class="away-letter"></div>
   <ul id="awayList" class="away-list"></ul>
   <div class="acts"><button class="btn primary" id="awayOk">Carry on</button></div>
+</div></div>
+
+<div class="modal" id="worlds"><div class="card">
+  <h2>Your worlds</h2>
+  <p id="wlNow"></p>
+  <div id="wlList" class="wl"></div>
+  <div class="acts"><button class="btn primary" id="wlNew">Start a new world</button><button class="btn" id="wlClose" style="margin-left:auto">Close</button></div>
+  <div class="fine" id="wlFine"></div>
 </div></div>
 
 <div class="modal" id="confirm"><div class="card">

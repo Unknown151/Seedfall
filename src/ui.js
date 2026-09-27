@@ -67,7 +67,7 @@ function bindUI() {
   $('optSh').addEventListener('change', e => { S.settings.shadows = e.target.checked; relightNow(); });
   $('bHelp').addEventListener('click', () => $('help').classList.add('show'));
   $('hClose').addEventListener('click', () => $('help').classList.remove('show'));
-  $('bNew').addEventListener('click', () => confirmBox('Start a new world?', CLOUD.on ? `${S.planet || 'This world'} will be replaced in the cloud (which keeps a daily backup for two weeks) and a new pod will fall somewhere else.` : `${S.planet || 'This world'} will be archived${FOLDER.ok ? ' to the worlds folder' : ''} and a new pod will fall somewhere else.`, () => newWorld(randSeed(), true)));
+  $('bNew').addEventListener('click', openWorlds);
   $('cNo').addEventListener('click', () => $('confirm').classList.remove('show'));
   $('banner').addEventListener('click', () => reconnectFolder());
 }
@@ -98,6 +98,7 @@ function onKey(e) {
     else if ($('help').classList.contains('show')) $('help').classList.remove('show');
     else if ($('confirm').classList.contains('show')) $('confirm').classList.remove('show');
     else if ($('away').classList.contains('show')) $('away').classList.remove('show');
+    else if ($('worlds').classList.contains('show')) $('worlds').classList.remove('show');
     else if ($('aiset').classList.contains('show')) $('aiset').classList.remove('show');
     else if ($('answer').classList.contains('show')) $('answer').classList.remove('show');
     else if ($('speak').classList.contains('show')) $('speak').classList.remove('show');
@@ -106,7 +107,7 @@ function onKey(e) {
   else if (k === 'Home' || k === '0') { CAM.manualUntil = 0; CAM.focusUntil = 0; CAM.nextTour = 0; toast('Camera handed back.'); }
   else if (k === '+' || k === '=') { CAM.tz = clamp(CAM.tz * 1.25, minZoom(), 4); CAM.manualUntil = DYN.t + 90; }
   else if (k === '-') { CAM.tz = clamp(CAM.tz / 1.25, minZoom(), 4); CAM.manualUntil = DYN.t + 90; }
-  else if (DEV && k === 'P') { SF.ff(50); toast('+50 years'); }
+  else if (k === 'D' && e.shiftKey) toggleDebug();
 }
 let toastT = 0;
 function toast(t) { const el = $('toast'); el.textContent = t; el.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => el.style.opacity = 0, 3500); }

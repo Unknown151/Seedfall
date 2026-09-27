@@ -227,5 +227,7 @@ KEYS
   6        speak to your people
   F        fullscreen
   Space    pause
+  Shift+D  debug card: leap 10, 20, 50 or 100 years ahead (the world really
+           moves on and is saved; handy for seeing slow changes play out)
   H        help
   Drag / scroll to look around; the camera drifts back on its own. Home hands it back.
