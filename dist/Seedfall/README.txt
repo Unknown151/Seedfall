@@ -210,6 +210,12 @@ HOW TOWNS LAY THEMSELVES OUT
   the big towns, and glowlanes in the hover age. The middle of town is paved
   first, and paving costs stone, clay and so on; short of them, it just goes
   slower. The old market quarter keeps its cobbles for good.
+  The streets fill up with life as they go: tufts, flowers, fences and
+  milestones on country lanes; barrels, crates and benches in villages;
+  planters, bollards, street trees and the odd water pump on the cobbles;
+  pavements, zebra crossings, post boxes, hydrants, bus shelters and traffic
+  lights later on. Open meadows get grass and wildflowers, and small houses
+  get hedges, bushes and a tree by the gate.
 
 QUARTERS, TERRACES AND REBUILDING
   Nobody zones a Seedfall town but the town itself. Each one keeps a market

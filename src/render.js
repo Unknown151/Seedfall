@@ -25,6 +25,7 @@ function objH(i) {
   if (M.tree[i]) return 34;
   if (M.ruin[i]) return 28;
   if (M.road[i] && M.water[i]) return 12 + bridgeZ(i) - surfZ(i);
+  if (M.road[i]) return 16; // lamps, street trees, bus shelters
   return 6;
 }
 const HOUSE_H = [14, 20, 22, 28, 34, 64, 128, 185];
@@ -303,9 +304,11 @@ function drawTileObjects(c, i, x, y, cx, cy) {
   if (M.ruin[i]) drawRuin(c, i, x, y, cx, cy);
   if (!B && !bid && springAt(i)) drawSpring(c, i, cx, cy);
   if (!w && S.ferries && S.ferries.length) { const fl = ferryLandings().get(i); if (fl) drawLanding(c, i, cx, cy, fl); }
-  if (B && !FLAT_TYPES[B.type]) drawBuilding(c, B, cx, cy, i);
+  if (M.road[i] && !w && !bid) drawVerge(c, i, x, y, cx, cy);
+  if (B && !FLAT_TYPES[B.type]) { drawBuilding(c, B, cx, cy, i); if (B.type === 'house' && B.prog >= 1) drawYard(c, B, x, y, cx, cy); }
   else if (!B && !bid && M.tree[i]) drawTrees(c, i, x, y, cx, cy);
   else if (!B && !w && (M.bio[i] === BIO.ROCK || M.bio[i] === BIO.HIGH) && hash2(x, y, 11) < 0.3 && !M.road[i]) drawRocks(c, x, y, cx, cy);
+  else if (!B && !bid && !w && !M.road[i] && !M.rail[i] && !M.ruin[i]) drawGround(c, i, x, y, cx, cy);
 }
 
 function cliff(c, i, X, Y, dh, side, top) {
@@ -504,6 +507,7 @@ function drawRuin(c, i, x, y, cx, cy) {
 }
 
 /* ---------- roads & rails ---------- */
+const PAVE_COL = [null, null, null, '#d3cabd', '#d1c2b2', '#c9c7c2', '#dedcd6', '#f2f6fa'];
 const ROAD_COL = [null, '#d9c19a', '#cbbfa8', '#b3aba2', '#b97a62', '#6f7075', '#cfcdc6', '#e8eef5']; // by surface (see streets.js)
 function roadNeighbors(arr, x, y) {
   const r = [];
@@ -533,7 +537,16 @@ function drawRoad(c, i, x, y, cx, cy) {
     }
     const [bx, by] = P(0, 0); c.fillStyle = t >= 3 ? '#9c958c' : '#7e5f47'; c.fillRect(bx - 1.2, by + 2, 2.4, zOff + 1);
   }
+  if (!bridge && sf >= R_COBBLE) { // a pavement either side
+    const pw = w + .13, pc = shade(PAVE_COL[sf], LT.fG);
+    poly(c, [P(-pw / 2, -pw / 2), P(pw / 2, -pw / 2), P(pw / 2, pw / 2), P(-pw / 2, pw / 2)], pc);
+    for (const [dx, dy] of nb) { if (dx) { const a = dx > 0 ? 0 : -.5, b = dx > 0 ? .5 : 0; poly(c, [P(a, -pw / 2), P(b, -pw / 2), P(b, pw / 2), P(a, pw / 2)], pc); } else { const a = dy > 0 ? 0 : -.5, b = dy > 0 ? .5 : 0; poly(c, [P(-pw / 2, a), P(pw / 2, a), P(pw / 2, b), P(-pw / 2, b)], pc); } }
+  }
   for (const s of segs) poly(c, s.map(([u, v]) => P(u, v)), bridge ? shade(t >= 3 ? '#c9c2b6' : '#b98d66', LT.fG) : col);
+  if (!bridge && (sf === R_ASPHALT || sf === R_CONCRETE) && nb.length >= 3) { // zebra crossings at the junction
+    c.fillStyle = 'rgba(255,255,255,.75)';
+    for (const [dx, dy] of nb) for (let k = -2; k <= 2; k++) { const o = k * w / 5.5, q = dx ? [P(dx * .23, o - .02), P(dx * .3, o - .02), P(dx * .3, o + .02), P(dx * .23, o + .02)] : [P(o - .02, dy * .23), P(o + .02, dy * .23), P(o + .02, dy * .3), P(o - .02, dy * .3)]; c.beginPath(); c.moveTo(q[0][0], q[0][1]); for (const z of q.slice(1)) c.lineTo(z[0], z[1]); c.closePath(); c.fill(); }
+  }
   if (!bridge) roadTexture(c, sf, segs, nb, P, x, y);
   if (sf === R_ASPHALT && !bridge) { // dashed centre line
     c.strokeStyle = 'rgba(255,240,190,.7)'; c.lineWidth = .5;
@@ -580,6 +593,84 @@ function drawRail(c, i, x, y, cx, cy) {
       line(c, a[0], a[1], b[0], b[1], maglev ? '#dfe7ef' : '#5b5f66', maglev ? 1.4 : .7);
     }
   }
+}
+
+/* ---------- the streetscape: what stands along the roads, and what grows on open ground ---------- */
+// Everything here is chosen from hashes of the tile, so it's the same on every redraw and costs nothing to store.
+// Road tiles have three free corners (the lamp takes the fourth); what goes in them depends on the surface (so the
+// era), whether it's in town, and the town's quarter.
+function tuft(c, px, py, col) { c.strokeStyle = col; c.lineWidth = .45; c.beginPath(); c.moveTo(px - 1, py - 1.8); c.lineTo(px, py); c.lineTo(px + .2, py - 2.4); c.moveTo(px, py); c.lineTo(px + 1.1, py - 1.6); c.stroke(); }
+function flowers(c, px, py, h) { for (let k = 0; k < 3; k++) circ(c, px + (k - 1) * 1.1, py - .6 - (k % 2) * .6, .55, FLOWERS[(((h * 17) | 0) + k) % FLOWERS.length]); }
+function bench(c, cx, cy, u, v, col) { box(c, cx, cy, u, v, .07, .03, 1, .5, col); box(c, cx, cy, u, v - .03, .07, .008, 1.5, 1.2, col); }
+function streetTree(c, cx, cy, u, v, h) {
+  const [px, py] = pt(cx, cy, u, v, 0), col = ['#6db873', '#5fae78', '#83c886', '#a57ac6'][(h * 4) | 0], s = .8 + h * .3;
+  ell(c, px + 1, py + .3, 2.8 * s, 1.3 * s, 'rgba(40,50,70,.13)');
+  c.fillStyle = '#7b5e4e'; c.fillRect(px - .45, py - 4.5 * s, .9, 4.5 * s);
+  circ(c, px, py - 6.5 * s, 2.9 * s, leafC(col, .85)); circ(c, px + .7 * LT.hx, py - 7.2 * s, 2.1 * s, topC(leafC(col)));
+}
+function drawVerge(c, i, x, y, cx, cy) {
+  refreshOwn();
+  const sf = M.road[i], T = OWN[i] ? S.T[OWN[i]] : null, inT = T && dist(x, y, T.x, T.y) <= townRadius(T) + 1, z = zoneAt(i), grass = leafC(shade(BIO_COL[M.bio[i]] || '#94d4a6', .72));
+  const nb = roadNeighbors(M.road, x, y);
+  for (const [u, v, k] of [[-.37, -.37, 0], [-.38, .37, 1], [.37, .38, 2]]) {
+    const h = hash2(x, y, 300 + k), [px, py] = pt(cx, cy, u, v, 0);
+    if (!inT) { // country roads
+      if (sf <= R_GRAVEL) { if (h < .45) tuft(c, px, py, grass); else if (h < .6) flowers(c, px, py, h); else if (h < .7) { line(c, px, py, px, py - 3, '#8a6d57', .7); line(c, px + 2.2, py + 1.1, px + 2.2, py - 1.9, '#8a6d57', .7); line(c, px, py - 2.2, px + 2.2, py - 1.1, '#8a6d57', .5); } else if (k === 0 && h > .94) box(c, cx, cy, u, v, .04, .03, 0, 2.6, '#b9b3aa'); } // tufts, flowers, a bit of fence, a milestone
+      else if (h < .4) tuft(c, px, py, grass); else if (h > .93 && sf < R_GLOW) { line(c, px, py, px, py - 5, '#8c9199', .5); c.fillStyle = h > .965 ? '#3f8f5f' : '#e8e2cf'; c.fillRect(px - 1.3, py - 6.6, 2.6, 1.8); } // road signs
+      continue;
+    }
+    if (sf <= R_GRAVEL) { // a village lane
+      if (h < .35) tuft(c, px, py, grass); else if (h < .55) flowers(c, px, py, h);
+      else if (h < .62) { cyl(c, px, py, .045, 0, 2.2, '#9a7456'); } // a water barrel
+      else if (h < .68) box(c, cx, cy, u, v, .05, .05, 0, 1.6, '#a88462'); // a crate
+      else if (h < .73) bench(c, cx, cy, u, v, '#8a6d57');
+      continue;
+    }
+    if (sf <= R_BRICK) { // cobbled and brick streets
+      if (z === Z_HOME && h < .28 || z === Z_GREEN && h < .6) streetTree(c, cx, cy, u, v, h);
+      else if (h < .42) { box(c, cx, cy, u, v, .06, .06, 0, 1.6, '#a88f78'); flowers(c, px, py - 1.6, h); } // a planter
+      else if (h < .52) bench(c, cx, cy, u, v, '#6b5040');
+      else if (h < .6) for (const o of [-.05, .05]) { const [bx, by] = pt(cx, cy, u + o, v - o, 0); line(c, bx, by, bx, by - 2, '#4c4f58', .9); } // bollards
+      else if (z === Z_CORE && h > .95 && k === 1) { cyl(c, px, py, .04, 0, 3.4, '#5b6770'); line(c, px, py - 3, px + 1.4, py - 2.2, '#5b6770', .6); } // the old water pump
+      else if (h < .72) tuft(c, px, py, grass);
+      continue;
+    }
+    if (sf <= R_CONCRETE) { // modern streets
+      if ((z === Z_HOME || z === Z_GREEN) && h < .34) streetTree(c, cx, cy, u, v, h);
+      else if (k === 2 && nb.length >= 2 && h > .9) { box(c, cx, cy, u - .02, v - .02, .1, .05, 0, .6, '#8c9199'); c.globalAlpha = .55; box(c, cx, cy, u - .02, v - .07, .1, .004, .6, 5, '#bfe3f0'); c.globalAlpha = 1; box(c, cx, cy, u - .02, v - .03, .12, .07, 5.6, .6, '#5b6770'); } // a bus shelter
+      else if (h < .4) cyl(c, px, py, .03, 0, 3, '#c0392b'); // a post box
+      else if (h < .45) { cyl(c, px, py, .022, 0, 1.6, '#e0b030'); circ(c, px, py - 1.8, .5, '#e0b030'); } // a hydrant
+      else if (h < .5) cyl(c, px, py, .03, 0, 2, '#4f5a4f'); // a bin
+      else if (h < .56) bench(c, cx, cy, u, v, '#5b6770');
+      else if (h < .59 && hasTech('radio') && !hasTech('net')) box(c, cx, cy, u, v, .035, .035, 0, 6.5, '#c0392b'); // a phone box
+      else if (h < .66) { box(c, cx, cy, u, v, .06, .06, 0, 1.6, '#9aa0a6'); flowers(c, px, py - 1.6, h); }
+      else if (h < .7 && z === Z_CORE) { line(c, px, py, px, py - 6, '#5b6770', .5); c.fillStyle = ['#e05b52', '#e0b030', '#4fa06a'][(h * 30 | 0) % 3]; c.fillRect(px - .8, py - 8.4, 1.6, 2.4); } // traffic light
+      continue;
+    }
+    if (h < .4) streetTree(c, cx, cy, u, v, h); // glowlanes: gardens all the way
+    else if (h < .55) { box(c, cx, cy, u, v, .07, .07, 0, 1.2, '#e8eef5'); flowers(c, px, py - 1.2, h); }
+    else if (h < .62) { line(c, px, py, px, py - 7, '#dfe7ef', .7); circ(c, px, py - 7.5, 1, '#8fe3ec'); emit(px, py - 7.5, 5, '#8fe3ec', .6); } // a holo post
+    else if (h < .7) bench(c, cx, cy, u, v, '#cfd8e0');
+  }
+}
+// open grass: tufts, clover and wildflowers, thicker on lush ground
+function drawGround(c, i, x, y, cx, cy) {
+  const b = M.bio[i]; if (b !== BIO.MEADOW && b !== BIO.LUSH && b !== BIO.HIGH && b !== BIO.BARREN) return;
+  const g = leafC(shade(BIO_COL[b], b === BIO.HIGH || b === BIO.BARREN ? .8 : .74)), n = b === BIO.LUSH ? 4 : b === BIO.MEADOW ? 3 : 1;
+  for (let k = 0; k < n; k++) {
+    const h = hash2(x, y, 400 + k); if (h < .3) continue;
+    const [px, py] = pt(cx, cy, (hash2(x, y, 410 + k) - .5) * .8, (hash2(x, y, 420 + k) - .5) * .8, 0);
+    if (h > .9 && b !== BIO.HIGH && b !== BIO.BARREN) flowers(c, px, py, h); else if (h > .82 && b === BIO.LUSH) { circ(c, px, py - 1, 1.4, leafC('#5fae78', .9)); circ(c, px + .5, py - 1.5, .9, leafC('#6db873')); } else tuft(c, px, py, g);
+  }
+}
+// a little garden round the smaller houses: a hedge, a bush, a tree by the gate
+function drawYard(c, B, x, y, cx, cy) {
+  if (B.tier > 3 || houseJoin(B)) return;
+  const h = hash2(x, y, 500);
+  if (h < .45) { circ(c, ...pt(cx, cy, -.42, .36, 1.2), 1.5, leafC('#5fae78', .85)); circ(c, ...pt(cx, cy, -.4, .38, 1.8), 1, leafC('#6db873')); }
+  if (h > .3 && h < .6) { const a = pt(cx, cy, .44, -.3, 0), b = pt(cx, cy, .44, .3, 0); c.strokeStyle = leafC('#4f9f6a', .85); c.lineWidth = 1.8; c.beginPath(); c.moveTo(a[0], a[1] - 1); c.lineTo(b[0], b[1] - 1); c.stroke(); } // hedge
+  if (h > .8 && B.tier >= 2) streetTree(c, cx, cy, -.4, -.4, hash2(x, y, 501));
+  if (h > .6 && h < .75) flowers(c, ...pt(cx, cy, .3, .44, 0), h);
 }
 
 /* ---------- street lamps ---------- */
