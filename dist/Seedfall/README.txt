@@ -204,6 +204,12 @@ HOW TOWNS LAY THEMSELVES OUT
   someone builds on them.
   With a voice key, "winding lanes" or "plan everything" changes how new
   streets are laid out. Worlds saved before this update keep their old streets.
+  Roads are paved as the towns learn how, and with what they have: dirt
+  tracks first, then gravel (the Wheel), then cobbles where there's stone or
+  bricks where there's clay (Masonry), then asphalt (Motorcars), concrete in
+  the big towns, and glowlanes in the hover age. The middle of town is paved
+  first, and paving costs stone, clay and so on; short of them, it just goes
+  slower. The old market quarter keeps its cobbles for good.
 
 QUARTERS, TERRACES AND REBUILDING
   Nobody zones a Seedfall town but the town itself. Each one keeps a market

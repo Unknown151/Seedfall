@@ -299,7 +299,7 @@ function planFerries(T) {
     }
   }
   if (!best) return;
-  const t = roadTier();
+  const t = laySurf();
   for (const j of [best.a, best.b]) { if (!M.road[j] && !M.bld[j]) { M.road[j] = t; M.tree[j] = 0; M.plan[j] = 1; markDirty(j); } }
   roadLink(best.b, [best.a, best.b]);
   fs.push({ a: best.a, b: best.b, dir: best.dir, len: best.len, tid: T.id, yr: yr() }); S.ferryV = (S.ferryV || 0) + 1;

@@ -299,7 +299,7 @@ function drawTileObjects(c, i, x, y, cx, cy) {
   const w = M.water[i], bid = M.bld[i];
   let B = bid ? S.B[bid] : null;
   if (B && B.hid) B = null;
-  if (M.road[i] >= 2 && !w && (x + 2 * y) % (M.road[i] >= 4 ? 2 : 3) === 0) drawLamp(c, i, cx, cy);
+  if (rcls(i) >= 2 && !w && (x + 2 * y) % (rcls(i) >= 4 ? 2 : 3) === 0) drawLamp(c, i, cx, cy);
   if (M.ruin[i]) drawRuin(c, i, x, y, cx, cy);
   if (!B && !bid && springAt(i)) drawSpring(c, i, cx, cy);
   if (!w && S.ferries && S.ferries.length) { const fl = ferryLandings().get(i); if (fl) drawLanding(c, i, cx, cy, fl); }
@@ -504,7 +504,7 @@ function drawRuin(c, i, x, y, cx, cy) {
 }
 
 /* ---------- roads & rails ---------- */
-const ROAD_COL = [null, '#d9c19a', '#cdb892', '#b9b2a8', '#6f7075', '#e8eef5'];
+const ROAD_COL = [null, '#d9c19a', '#cbbfa8', '#b3aba2', '#b97a62', '#6f7075', '#cfcdc6', '#e8eef5']; // by surface (see streets.js)
 function roadNeighbors(arr, x, y) {
   const r = [];
   for (const [dx, dy] of N4) { const nx = x + dx, ny = y + dy; if (inb(nx, ny)) { const j = idx(nx, ny); if (arr[j] || (arr === M.road && M.bld[j] && isRoadAnchor(j))) r.push([dx, dy]); } }
@@ -512,7 +512,7 @@ function roadNeighbors(arr, x, y) {
 }
 function isRoadAnchor(j) { const B = S.B[M.bld[j]]; return B && (B.type === 'plaza' || B.type === 'pod' || B.type === 'station'); }
 function drawRoad(c, i, x, y, cx, cy) {
-  const t = M.road[i], col = shade(ROAD_COL[t] || ROAD_COL[1], LT.fG);
+  const sf = M.road[i], t = RCLS[sf] || 1, col = shade(ROAD_COL[sf] || ROAD_COL[1], LT.fG);
   let zOff = 0;
   const bridge = M.water[i] !== 0;
   if (bridge) zOff = bridgeZ(i) - surfZ(i);
@@ -534,11 +534,26 @@ function drawRoad(c, i, x, y, cx, cy) {
     const [bx, by] = P(0, 0); c.fillStyle = t >= 3 ? '#9c958c' : '#7e5f47'; c.fillRect(bx - 1.2, by + 2, 2.4, zOff + 1);
   }
   for (const s of segs) poly(c, s.map(([u, v]) => P(u, v)), bridge ? shade(t >= 3 ? '#c9c2b6' : '#b98d66', LT.fG) : col);
-  if (t === 4 && !bridge) { // dashed centre line
+  if (!bridge) roadTexture(c, sf, segs, nb, P, x, y);
+  if (sf === R_ASPHALT && !bridge) { // dashed centre line
     c.strokeStyle = 'rgba(255,240,190,.7)'; c.lineWidth = .5;
     for (const [dx, dy] of nb) { const a = P(dx * .12, dy * .12), b = P(dx * .38, dy * .38); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
   }
-  if (t === 5) { c.strokeStyle = 'rgba(120,220,230,.7)'; c.lineWidth = .5; for (const [dx, dy] of nb) { const a = P(0, 0), b = P(dx * .5, dy * .5); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); } }
+  if (sf === R_GLOW) { c.strokeStyle = 'rgba(120,220,230,.7)'; c.lineWidth = .5; for (const [dx, dy] of nb) { const a = P(0, 0), b = P(dx * .5, dy * .5); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); } }
+}
+// what the surface looks like close up: ruts, gravel, setts, herringbone, expansion joints
+function roadTexture(c, sf, segs, nb, P, x, y) {
+  if (sf === R_DIRT) { c.fillStyle = 'rgba(140,105,70,.18)'; for (let k = 0; k < 3; k++) { const [px, py] = P((hash2(x, y, 40 + k) - .5) * .3, (hash2(x, y, 50 + k) - .5) * .3); c.fillRect(px - .8, py - .3, 1.6, .6); } return; }
+  if (sf === R_GRAVEL) { for (let k = 0; k < 7; k++) { const [px, py] = P((hash2(x, y, 60 + k) - .5) * .36, (hash2(x, y, 70 + k) - .5) * .36); c.fillStyle = k % 2 ? 'rgba(110,95,80,.35)' : 'rgba(255,250,240,.4)'; c.fillRect(px - .35, py - .35, .7, .7); } return; }
+  const cross = sf === R_COBBLE ? .085 : sf === R_BRICK ? .07 : sf === R_CONCRETE ? .25 : 0; if (!cross) return;
+  c.strokeStyle = sf === R_BRICK ? 'rgba(90,40,30,.3)' : sf === R_CONCRETE ? 'rgba(90,90,90,.22)' : 'rgba(70,65,60,.32)'; c.lineWidth = sf === R_CONCRETE ? .45 : .35; c.beginPath();
+  for (const sg of segs) { // lines across the direction of travel, clipped to the segment
+    const u0 = Math.min(sg[0][0], sg[2][0]), u1 = Math.max(sg[0][0], sg[2][0]), v0 = Math.min(sg[0][1], sg[2][1]), v1 = Math.max(sg[0][1], sg[2][1]), alongU = u1 - u0 >= v1 - v0;
+    if (alongU) for (let u = u0 + cross / 2; u < u1; u += cross) { const a = P(u, v0), b = P(u, v1); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
+    else for (let v = v0 + cross / 2; v < v1; v += cross) { const a = P(u0, v), b = P(u1, v); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
+    if (sf === R_COBBLE || sf === R_BRICK) { const m = alongU ? P(u0, (v0 + v1) / 2) : P((u0 + u1) / 2, v0), n2 = alongU ? P(u1, (v0 + v1) / 2) : P((u0 + u1) / 2, v1); c.moveTo(m[0], m[1]); c.lineTo(n2[0], n2[1]); }
+  }
+  c.stroke();
 }
 // a bridge deck sits level with the banks it joins
 function bridgeZ(i) {
@@ -570,7 +585,7 @@ function drawRail(c, i, x, y, cx, cy) {
 /* ---------- street lamps ---------- */
 function lampC(x, y) { return LT.lampCs ? LT.lampCs[(hash2(x | 0, y | 0, 17) * LT.lampCs.length) | 0] : LT.lampC; }
 function drawLamp(c, i, cx, cy) {
-  const k = LT.era, t = M.road[i], [px, py] = pt(cx, cy, .36, -.36, 0), on = LT.lit > 0 && !LT.lampOff;
+  const k = LT.era, t = rcls(i), [px, py] = pt(cx, cy, .36, -.36, 0), on = LT.lit > 0 && !LT.lampOff;
   const EQ = EMQ; if (LT.lampOff) EMQ = null;
   const col = lampC(px * 3, py * 3), sv = LT.lampC; LT.lampC = col;
   if (t >= 5 || k === 2) { // light pillar

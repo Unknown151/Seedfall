@@ -191,7 +191,7 @@ function pavePath(start, maxD, ok) {
     q = nq;
   }
   if (found < 0) return false;
-  const t = roadTier();
+  const t = laySurf();
   for (let i = prev.get(found); i !== start && i >= 0; i = prev.get(i)) { clearField(i); M.plan[i] = 1; if (!M.road[i]) { M.road[i] = t; M.tree[i] = 0; M.wild[i] = 0; markDirty(i); } }
   return true;
 }
@@ -207,3 +207,52 @@ function legacyStreets() {
   }
   for (const T of towns()) T.grid = T.grid || { sx: 4, sy: 4, set: 1, ox: T.x, oy: T.y };
 }
+
+/* ---------- paving: dirt tracks, then gravel, cobbles or bricks, asphalt, concrete and glowlanes ---------- */
+// M.road holds the surface. New roads go down as whatever the age lays (laySurf); then every few months each town
+// paves a few of its streets with the best it knows AND can make: cobbles where there's stone, bricks where there's
+// clay. The middle of town goes first. Paving costs materials; short of them it goes slower (and never stops).
+// The old market quarter keeps its cobbles or bricks for good: people like them.
+const R_DIRT = 1, R_GRAVEL = 2, R_COBBLE = 3, R_BRICK = 4, R_ASPHALT = 5, R_CONCRETE = 6, R_GLOW = 7;
+const RCLS = [0, 1, 2, 3, 3, 4, 4, 5]; // the old road tiers (width, lamps, bridges)
+const R_NAME = ['', 'dirt track', 'gravel road', 'cobbled street', 'brick street', 'asphalt road', 'concrete road', 'glowlane'];
+const R_COST = [null, null, { stone: .3 }, { stone: 1 }, { clay: 1 }, { goods: .4, stone: .5 }, { stone: 1.5 }, { glass: .4, metal: .4 }];
+const rcls = i => RCLS[M.road[i]] || 0;
+function paveSurf(T, i, d, R) { // what this street ought to be, in this town, now
+  const z = zoneAt(i), cur = M.road[i], out = d > R + 1.5;
+  if (z === Z_CORE && (cur === R_COBBLE || cur === R_BRICK) && hasTech('motor')) return cur; // the old town keeps its cobbles, for good
+  if (hasTech('hover')) return R_GLOW;
+  if (hasTech('motor')) {
+    if (z === Z_CORE && (cur === R_COBBLE || cur === R_BRICK)) return cur; // the old town keeps its cobbles
+    return !out && hasTech('concrete') && T.pop > 3000 && (z === Z_CORE || z === Z_WORKS || (hash2(i, T.id, 7) < .3)) ? R_CONCRETE : R_ASPHALT;
+  }
+  if (hasTech('masonry') && !out) {
+    if (cur === R_COBBLE || cur === R_BRICK) return cur;
+    const st = (T.res.stone || 0) + (T.pot.stone || 0) * 40, cl = (T.res.clay || 0) + (T.pot.clay || 0) * 40;
+    return cl > st * (hasTech('brick') ? .8 : 1.3) ? R_BRICK : R_COBBLE;
+  }
+  return hasTech('wheel') ? R_GRAVEL : R_DIRT;
+}
+function paveTown(T) {
+  if (!T.res || !T.pot) return;
+  const R = townRadius(T), Rx = R + 5, n = Math.min(14, 2 + Math.floor(T.pop / 700)), todo = [];
+  for (let y = Math.max(0, Math.floor(T.y - Rx)); y <= Math.min(H - 1, Math.ceil(T.y + Rx)); y++) for (let x = Math.max(0, Math.floor(T.x - Rx)); x <= Math.min(W - 1, Math.ceil(T.x + Rx)); x++) {
+    const i = idx(x, y); if (!M.road[i] || OWN[i] !== T.id) continue;
+    const d = dist(x, y, T.x, T.y), want = paveSurf(T, i, d, R);
+    if (want !== M.road[i] && (want > M.road[i] || want === R_GLOW)) todo.push([d + (M.water[i] ? 3 : 0), i, want]);
+  }
+  if (!todo.length) return;
+  todo.sort((a, b) => a[0] - b[0]);
+  let done = 0;
+  for (const [, i, want] of todo) {
+    if (done >= n) break;
+    const c = R_COST[want];
+    if (c && !Object.keys(c).every(r => T.res[r] >= c[r]) && !chance(.35)) continue; // short of it: some gets done anyway, slowly
+    if (c) for (const r in c) T.res[r] = Math.max(0, T.res[r] - c[r]);
+    M.road[i] = want; markDirty(i); done++;
+    if (!S.firsts['road' + want]) { S.firsts['road' + want] = yr(); if (want > R_GRAVEL) chron('🛣️', PAVE_TXT[want].replace('{T}', T.name), { x: i % W, y: (i / W) | 0 }); }
+  }
+}
+const PAVE_TXT = [, , , '{T} lays its first cobbles, round the square. Carts rattle; everyone pretends to love it.', 'The first brick street is laid in {T}, herringbone, in the good red clay.',
+  'Hot asphalt is rolled out in {T}. The smell hangs over town for a week and the children draw on it in chalk.', '{T} pours its first concrete roads, straight and pale and very smooth. The roller-skaters are delighted.',
+  'The streets of {T} begin to glow softly underfoot. Nobody needs a lamp to get home any more.'];
