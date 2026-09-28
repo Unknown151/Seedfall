@@ -23,7 +23,7 @@ function gcol(s) {
 }
 
 /* ---------- geometry: vertex = position, normal, colour, emissive (10 floats) ---------- */
-function gv(p, n, c, e) { GLB.v.push(p[0], p[1], p[2], n[0], n[1], n[2], c[0], c[1], c[2], e, GLB.id || 0, e ? 0 : GLB.mat || 0); } // then what the pixel belongs to (picking) and what it's made of (texture) // the last float is what the pixel belongs to (for picking)
+function gv(p, n, c, e) { GLB.v.push(p[0], p[1], p[2], n[0], n[1], n[2], c[0], c[1], c[2], e, GLB.id || 0, e ? 0 : GLB.mat || 0, GLB.ao || 1); } // and how much sky it sees (ambient occlusion, baked later) // then what the pixel belongs to (picking) and what it's made of (texture) // the last float is what the pixel belongs to (for picking)
 function gtri(a, b, c, col, e = 0) {
   const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
   let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
@@ -117,6 +117,50 @@ function glDoor(cx, cy, u0, v0, hd, w, h, col) {
 
 /* ---------- a chunk: terrain, water, roads, trees, lamps and everything standing on its tiles ---------- */
 const GT = i => M.water[i] === 1 ? SEAZ * ZS : surfZ(i) * ZS;
+function glBusy(x, y) { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (M.bld[j] || M.tree[j] || GT(j) > GT(idx(x, y)) + .05) return true; } return false; }
+/* ---------- ambient occlusion, baked: a height map of the valley, and each vertex looks round it for how much sky it can see ---------- */
+const HFR = 8, HFN = W * HFR, HF = new Float32Array(HFN * HFN).fill(-9), AO_D = [...Array(8)].map((_, k) => [Math.cos(k / 8 * TAU + .2), Math.sin(k / 8 * TAU + .2)]), AO_S = [.14, .32, .65, 1.1, 1.8, 2.8];
+function hfAt(x, z) { const a = Math.floor((x + .5) * HFR), b = Math.floor((z + .5) * HFR); return a < 0 || b < 0 || a >= HFN || b >= HFN ? -9 : HF[b * HFN + a]; }
+// the chunk's own patch of the height map, from its (not too steep) triangles; walls are left out, the roofs above them say how tall things are
+function hfRaster(k, v) {
+  const x0 = (k % GNC) * GCH * HFR, z0 = ((k / GNC) | 0) * GCH * HFR, x1 = x0 + GCH * HFR, z1 = z0 + GCH * HFR, N = 13;
+  for (let b = z0; b < z1; b++) HF.fill(-9, b * HFN + x0, b * HFN + x1);
+  for (let t = 0; t < v.length; t += N * 3) {
+    if (Math.abs(v[t + 4]) < .2) continue;
+    const ax = v[t], ay = v[t + 1], az = v[t + 2], bx = v[t + N], by = v[t + N + 1], bz = v[t + N + 2], cx = v[t + 2 * N], cy = v[t + 2 * N + 1], cz = v[t + 2 * N + 2];
+    if (Math.max(ax, bx, cx) - Math.min(ax, bx, cx) < .09 && Math.max(az, bz, cz) - Math.min(az, bz, cz) < .09) continue; // grass, flowers and trims don't hide the sky
+    const det = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(det) < 1e-9) continue;
+    const i0 = Math.max(x0, Math.floor((Math.min(ax, bx, cx) + .5) * HFR)), i1 = Math.min(x1 - 1, Math.floor((Math.max(ax, bx, cx) + .5) * HFR)), j0 = Math.max(z0, Math.floor((Math.min(az, bz, cz) + .5) * HFR)), j1 = Math.min(z1 - 1, Math.floor((Math.max(az, bz, cz) + .5) * HFR));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const px = (i + .5) / HFR - .5, pz = (j + .5) / HFR - .5, l1 = ((bz - cz) * (px - cx) + (cx - bx) * (pz - cz)) / det, l2 = ((cz - az) * (px - cx) + (ax - cx) * (pz - cz)) / det, l3 = 1 - l1 - l2;
+      if (l1 < -1e-4 || l2 < -1e-4 || l3 < -1e-4) continue;
+      const y = l1 * ay + l2 * by + l3 * cy, o = j * HFN + i; if (y > HF[o]) HF[o] = y;
+    }
+  }
+}
+// horizon-based: in eight directions, the highest thing nearby above the surface's own tangent plane hides that much sky
+function aoAt(px, py, pz, nx, ny, nz) {
+  if (ny < -.5) return .55; // undersides: the ground's light, not the sky's
+  const ox = px + nx * .05, oy = py + ny * .05, oz = pz + nz * .05; let sw = 0, sv = 0;
+  for (let d = 0; d < 8; d++) {
+    const dx = AO_D[d][0], dz = AO_D[d][1], f = dx * nx + dz * nz, w = ny > .5 ? 1 : f; if (w < .05) continue;
+    const st = ny > .3 ? -f / ny / Math.sqrt(1 + f * f / (ny * ny)) : 0; let occ = 0;
+    for (let k = 0; k < 6; k++) {
+      const s = AO_S[k], a = Math.floor((ox + dx * s + .5) * HFR), b = Math.floor((oz + dz * s + .5) * HFR); if (a < 0 || b < 0 || a >= HFN || b >= HFN) continue;
+      const dh = HF[b * HFN + a] - oy; if (dh <= 0 && st >= 0) continue;
+      const o = (dh / Math.sqrt(dh * dh + s * s) - st) * (1 - s / 3.2); if (o > occ) occ = o;
+    }
+    sv += w * (1 - Math.min(1, occ)); sw += w;
+  }
+  return sw ? sv / sw : 1;
+}
+function glAO(v) { // corners are shared by several triangles: work each one out once
+  const memo = new Map();
+  for (let t = 0; t < v.length; t += 13) {
+    const key = Math.round(v[t] * 256) * 131071 + Math.round(v[t + 2] * 256) * 8191 + Math.round(v[t + 1] * 512) * 7 + Math.round(v[t + 4] * 3) * 3 + Math.round(v[t + 3] * 3) * 5 + Math.round(v[t + 5] * 3) * 11;
+    let a = memo.get(key); if (a === undefined) { a = aoAt(v[t], v[t + 1], v[t + 2], v[t + 3], v[t + 4], v[t + 5]); memo.set(key, a); } v[t + 12] = a;
+  }
+}
 function glBuildChunk(k) {
   const cx0 = (k % GNC) * GCH, cy0 = ((k / GNC) | 0) * GCH, v = [], lamps = [];
   const svLT = LT, svEM = EMQ; LT = GLT_FLAT(); EMQ = null;
@@ -127,7 +171,9 @@ function glBuildChunk(k) {
       const bio = M.bio[i], gmat = M.water[i] ? 0 : bio === BIO.MEADOW || bio === BIO.LUSH ? M_GRASS : bio === BIO.ROCK || bio === BIO.SNOW ? M_STONE : bio === BIO.SAND ? M_SAND : M_EARTH;
       // ground
       const top = gcol(topColor(i)), sc = gcol(sideCol(i));
-      GLB.ctr = [x, h - 1, y]; GLB.mat = gmat; gquad([x - .5, h, y - .5], [x - .5, h, y + .5], [x + .5, h, y + .5], [x + .5, h, y - .5], top, M.water[i] ? -1 : 0);
+      GLB.ctr = [x, h - 1, y]; GLB.mat = gmat;
+      const sub = !M.water[i] && glBusy(x, y) ? 4 : 1; // finer ground next to buildings and trees, so the soft shadow at their feet has vertices to live on
+      for (let a = 0; a < sub; a++) for (let b = 0; b < sub; b++) { const u0 = x - .5 + a / sub, v0 = y - .5 + b / sub, d = 1 / sub; gquad([u0, h, v0], [u0, h, v0 + d], [u0 + d, h, v0 + d], [u0 + d, h, v0], top, M.water[i] ? -1 : 0); }
       for (const [dx, dy] of N4) { // walls down to lower neighbours (and the island's edge)
         const nx = x + dx, ny = y + dy, nh = inb(nx, ny) ? GT(idx(nx, ny)) : -SLAB * ZS; if (nh >= h - .001) continue;
         const e = dx ? [[x + dx * .5, y - .5], [x + dx * .5, y + .5]] : [[x - .5, y + dy * .5], [x + .5, y + dy * .5]];
@@ -211,23 +257,54 @@ function glSheep(X, Z, y0, s, ang) { // a woolly body, a black face and four leg
   glBlob(u, v, .055 * s, zz + 2 * s, 1.1 * s, '#ece7da', 0); glBlob(u + .015 * ca * s, v + .015 * sa * s, .04 * s, zz + 2.7 * s, .7 * s, '#f6f3ec', 0);
   glBlob(u + .062 * ca * s, v + .062 * sa * s, .02 * s, zz + 2.4 * s, .65 * s, '#3a3430', 0);
 }
+function glNbrs(k) { const a = k % GNC, b = (k / GNC) | 0, o = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && a + dx >= 0 && b + dy >= 0 && a + dx < GNC && b + dy < GNC) o.push((b + dy) * GNC + a + dx); return o; }
+function glEdge(k) { // a fingerprint of the chunk's height map near its edges
+  const x0 = (k % GNC) * GCH * HFR, z0 = ((k / GNC) | 0) * GCH * HFR, n = GCH * HFR; let h = 0;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (i < 20 || j < 20 || i >= n - 20 || j >= n - 20) h = (h * 31 + Math.round(HF[(z0 + j) * HFN + x0 + i] * 20)) | 0;
+  return h;
+}
 function glDirty(i) { const x = i % W, y = (i / W) | 0; for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (inb(nx, ny)) GL3.dirty.add(((ny / GCH) | 0) * GNC + ((nx / GCH) | 0)); } }
 
 /* ---------- shaders ---------- */
+/* ---------- the sky: blue overhead, pale at the horizon, gold and rose round a low sun; the haze takes the same colour ---------- */
+const GL_SKY = `
+uniform vec3 uSunD; uniform float uSunY, uCover;
+vec3 skyCol(vec3 v){ // in screen colour (after the tone curve)
+  float day=smoothstep(-.1,.2,uSunY), gold=smoothstep(-.16,.02,uSunY)*(1.-smoothstep(.05,.42,uSunY));
+  float mu=dot(v,uSunD), m=max(mu,0.), toward=pow(mu*.5+.5,4.), h=clamp(v.y,0.,1.);
+  vec3 zen=mix(vec3(.03,.05,.12),vec3(.27,.49,.83),day), hor=mix(vec3(.07,.09,.17),vec3(.8,.88,.95),day);
+  hor=mix(hor,vec3(1.,.6,.34),gold*toward); hor=mix(hor,vec3(.62,.52,.68),gold*(1.-toward)*.45); zen=mix(zen,vec3(.32,.35,.56),gold*.45);
+  vec3 c=mix(hor,zen,pow(h,.5)); if(v.y<0.) c=hor*mix(1.,.86,clamp(-v.y*4.,0.,1.));
+  c+=vec3(1.,.84,.6)*(pow(m,10.)*.3*(day*.5+gold)+pow(m,180.)*.45*day);
+  c=mix(c,vec3(dot(c,vec3(.3,.59,.11)))*mix(.4,1.03,day),uCover*.72);
+  return clamp(c,0.,1.);
+}
+vec3 untone(vec3 c){ return -log(1.-min(c,vec3(.97)))/1.45; }`;
+const GL_KVS = `#version 300 es
+out vec2 vU; void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2)); vU=p*2.-1.; gl_Position=vec4(vU,0.,1.); }`;
+const GL_KFS = `#version 300 es
+precision highp float; in vec2 vU; out vec4 o; uniform vec3 uF, uR, uU;` + GL_SKY + `
+void main(){
+  vec3 v=normalize(uF+vU.x*uR+vU.y*uU), c=skyCol(v); float mu=dot(v,uSunD), day=smoothstep(-.1,.2,uSunY);
+  float disc=smoothstep(.99955,.9998,mu)*smoothstep(-.03,.02,uSunY)*(1.-uCover*.8); c=mix(c,vec3(1.,.97,.9),disc);
+  vec3 q=floor(v*260.); float st=fract(sin(dot(q,vec3(12.9898,78.233,37.719)))*43758.5453); // stars
+  c+=vec3(.9,.92,1.)*step(.9965,st)*(1.-day)*(1.-uCover)*smoothstep(0.,.2,v.y)*(.5+.5*fract(st*97.));
+  o=vec4(c, disc+pow(max(mu,0.),60.)*.35*(1.-uCover));
+}`;
 const GL_VS = `#version 300 es
-layout(location=0) in vec3 aP; layout(location=1) in vec3 aN; layout(location=2) in vec3 aC; layout(location=3) in float aE; layout(location=4) in float aI; layout(location=5) in float aM;
-uniform mat4 uVP, uSVP; out vec3 vP, vN, vC; out float vE; out vec4 vS; flat out float vI, vM;
-void main(){ vP=aP; vN=aN; vC=aC; vE=aE; vI=aI; vM=aM; vS=uSVP*vec4(aP+aN*.02,1.); gl_Position=uVP*vec4(aP,1.); }`;
+layout(location=0) in vec3 aP; layout(location=1) in vec3 aN; layout(location=2) in vec3 aC; layout(location=3) in float aE; layout(location=4) in float aI; layout(location=5) in float aM; layout(location=6) in float aO;
+uniform mat4 uVP, uSVP; out vec3 vP, vN, vC; out float vE, vO; out vec4 vS; flat out float vI, vM;
+void main(){ vP=aP; vN=aN; vC=aC; vE=aE; vI=aI; vM=aM; vO=aO; vS=uSVP*vec4(aP+aN*.02,1.); gl_Position=uVP*vec4(aP,1.); }`;
 const GL_FS = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
-in vec3 vP, vN, vC; in float vE; in vec4 vS; flat in float vI, vM; out vec4 o;
+in vec3 vP, vN, vC; in float vE, vO; in vec4 vS; flat in float vI, vM; out vec4 o;
 uniform highp sampler2DArray uTex; uniform vec3 uAvg[18]; uniform float uTS[18], uRaw[18];
 uniform float uHi, uFog0, uFogL; uniform vec3 uFogC; uniform vec3 uSun, uSunC, uSky, uGnd, uWin, uLamp, uEye; uniform float uLit, uShK, uT;
-uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64];
+uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64];` + GL_SKY + `
 float shadow(){ vec3 p=vS.xyz/vS.w*.5+.5; if(p.x<0.||p.x>1.||p.y<0.||p.y>1.) return 1.; float s=0.; vec2 d=vec2(1./2048.);
   for(int x=-1;x<=1;x++) for(int y=-1;y<=1;y++) s+=texture(uSh, vec3(p.xy+vec2(x,y)*d*1.2, p.z-.0015)); return s/9.; }
 void main(){
-  vec3 n=normalize(vN), c=vC;
+  vec3 n=normalize(vN), c=vC; float glow=0.;
   int m=int(vM+.5);
   if(m>0){ // triplanar: the ground and roofs take the texture from above, walls from the side they face
     vec3 a=abs(n); vec2 uv = a.y>.55 ? vP.xz : (a.x>a.z ? vec2(vP.z,-vP.y) : vec2(vP.x,-vP.y));
@@ -237,23 +314,65 @@ void main(){
   if(vE<-.5 && n.y>.5){ // water: ripples that move, a deeper colour, and the sun's glint
     vec2 q=vP.xz; n=normalize(vec3(sin(q.x*9.+uT*1.3)*.06+sin(q.y*13.7-uT*1.7)*.04+sin((q.x+q.y)*21.-uT*2.3)*.025, 1., cos(q.y*8.3+uT*1.1)*.06+cos((q.x-q.y)*17.+uT*1.9)*.03));
     vec3 v=normalize(uEye-vP), h=normalize(uSun+v); float sp=pow(max(dot(n,h),0.),120.);
-    c=mix(c*vec3(.72,.86,.92), vec3(.8,.9,.95), .25*(1.-max(dot(n,v),0.))); c+=vec3(1.,.95,.85)*sp*2.2*uShK; }
-  float nd=max(dot(n,uSun),0.), sh=mix(1., shadow(), uShK);
-  vec3 amb=mix(uGnd,uSky,n.y*.5+.5);
-  vec3 bounce=uSunC*.22*max(dot(n,normalize(vec3(-uSun.x,.35,-uSun.z))),0.); // light thrown back off the sunny side of things
-  vec3 lit=c*(amb+uSunC*nd*sh+bounce);
+    vec3 rf=reflect(-v,n); rf.y=abs(rf.y); c=mix(c*vec3(.72,.86,.92), untone(skyCol(rf))*.8, .35*(1.-max(dot(n,v),0.))); c+=vec3(1.,.95,.85)*sp*2.2*uShK; glow=min(1.,sp*1.6)*uShK; }
+  float nd=m==5 ? clamp(dot(n,uSun)*.55+.45,0.,1.) : max(dot(n,uSun),0.), sh=mix(1., shadow(), uShK); // leaves let light through, so it wraps round to their shady side
+  float ao=vE<-.5?1.:clamp(vO,0.,1.); ao=ao*ao*(3.-2.*ao); if(m==5) ao=.35+.65*ao; // how much open sky this spot sees (baked per vertex)
+  vec3 amb=mix(uGnd,uSky,n.y*.5+.5)*ao;
+  vec3 bounce=uSunC*.22*max(dot(n,normalize(vec3(-uSun.x,.35,-uSun.z))),0.)*(.4+.6*ao); // light thrown back off the sunny side of things
+  vec3 lit=c*(amb+uSunC*nd*sh*mix(.8,1.,ao)+bounce);
   vec3 pl=vec3(0.);
   for(int i=0;i<64;i++){ if(i>=uNL) break; vec3 d=uLP[i]-vP; float l=length(d); float a=max(0.,1.-l/2.4); pl+=uLamp*a*a*(.35+.65*max(dot(n,d/l),0.)); }
-  lit+=c*pl;
-  if(vE>0. && vE<1.){ if(vE<uLit) lit=mix(lit, uWin*(.9+.2*fract(vE*37.)), .92); }
-  else if(vE>.45 && vE<.55 && uLit>0.) lit=mix(lit,uWin,.8*min(1.,uLit*2.));
-  if(vE>1.5) lit=mix(c, uLamp*1.4, uLit>0.?1.:0.);
+  lit+=c*pl*mix(.55,1.,ao);
+  if(vE>0. && vE<1.){ if(vE<uLit){ lit=mix(lit, uWin*(.9+.2*fract(vE*37.)), .92); glow=.45; } }
+  else if(vE>.45 && vE<.55 && uLit>0.){ lit=mix(lit,uWin,.8*min(1.,uLit*2.)); glow=.3; }
+  if(vE>1.5){ lit=mix(c, uLamp*1.4, uLit>0.?1.:0.); glow=uLit>0.?1.:0.; }
   if(uHi>0. && abs(vI-uHi)<.5) lit=mix(lit*1.2, vec3(1.,.84,.5), .28+.08*sin(uT*5.)); // what the pointer is on glows softly
-  if(uFogL>0.) lit=mix(lit, uFogC, clamp((length(vP-uEye)-uFog0)/uFogL,0.,.55)); // the far side of the valley fades into the sky
+  if(uFogL>0.){ vec3 fv=normalize(vP-uEye); fv.y=max(fv.y,0.); float f=1.-exp(-max(0.,length(vP-uEye)-uFog0)/uFogL*1.3); float d=length(vP-uEye)-uFog0; lit=mix(lit, untone(skyCol(normalize(fv))), min(f, mix(.62,1.,smoothstep(uFogL*1.2,uFogL*4.,d)))); glow*=1.-f; } // the far side of the valley fades into the haze, the colour of the sky behind it
   lit=1.-exp(-lit*1.45); // a soft tone curve that keeps the colour
   float g=dot(lit,vec3(.299,.587,.114)); lit=clamp(mix(vec3(g),lit,1.18),0.,1.);
-  o=vec4(lit,1.);
+  o=vec4(lit,glow);
 }`;
+/* ---------- bloom: the glowing things (alpha of the lit view) bleed soft light around themselves ---------- */
+const GL_BFS = `#version 300 es
+precision highp float; in vec2 vU; out vec4 o; uniform sampler2D uA, uB; uniform vec2 uPx; uniform int uMode; uniform float uK;
+void main(){ vec2 uv=vU*.5+.5;
+  if(uMode==0){ vec4 s=vec4(0.); for(int i=0;i<4;i++){ vec4 t=texture(uA,uv+uPx*vec2((i&1)==1?1.:-1.,i>1?1.:-1.)); s+=vec4(t.rgb*t.a,1.); } o=vec4(s.rgb/4.,1.); }
+  else if(uMode==1){ vec3 s=texture(uA,uv).rgb*.5; for(int i=0;i<4;i++) s+=texture(uA,uv+uPx*vec2((i&1)==1?1.:-1.,i>1?1.:-1.)).rgb*.125; o=vec4(s,1.); }
+  else if(uMode==2){ vec3 s=vec3(0.); for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++) s+=texture(uA,uv+uPx*vec2(x,y)).rgb*float((2-abs(x))*(2-abs(y)))/16.; o=vec4(s*uK,1.); }
+  else { o=vec4(texture(uA,uv).rgb+texture(uB,uv).rgb*uK,1.); }
+}`;
+function glSoft(gl) { // drawn by the CPU (no graphics card, a VM, remote desktop): multisampling there costs every pixel four times
+  try { const d = gl.getExtension('WEBGL_debug_renderer_info'), r = d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); return /swiftshader|llvmpipe|software|softpipe|basic render/i.test(r || ''); } catch (e) { return false; }
+}
+function glPostSize(gl, w, h) { // the multisampled view, its resolved copy, and the bloom chain (half size down to 1/32)
+  const P = GL3.post; if (P.w === w && P.h === h) return; P.w = w; P.h = h;
+  const fmt = P.hdr ? gl.RGBA16F : gl.RGBA8, typ = P.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
+  gl.bindRenderbuffer(gl.RENDERBUFFER, P.msC); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, P.ns, gl.RGBA8, w, h);
+  gl.bindRenderbuffer(gl.RENDERBUFFER, P.msD); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, P.ns, gl.DEPTH_COMPONENT24, w, h);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, P.msF); gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, P.msC); gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, P.msD);
+  const tex = (tw, th, f, t) => { const o = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, o); gl.texImage2D(gl.TEXTURE_2D, 0, f, tw, th, 0, gl.RGBA, t, null); for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v); return o; };
+  const fb = t => { const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0); return f; };
+  for (const o of [P.rsT, ...P.lv.map(l => l.t)]) if (o) gl.deleteTexture(o); for (const o of [P.rsF, ...P.lv.map(l => l.f)]) if (o) gl.deleteFramebuffer(o);
+  P.rsT = tex(w, h, gl.RGBA8, gl.UNSIGNED_BYTE); P.rsF = fb(P.rsT); P.lv = [];
+  for (let k = 1; k <= 5; k++) { const lw = Math.max(1, w >> k), lh = Math.max(1, h >> k), t = tex(lw, lh, fmt, typ); P.lv.push({ t, f: fb(t), w: lw, h: lh }); }
+  P.ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE; gl.bindFramebuffer(gl.FRAMEBUFFER, P.msF); P.ok = P.ok && gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+function glBloom(gl, w, h, k) {
+  const P = GL3.post, B = P.pr, U = B.u; gl.bindFramebuffer(gl.READ_FRAMEBUFFER, P.msF); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, P.rsF); gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+  for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
+  gl.disable(gl.DEPTH_TEST); gl.useProgram(B.p); gl.uniform1i(U.uA, 0); gl.uniform1i(U.uB, 1); gl.activeTexture(gl.TEXTURE0);
+  const pass = (src, sw, sh, dst, mode, kk = 1) => { gl.bindFramebuffer(gl.FRAMEBUFFER, dst.f); gl.viewport(0, 0, dst.w, dst.h); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform2f(U.uPx, 1 / sw, 1 / sh); gl.uniform1i(U.uMode, mode); gl.uniform1f(U.uK, kk); gl.drawArrays(gl.TRIANGLES, 0, 3); };
+  pass(P.rsT, w, h, P.lv[0], 0);
+  for (let i = 1; i < P.lv.length; i++) pass(P.lv[i - 1].t, P.lv[i - 1].w, P.lv[i - 1].h, P.lv[i], 1);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+  for (let i = P.lv.length - 1; i > 0; i--) pass(P.lv[i].t, P.lv[i].w, P.lv[i].h, P.lv[i - 1], 2, 1);
+  gl.disable(gl.BLEND);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, w, h);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, P.lv[0].t); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, P.rsT);
+  gl.uniform1i(U.uMode, 3); gl.uniform1f(U.uK, k); gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.enable(gl.DEPTH_TEST);
+}
 const GL_SVS = `#version 300 es
 layout(location=0) in vec3 aP; uniform mat4 uSVP; void main(){ gl_Position=uSVP*vec4(aP,1.); }`;
 const GL_SFS = `#version 300 es
@@ -285,11 +404,13 @@ function m4look(e, t, up) {
 /* ---------- start, and each frame ---------- */
 function glInit() {
   const c = document.createElement('canvas'); c.id = 'gl3'; c.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;display:block;touch-action:none';
-  const gl = c.getContext('webgl2', { antialias: true });
+  const gl = c.getContext('webgl2', { antialias: false, alpha: false }); // (smoothing comes from the multisampled view below)
   if (!gl) { toast('This browser has no WebGL2, so the 3D preview can’t run here.'); return false; }
   $('view').style.display = 'none'; document.body.insertBefore(c, $('view'));
   GL3.c = c; GL3.gl = gl; GL3.on = true;
-  GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sh = glProg(gl, GL_SVS, GL_SFS); GL3.pk = glProg(gl, GL_PVS, GL_PFS);
+  GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sky = glProg(gl, GL_KVS, GL_KFS);
+  try { GL3.post = { pr: glProg(gl, GL_KVS, GL_BFS), msF: gl.createFramebuffer(), msC: gl.createRenderbuffer(), msD: gl.createRenderbuffer(), ns: glSoft(gl) || QS.has('lo') ? 0 : Math.min(4, gl.getParameter(gl.MAX_SAMPLES)), hdr: !!gl.getExtension('EXT_color_buffer_float'), lv: [], w: 0, h: 0 }; } catch (e) { GL3.post = null; }
+  GL3.sh = glProg(gl, GL_SVS, GL_SFS); GL3.pk = glProg(gl, GL_PVS, GL_PFS);
   { const t0 = performance.now(), T = glTextures(); GL3.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex);
     gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, TX.N, TX.N, TX.L, 0, gl.RGBA, gl.UNSIGNED_BYTE, T.data); gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -302,6 +423,10 @@ function glInit() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   GL3.shF = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, GL3.shF); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, GL3.shT, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   GL3.dyn = gl.createBuffer();
+  { // the open sea round the valley, out to the horizon
+    const y = SEAZ * ZS - .012, c = gcol('#3f8fb4'), R = 420, q = [[-R, -R], [-R, W + R], [W + R, W + R], [-R, -R], [W + R, W + R], [W + R, -R]], a = [];
+    for (const [x, z] of q) a.push(x, y, z, 0, 1, 0, c[0], c[1], c[2], -1, 0, 0, 1);
+    GL3.sea = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, GL3.sea); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(a), gl.STATIC_DRAW); }
   for (let k = 0; k < GNC * GNC; k++) { GL3.chunks[k] = { buf: gl.createBuffer(), n: 0, lamps: [] }; GL3.dirty.add(k); }
   // looking round: drag to turn, wheel to zoom; R, N and T for rotation, time of day and the next town
   // mouse: drag turns, a click acts. Touch: one finger turns, two fingers pinch to zoom and move to pan, a tap shows what's there
@@ -362,7 +487,12 @@ function glFrame(dt) {
   const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
   // rebuild what changed, a few chunks a frame
-  let n = 0; for (const k of GL3.dirty) { if (n++ >= (GL3.first ? 3 : 64)) break; GL3.dirty.delete(k); const r = glBuildChunk(k), ch = GL3.chunks[k]; gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); gl.bufferData(gl.ARRAY_BUFFER, r.v, gl.STATIC_DRAW); ch.n = r.v.length / 12; ch.lamps = r.lamps; }
+  // (the height map first, for every chunk in this batch, then the occlusion, which looks across into the neighbours)
+  const batch = [], again = new Set(); let n = 0;
+  for (const k of GL3.dirty) { if (n++ >= (GL3.first ? 3 : 64)) break; batch.push(k); }
+  const built = batch.map(k => { GL3.dirty.delete(k); const r = glBuildChunk(k), old = glEdge(k); hfRaster(k, r.v); if (GL3.first && glEdge(k) !== old) for (const j of glNbrs(k)) if (!batch.includes(j)) again.add(j); return [k, r]; });
+  for (const [k, r] of built) { glAO(r.v); const ch = GL3.chunks[k]; gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); gl.bufferData(gl.ARRAY_BUFFER, r.v, gl.STATIC_DRAW); ch.n = r.v.length / 13; ch.lamps = r.lamps; }
+  for (const j of again) GL3.dirty.add(j); // a new tall building by the edge darkens the next chunk's streets too
   GL3.first = true;
   if (cam.auto) cam.yaw += dt * .05;
   const fw = GL3.follow && walkerPos(GL3.follow); if (fw) GL3.goto = [fw[0], fw[2] * ZS, fw[1]];
@@ -380,28 +510,34 @@ function glFrame(dt) {
   // perspective: a 38° lens backed off so the zoom still means "how much ground fits"; isometric: the flat lens of the 2D view
   if (cam.persp) { const d0 = zz / Math.tan(19 * DEG); cam.pitch = Math.max(cam.pitch, Math.asin(Math.min(.95, 2.2 / d0))); dir[0] = Math.cos(cam.pitch) * Math.sin(cam.yaw); dir[1] = Math.sin(cam.pitch); dir[2] = Math.cos(cam.pitch) * Math.cos(cam.yaw); } // stay above the rooftops
   const fov = 38 * DEG, dist = cam.persp ? zz / Math.tan(fov / 2) : 90, tgt = [cam.tx, cam.ty, cam.tz], eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
-  const VP = m4mul(cam.persp ? m4persp(fov, aspect, Math.max(.2, dist * .02), dist + 140) : m4ortho(-zz * aspect, zz * aspect, -zz, zz, 1, 220), m4look(eye, tgt, [0, 1, 0]));
+  const VP = m4mul(cam.persp ? m4persp(fov, aspect, Math.max(.2, dist * .02), dist + 520) : m4ortho(-zz * aspect, zz * aspect, -zz, zz, 1, 220), m4look(eye, tgt, [0, 1, 0]));
   const sc = [32, 2, 32], se = [sc[0] + sd[0] * 80, sc[1] + sd[1] * 80, sc[2] + sd[2] * 80];
   const SVP = m4mul(m4ortho(-50, 50, -50, 50, 1, 180), m4look(se, sc, [0, 1, 0]));
   // lamps near the middle of the view light the streets
   const lamps = []; if (lit > 0) { for (const ch of GL3.chunks) for (const L of ch.lamps) lamps.push(L); lamps.sort((a, b) => Math.hypot(a[0] - tgt[0], a[2] - tgt[2]) - Math.hypot(b[0] - tgt[0], b[2] - tgt[2])); lamps.length = Math.min(64, lamps.length); }
   const dyn = glPeople();
   const attrs = full => { // full: everything the lit view needs; 1: position and id (picking); 0: position only (shadows)
-    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 48, 0);
-    if (full === true) { for (const a of [1, 2, 3]) gl.enableVertexAttribArray(a); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 48, 12); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 48, 24); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 48, 36); gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 1, gl.FLOAT, false, 48, 44); } else gl.disableVertexAttribArray(5);
-    if (full) { gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 1, gl.FLOAT, false, 48, 40); } else gl.disableVertexAttribArray(4);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 52, 0);
+    if (full === true) { for (const a of [1, 2, 3, 5, 6]) gl.enableVertexAttribArray(a); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 52, 12); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 52, 24); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 52, 36); gl.vertexAttribPointer(5, 1, gl.FLOAT, false, 52, 44); gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 52, 48); } else { gl.disableVertexAttribArray(5); gl.disableVertexAttribArray(6); }
+    if (full) { gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 1, gl.FLOAT, false, 52, 40); } else gl.disableVertexAttribArray(4);
   };
   gl.bindBuffer(gl.ARRAY_BUFFER, GL3.dyn); gl.bufferData(gl.ARRAY_BUFFER, dyn, gl.STREAM_DRAW);
-  const drawAll = full => { for (const ch of GL3.chunks) if (ch.n) { gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, ch.n); } if (dyn.length) { gl.bindBuffer(gl.ARRAY_BUFFER, GL3.dyn); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, dyn.length / 12); } };
+  const drawAll = full => { for (const ch of GL3.chunks) if (ch.n) { gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, ch.n); } if (dyn.length) { gl.bindBuffer(gl.ARRAY_BUFFER, GL3.dyn); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, dyn.length / 13); } if (full === true) { gl.bindBuffer(gl.ARRAY_BUFFER, GL3.sea); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, 6); } };
   gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
   // shadow pass
   gl.bindFramebuffer(gl.FRAMEBUFFER, GL3.shF); gl.viewport(0, 0, 2048, 2048); gl.clear(gl.DEPTH_BUFFER_BIT);
   gl.useProgram(GL3.sh.p); gl.uniformMatrix4fv(GL3.sh.u.uSVP, false, SVP); for (const a of [1, 2, 3]) gl.disableVertexAttribArray(a); drawAll(false);
   // the view
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, w, h);
-  const bg = [lerp(.1, .81, day) * (1 - .1 * cover), lerp(.12, .89, day), lerp(.22, .9, day)];
-  gl.clearColor(bg[0], bg[1], bg[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  const P = GL3.main, U = P.u; gl.useProgram(P.p);
+  const post = GL3.post; if (post) { glPostSize(gl, w, h); if (!post.ok) GL3.post = null; }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, GL3.post ? post.msF : null); gl.viewport(0, 0, w, h);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  // the sky, behind everything
+  const sd0 = [Math.cos(el * DEG) * Math.cos(t), Math.sin(el * DEG), Math.cos(el * DEG) * Math.sin(t)], skyU = U => { gl.uniform3fv(U.uSunD, sd0); gl.uniform1f(U.uSunY, sd0[1]); gl.uniform1f(U.uCover, cover); };
+  { const K = GL3.sky, f = [-dir[0], -dir[1], -dir[2]], tn = Math.tan(fov / 2), r0 = [f[2], 0, -f[0]], rl = Math.hypot(r0[0], r0[2]) || 1, r = [-r0[0] / rl, 0, -r0[2] / rl], u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+    for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
+    gl.useProgram(K.p); skyU(K.u); gl.uniform3fv(K.u.uF, f); gl.uniform3fv(K.u.uR, r.map(q => q * tn * aspect)); gl.uniform3fv(K.u.uU, u.map(q => q * tn));
+    gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.depthMask(true); gl.enable(gl.DEPTH_TEST); }
+  const P = GL3.main, U = P.u; gl.useProgram(P.p); skyU(U);
   gl.uniformMatrix4fv(U.uVP, false, VP); gl.uniformMatrix4fv(U.uSVP, false, SVP);
   gl.uniform3fv(U.uSun, sd); gl.uniform3fv(U.uSunC, sunC); gl.uniform3fv(U.uSky, sky); gl.uniform3fv(U.uGnd, gnd); gl.uniform3fv(U.uEye, eye);
   gl.uniform3fv(U.uWin, gcol((LIGHT.cur && LIGHT.cur.winC || ['#ffd07a'])[0])); gl.uniform3fv(U.uLamp, [1.25, .86, .5]);
@@ -410,8 +546,9 @@ function glFrame(dt) {
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex); gl.uniform1i(U.uTex, 1); gl.uniform3fv(U.uAvg, GL3.texAvg); gl.uniform1fv(U.uTS, TX.SCALE); gl.uniform1fv(U.uRaw, TX.RAW); gl.activeTexture(gl.TEXTURE0);
   gl.uniform1i(U.uNL, lamps.length); if (lamps.length) gl.uniform3fv(U.uLP, new Float32Array(lamps.flat()));
   gl.uniform1f(U.uHi, GL3.hover || 0);
-  gl.uniform1f(U.uFog0, dist + zz * 1.2); gl.uniform1f(U.uFogL, cam.persp ? 60 : 0); gl.uniform3fv(U.uFogC, bg.map(v => -Math.log(1 - Math.min(.97, v)) / 1.45)); // (the haze colour, undone through the tone curve so it lands on the sky)
+  gl.uniform1f(U.uFog0, dist + zz * .6); gl.uniform1f(U.uFogL, cam.persp ? 55 : 0);
   drawAll(true);
+  if (GL3.post) glBloom(gl, w, h, .9 + lit * .8);
   // what's under the pointer: the same scene again, each thing painted in its own id colour, read back one pixel
   if (GL3.pickReq && performance.now() - (GL3.pickT || 0) > 70 && UI.mouse.x >= 0) {
     GL3.pickReq = false; GL3.pickT = performance.now();
@@ -463,11 +600,11 @@ function glPeople() {
   try {
     for (let k = 0; k < DYN.walkers.length; k++) {
       const w = DYN.walkers[k], p = walkerPos(w); if (!p || p[3] < .3) continue; GLB.id = w.pid ? GPID + k : 0; // a person you can point at
-      const X = p[0], Z = p[1], y0 = p[2] * ZS, s = w.kid ? .7 : 1;
+      const X = p[0], Z = p[1], y0 = p[2] * ZS, s = w.kid ? .7 : 1; GLB.ao = .35 + .65 * aoAt(X, y0 + .15, Z, 0, 1, 0); // darker down an alley
       glBoxW(X, Z, .035 * s, y0, 3.2 * s * ZS, w.pants || '#555'); glBoxW(X, Z, .045 * s, y0 + 3.2 * s * ZS, 3 * s * ZS, w.col || '#e5874f'); glBoxW(X, Z, .035 * s, y0 + 6.2 * s * ZS, 1.8 * s * ZS, w.skin || '#e0b090');
     }
     GLB.id = 0; for (const h of DYN.herds) for (const m of h.members) { const [fx, fy, z] = agentPos(m), bx = m.b % W - m.a % W, by = ((m.b / W) | 0) - ((m.a / W) | 0); glSheep(fx, fy, z * ZS, (m.size || 1) * (m.baby ? .6 : 1), bx || by ? Math.atan2(by, bx) : m.a); }
-    for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; glBoxW(p[0], p[1], .09, p[2] * ZS, 4 * ZS, c.col || '#c0392b'); glBoxW(p[0], p[1], .06, p[2] * ZS + 4 * ZS, 2.2 * ZS, '#dfe7ef'); }
+    for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; GLB.ao = .35 + .65 * aoAt(p[0], p[2] * ZS + .15, p[1], 0, 1, 0); glBoxW(p[0], p[1], .09, p[2] * ZS, 4 * ZS, c.col || '#c0392b'); glBoxW(p[0], p[1], .06, p[2] * ZS + 4 * ZS, 2.2 * ZS, '#dfe7ef'); }
   } catch (e) { } finally { GLB = null; }
   return new Float32Array(v);
 }
