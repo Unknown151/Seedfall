@@ -276,7 +276,7 @@ vec3 skyCol(vec3 v){ // in screen colour (after the tone curve)
   vec3 zen=mix(vec3(.03,.05,.12),vec3(.27,.49,.83),day), hor=mix(vec3(.07,.09,.17),vec3(.8,.88,.95),day);
   hor=mix(hor,vec3(1.,.6,.34),gold*toward); hor=mix(hor,vec3(.62,.52,.68),gold*(1.-toward)*.45); zen=mix(zen,vec3(.32,.35,.56),gold*.45);
   vec3 c=mix(hor,zen,pow(h,.5)); if(v.y<0.) c=hor*mix(1.,.86,clamp(-v.y*4.,0.,1.));
-  c+=vec3(1.,.84,.6)*(pow(m,10.)*.3*(day*.5+gold)+pow(m,180.)*.45*day);
+  c+=vec3(1.,.84,.6)*(pow(m,10.)*.26*(day*.5+gold)+pow(m,900.)*.4*day);
   c=mix(c,vec3(dot(c,vec3(.3,.59,.11)))*mix(.4,1.03,day),uCover*.72);
   return clamp(c,0.,1.);
 }
@@ -287,10 +287,11 @@ const GL_KFS = `#version 300 es
 precision highp float; in vec2 vU; out vec4 o; uniform vec3 uF, uR, uU;` + GL_SKY + `
 void main(){
   vec3 v=normalize(uF+vU.x*uR+vU.y*uU), c=skyCol(v); float mu=dot(v,uSunD), day=smoothstep(-.1,.2,uSunY);
-  float disc=smoothstep(.99955,.9998,mu)*smoothstep(-.03,.02,uSunY)*(1.-uCover*.8); c=mix(c,vec3(1.,.97,.9),disc);
-  vec3 q=floor(v*260.); float st=fract(sin(dot(q,vec3(12.9898,78.233,37.719)))*43758.5453); // stars
-  c+=vec3(.9,.92,1.)*step(.9965,st)*(1.-day)*(1.-uCover)*smoothstep(0.,.2,v.y)*(.5+.5*fract(st*97.));
-  o=vec4(c, disc+pow(max(mu,0.),60.)*.35*(1.-uCover));
+  float disc=smoothstep(.99982,.99992,mu)*smoothstep(-.03,.02,uSunY)*(1.-uCover*.8); c=mix(c,vec3(1.,.97,.9),disc);
+  vec3 q=v*420., qc=floor(q); float st=fract(sin(dot(qc,vec3(12.9898,78.233,37.719)))*43758.5453); // stars: small round points, out once the sun is well down
+  float night=1.-smoothstep(-.2,-.06,uSunY), pt=smoothstep(.34,.08,length(fract(q)-.5));
+  c+=vec3(.9,.92,1.)*step(.9975,st)*pt*night*(1.-uCover)*smoothstep(0.,.2,v.y)*(.45+.55*fract(st*97.));
+  o=vec4(c, disc*.5); // (only the disc itself glows: a glow over a wide patch of bright sky blooms into a blinding blob)
 }`;
 const GL_VS = `#version 300 es
 layout(location=0) in vec3 aP; layout(location=1) in vec3 aN; layout(location=2) in vec3 aC; layout(location=3) in float aE; layout(location=4) in float aI; layout(location=5) in float aM; layout(location=6) in float aO;
@@ -315,7 +316,7 @@ void main(){
   if(vE<-.5 && n.y>.5){ // water: ripples that move, a deeper colour, and the sun's glint
     vec2 q=vP.xz; n=normalize(vec3(sin(q.x*9.+uT*1.3)*.06+sin(q.y*13.7-uT*1.7)*.04+sin((q.x+q.y)*21.-uT*2.3)*.025, 1., cos(q.y*8.3+uT*1.1)*.06+cos((q.x-q.y)*17.+uT*1.9)*.03));
     vec3 v=normalize(uEye-vP), h=normalize(uSun+v); float sp=pow(max(dot(n,h),0.),120.);
-    vec3 rf=reflect(-v,n); rf.y=abs(rf.y); c=mix(c*vec3(.72,.86,.92), untone(skyCol(rf))*.8, .35*(1.-max(dot(n,v),0.))); c+=vec3(1.,.95,.85)*sp*2.2*uShK; glow=min(1.,sp*1.6)*uShK; }
+    vec3 rf=reflect(-v,n); rf.y=abs(rf.y); c=mix(c*vec3(.72,.86,.92), untone(skyCol(rf))*.8, .35*(1.-max(dot(n,v),0.))); c+=vec3(1.,.95,.85)*sp*2.2*uShK; glow=min(.45,sp*.7)*uShK; }
   float nd=m==5 ? clamp(dot(n,uSun)*.55+.45,0.,1.) : max(dot(n,uSun),0.), sh=mix(1., shadow(), uShK); // leaves let light through, so it wraps round to their shady side
   float ao=vE<-.5?1.:clamp(vO,0.,1.); ao=ao*ao*(3.-2.*ao); if(m==5) ao=.35+.65*ao; // how much open sky this spot sees (baked per vertex)
   vec3 amb=mix(uGnd,uSky,n.y*.5+.5)*ao;
@@ -362,16 +363,18 @@ function glPostSize(gl, w, h) { // the multisampled view, its resolved copy, and
 function glBloom(gl, w, h, k) {
   const P = GL3.post, B = P.pr, U = B.u; gl.bindFramebuffer(gl.READ_FRAMEBUFFER, P.msF); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, P.rsF); gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
   for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, null); // last frame's glow is still bound here: drawing into it would be a feedback loop, and WebGL silently skips the draw
   gl.disable(gl.DEPTH_TEST); gl.useProgram(B.p); gl.uniform1i(U.uA, 0); gl.uniform1i(U.uB, 1); gl.activeTexture(gl.TEXTURE0);
   const pass = (src, sw, sh, dst, mode, kk = 1) => { gl.bindFramebuffer(gl.FRAMEBUFFER, dst.f); gl.viewport(0, 0, dst.w, dst.h); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform2f(U.uPx, 1 / sw, 1 / sh); gl.uniform1i(U.uMode, mode); gl.uniform1f(U.uK, kk); gl.drawArrays(gl.TRIANGLES, 0, 3); };
   pass(P.rsT, w, h, P.lv[0], 0);
   for (let i = 1; i < P.lv.length; i++) pass(P.lv[i - 1].t, P.lv[i - 1].w, P.lv[i - 1].h, P.lv[i], 1);
   gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
-  for (let i = P.lv.length - 1; i > 0; i--) pass(P.lv[i].t, P.lv[i].w, P.lv[i].h, P.lv[i - 1], 2, 1);
+  for (let i = P.lv.length - 1; i > 0; i--) pass(P.lv[i].t, P.lv[i].w, P.lv[i].h, P.lv[i - 1], 2, .75); // the widest levels fade, so a glow is soft round the edges, not a wide blob
   gl.disable(gl.BLEND);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, w, h);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, P.lv[0].t); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, P.rsT);
   gl.uniform1i(U.uMode, 3); gl.uniform1f(U.uK, k); gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, null); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, null);
   gl.enable(gl.DEPTH_TEST);
 }
 const GL_SVS = `#version 300 es
@@ -507,13 +510,17 @@ function glFrame(dt) {
   const sky = [lerp(.13, .36 + .06 * gold, day) * (1 + .3 * cover), lerp(.17, .41, day) * (1 + .3 * cover), lerp(.32, .52 - .08 * gold, day) * (1 + .3 * cover)], gnd = [lerp(.07, .27 + .05 * gold, day), lerp(.08, .25, day), lerp(.14, .23, day)];
   const lit = el > 6 ? 0 : clamp((6 - el) / 12, 0, .75);
   // cameras
-  const aspect = w / h, zz = cam.zoom; let dir = [Math.cos(cam.pitch) * Math.sin(cam.yaw), Math.sin(cam.pitch), Math.cos(cam.pitch) * Math.cos(cam.yaw)];
+  const aspect = w / h, zz = cam.zoom; let pit = cam.pitch, dir = [Math.cos(pit) * Math.sin(cam.yaw), Math.sin(pit), Math.cos(pit) * Math.cos(cam.yaw)];
   // perspective: a 38° lens backed off so the zoom still means "how much ground fits"; isometric: the flat lens of the 2D view
-  if (cam.persp) { const d0 = zz / Math.tan(19 * DEG); cam.pitch = Math.max(cam.pitch, Math.asin(Math.min(.95, 2.2 / d0))); dir[0] = Math.cos(cam.pitch) * Math.sin(cam.yaw); dir[1] = Math.sin(cam.pitch); dir[2] = Math.cos(cam.pitch) * Math.cos(cam.yaw); } // stay above the rooftops
+  if (cam.persp) { const d0 = zz / Math.tan(19 * DEG); pit = Math.max(pit, Math.asin(Math.min(.95, 2.2 / d0))); dir[0] = Math.cos(pit) * Math.sin(cam.yaw); dir[1] = Math.sin(pit); dir[2] = Math.cos(pit) * Math.cos(cam.yaw); } // stay above the rooftops
   const fov = 38 * DEG, dist = cam.persp ? zz / Math.tan(fov / 2) : 90, tgt = [cam.tx, cam.ty, cam.tz]; let eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
   if (cam.persp) for (let k = 0; k < 24; k++) { // tall buildings: tip the camera up until neither it nor the middle of its view line is inside one
-    const g = Math.max(hfAt(eye[0], eye[2]) - eye[1], hfAt((eye[0] + tgt[0]) / 2, (eye[2] + tgt[2]) / 2) - (eye[1] + tgt[1]) / 2); if (g < -.35 || cam.pitch >= 1.45) break;
-    cam.pitch = Math.min(1.45, cam.pitch + .04); dir = [Math.cos(cam.pitch) * Math.sin(cam.yaw), Math.sin(cam.pitch), Math.cos(cam.pitch) * Math.cos(cam.yaw)]; eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
+    const g = Math.max(hfAt(eye[0], eye[2]) - eye[1], hfAt((eye[0] + tgt[0]) / 2, (eye[2] + tgt[2]) / 2) - (eye[1] + tgt[1]) / 2); if (g < -.35 || pit >= 1.45) break;
+    pit = Math.min(1.45, pit + .04); dir = [Math.cos(pit) * Math.sin(cam.yaw), Math.sin(pit), Math.cos(pit) * Math.cos(cam.yaw)]; eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
+  }
+  { // (only for this frame: the angle you chose stays underneath. Up at once, back down gently)
+    GL3.pe = !cam.persp || GL3.pe == null || pit > GL3.pe ? pit : GL3.pe + (pit - GL3.pe) * Math.min(1, dt * 3);
+    if (GL3.pe !== pit) { pit = GL3.pe; dir = [Math.cos(pit) * Math.sin(cam.yaw), Math.sin(pit), Math.cos(pit) * Math.cos(cam.yaw)]; eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist]; }
   }
   GL3.eye = eye;
   const VP = m4mul(cam.persp ? m4persp(fov, aspect, Math.max(.2, dist * .02), dist + 520) : m4ortho(-zz * aspect, zz * aspect, -zz, zz, 1, 220), m4look(eye, tgt, [0, 1, 0]));
@@ -554,7 +561,7 @@ function glFrame(dt) {
   gl.uniform1f(U.uHi, GL3.hover || 0);
   gl.uniform1f(U.uFog0, dist + zz * .6); gl.uniform1f(U.uFogL, cam.persp ? 55 : 0);
   drawAll(true);
-  if (GL3.post) glBloom(gl, w, h, .9 + lit * .8);
+  if (GL3.post) glBloom(gl, w, h, .55 + lit * .7);
   // what's under the pointer: the same scene again, each thing painted in its own id colour, read back one pixel
   if (GL3.pickReq && performance.now() - (GL3.pickT || 0) > 70 && UI.mouse.x >= 0) {
     GL3.pickReq = false; GL3.pickT = performance.now();
