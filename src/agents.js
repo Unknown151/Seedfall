@@ -665,16 +665,16 @@ function drawMarks(c) {
 
 /* ---------- keeping the right number of people and vehicles around ---------- */
 function syncPeople() {
-  let total = 0;
+  let total = 0; const crowd = typeof GL3 !== 'undefined' && GL3.on ? 2.5 : 1; // the 3D view draws people cheaply enough to fill the streets
   const vt = hasTech('hover') ? 'hover' : hasTech('motor') ? 'car' : hasTech('wheel') ? 'cart' : null;
   for (const T of towns()) {
-    const want = Math.round(Math.min(56, (T.id === 1 && S.year < 20 ? 0 : 4) + Math.sqrt(T.pop) * 2.3));
+    const want = Math.round(Math.min(56 * crowd, (T.id === 1 && S.year < 20 ? 0 : 4) + Math.sqrt(T.pop) * 2.3 * crowd));
     const have = DYN.walkers.filter(w => w.tid === T.id && w.kind === 'p');
-    if (have.length < want && total < 380) { for (let k = 0; k < Math.min(4, want - have.length); k++) spawnWalker(T); }
+    if (have.length < want && total < 380 * crowd) { for (let k = 0; k < Math.min(4, want - have.length); k++) spawnWalker(T); }
     else if (have.length > want + 3) { const w = have.find(w => w.st === 'in') || have[0]; DYN.walkers.splice(DYN.walkers.indexOf(w), 1); }
     total += have.length;
     if (vt) {
-      const vw = Math.round(Math.min(16, T.pop / 90)), vh = DYN.vehicles.filter(v => v.tid === T.id);
+      const vw = Math.round(Math.min(16 * crowd, T.pop / 90 * Math.min(2, crowd))), vh = DYN.vehicles.filter(v => v.tid === T.id);
       if (vh.length < vw) spawnVehicle(T, vt);
       else if (vh.length > vw + 1) DYN.vehicles.splice(DYN.vehicles.indexOf(vh.find(v => v.st === 'in') || vh[0]), 1);
     }
