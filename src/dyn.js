@@ -177,7 +177,7 @@ function processFX() {
       case 'meteors': DYN.meteorShower = 20; break;
       case 'comet': DYN.comet = { x: VW * rf(.2, .6), y: VH * rf(.08, .2), t: 0, life: 80 }; break;
       case 'caravan': spawnCaravan(f.from, f.to, f.n); break;
-      case 'trade': if (f.sea) { const A = S.T[f.from], B = S.T[f.to], ha = A && townHarbour(A), hb = B && townHarbour(B); if (ha && hb && !DYN.slot[ha.id]) { const sh = spawnShip(ha, hb, f.r); if (sh) DYN.slot[ha.id] = sh; } } else spawnTrader(f.from, f.to, f.r); break;
+      case 'trade': if (f.sea) { const A = S.T[f.from], B = S.T[f.to], ha = A && townHarbour(A), hb = B && townHarbour(B); if (ha && hb && freeBerth(ha) >= 0) { const sh = spawnShip(ha, hb, f.r); if (sh) DYN.slot[bkey(ha, sh.bk)] = sh; } } else spawnTrader(f.from, f.to, f.r); break;
       case 'launch': launchRocket(f.id); break;
       case 'seedship': { const e = Object.values(S.B).find(B => B.type === 'elevator' || B.type === 'launchpad'); if (e) launchRocket(e.id, true); break; }
       case 'drop': DYN.drops.push({ x: f.x, y: f.y, t: 0 }); focusOn(f.x, f.y, 1.7, 14); break;

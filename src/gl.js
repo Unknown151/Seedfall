@@ -271,6 +271,151 @@ function glPod(B) {
   if (age > 600) for (let k = 0; k < 4; k++) on(P(-.16 + k * .045, Math.PI * (.45 + (k % 2) * .08), r + .018), .012, .35, FLOWERS[k % FLOWERS.length], 0); // and flowers in it
   if (age > 250) for (let k = 0; k < 10; k++) { const t = k / 10 * TAU; GLB.mat = M_PLANK; glBoxW(GLB.x + Math.cos(t) * .44, GLB.y + Math.sin(t) * .44, .012, GLB.base, 3.5 * ZS, '#8a6d57'); } // the fence of honour
 }
+/* ---------- big lots in 3D: the harbour at any length, and the landmarks that spread over 2×1 or 2×2 tiles ---------- */
+// world-space helpers: c is the middle of the thing on the ground (or where noted), f/r half-extent vectors along the ground
+const V3a = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], V3s = (a, k) => [a[0] * k, a[1] * k, a[2] * k], V3x = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+function gBox(c, f, r, h, col, mat = 0, e = 0) { GLB.mat = mat; glOBox([c[0], c[1] + h / 2, c[2]], f, r, [0, h / 2, 0], col, e); }
+function gBeam(A, Bp, w, col, mat = 0, e = 0) { // a square beam from A to B
+  const f = V3s([Bp[0] - A[0], Bp[1] - A[1], Bp[2] - A[2]], .5), hz = Math.hypot(f[0], f[2]), r = hz > 1e-6 ? [-f[2] / hz * w, 0, f[0] / hz * w] : [w, 0, 0];
+  let u = V3x(f, r); const lu = Math.hypot(...u) || 1; u = V3s(u, w / lu); GLB.mat = mat; glOBox(V3a(A, f), f, r, u, col, e);
+}
+function gRoof(c, f, r, y0, rh, col, wall) { // a gable roof: ridge along f, eaves along ±r, at height y0; the gable ends in the wall colour
+  const C = gcol(col), Cw = gcol(wall), P = (i, j, y) => [c[0] + f[0] * i + r[0] * j, y, c[2] + f[2] * i + r[2] * j], rm = roofMat(C), top = y0 + rh; GLB.ctr = [c[0], y0 - .2, c[2]];
+  const g = 1.06; // (a little overhang)
+  GLB.mat = rm; gquad(P(-g, -g, y0), P(g, -g, y0), P(g, 0, top), P(-g, 0, top), C); gquad(P(-g, g, y0), P(g, g, y0), P(g, 0, top), P(-g, 0, top), C);
+  GLB.mat = GLB.wall || 0; gtri(P(1, -1, y0), P(1, 1, y0), P(1, 0, top), Cw); gtri(P(-1, -1, y0), P(-1, 1, y0), P(-1, 0, top), Cw);
+}
+function gWins(c, along, out, hw, y0, floors, cols, fh, seed) { // rows of windows on a wall: c is the wall's middle at the ground, out is the way it faces
+  const n = Math.hypot(...out) || 1, o = V3s(out, .004 / n);
+  for (let f = 0; f < floors; f++) for (let k = 0; k < cols; k++) {
+    const s = -hw + (k + .5) / cols * hw * 2, p = V3a(V3a(c, V3s(along, s)), o);
+    glOBox([p[0], y0 + (f + .5) * fh, p[2]], V3s(along, hw / cols * .32), V3s(out, .002 / n), [0, fh * .24, 0], '#3a4250', .03 + .94 * hash2((seed * 7 + f) | 0, (seed * 13 + k) | 0, 71));
+  }
+}
+function gSpire(c, r, h, col) { const C = gcol(col), T = [c[0], c[1] + h, c[2]], P = (i, j) => [c[0] + i * r, c[1], c[2] + j * r]; GLB.ctr = [c[0], c[1] - .1, c[2]]; GLB.mat = roofMat(C); gtri(P(-1, -1), P(1, -1), T, C); gtri(P(1, -1), P(1, 1), T, C); gtri(P(1, 1), P(-1, 1), T, C); gtri(P(-1, 1), P(-1, -1), T, C); }
+const glLot = B => [B.x + (fpW(B) - 1) / 2, B.y + (fpH(B) - 1) / 2]; // the middle of a lot, in tiles
+function glFacing(B) { // the long side that has a street along it (a 2×1 lot faces its road)
+  const long = fpW(B) >= fpH(B) ? [1, 0] : [0, 1], n = [long[1], long[0]];
+  for (const sg of [1, -1]) for (const t of fpTiles(B)) { const x = t % W + n[0] * sg, y = ((t / W) | 0) + n[1] * sg; if (inb(x, y) && M.road[idx(x, y)]) return { a: long, d: [n[0] * sg, n[1] * sg] }; }
+  return { a: long, d: n };
+}
+
+// the harbour: a stone quay along its shore, a berth in front of each tile, piers between, warehouses behind, cranes and cargo by the era
+function glHarbour(B) {
+  const d = B.dir || [1, 0], a = d[0] ? [0, 1] : [1, 0], L = berths(B), [lx, lz] = glLot(B), ys = SEAZ * ZS - .02;
+  let y = 0; for (const j of fpTiles(B)) if (!M.water[j]) y = Math.max(y, surfZ(j) * ZS); if (!y) y = GLB.base; // (the quay is level with the land, also where it's built out over the water)
+  const steel = hasTech('steam'), boxes = hasTech('computing'), brick = hasTech('brick');
+  const P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t], A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]];
+  gBox(P(0, 0, y - .005), V3s(A3, L / 2), V3s(D3, .5), .03, B.style >= 3 || steel ? '#bdb5a7' : '#b9a488', M_STONE); // the quay
+  gBox(P(0, .5, ys - .05), V3s(A3, L / 2), V3s(D3, .035), y - ys + .075, '#a39a8c', M_STONE); // its wall down into the water
+  for (const sg of [-1, 1]) gBox(P(sg * L / 2, 0, ys - .05), V3s(A3, .035), V3s(D3, .5), y - ys + .075, '#a39a8c', M_STONE); // and its ends
+  for (let k = 0; k <= L * 3; k++) gBox(P(-L / 2 + k / 3 + .02, .45), [.014, 0, 0], [0, 0, .014], .045, '#3a3c42'); // bollards
+  for (let k = 0; k <= L; k++) { // piers between the berths, on posts
+    const s = -L / 2 + k + (k === 0 ? .05 : k === L ? -.05 : 0);
+    gBox(P(s, .93, y - .01), V3s(A3, .045), V3s(D3, .43), .022, steel ? '#8f877a' : '#8a6a4c', steel ? M_STONE : M_PLANK);
+    for (const t of [.62, .95, 1.28]) gBox(P(s, t, ys - .06), [.012, 0, 0], [0, 0, .012], y - ys + .05, '#5a4a3c', M_PLANK);
+  }
+  for (let k = 0; k < L; k++) {
+    const s = -L / 2 + k + .5, h = hash2(B.x + k, B.y, 5);
+    // a warehouse at the back of each berth
+    const wh = (boxes ? 13 : steel ? 11 : 9) * ZS, wall = boxes ? '#98a2ab' : brick ? '#b8684f' : '#c8a77a';
+    const sv = GLB.wall; GLB.wall = boxes ? M_PLASTER : brick ? M_BRICK : M_PLANK;
+    gBox(P(s, -.24), V3s(A3, .4), V3s(D3, .2), wh, wall, GLB.wall);
+    if (boxes) gBox(P(s, -.24, y + wh), V3s(A3, .41), V3s(D3, .21), .012, '#6b737c', M_TAR);
+    else gRoof(P(s, -.24), V3s(A3, .4), V3s(D3, .2), y + wh, 4.5 * ZS, steel ? '#5d6670' : '#a0523c', wall);
+    gWins(P(s, -.03), A3, D3, .36, y + .03, boxes ? 3 : 2, 4, wh / (boxes ? 3.4 : 2.4), B.x * 3 + k);
+    GLB.mat = 0; glOBox(P(s + .22, -.035, y + wh * .3), V3s(A3, .07), V3s(D3, .004), [0, wh * .3, 0], '#4a3a30'); // the big door
+    GLB.wall = sv;
+    // a crane at each berth
+    if (boxes) { // gantry: four legs, a beam and a boom out over the ship
+      const hc = .95, col = h < .5 ? '#d6703a' : '#3f6f9f';
+      for (const [sa, ta] of [[-.14, .12], [.14, .12], [-.14, .42], [.14, .42]]) gBeam(P(s + sa, ta), P(s + sa, ta, y + hc), .014, col);
+      for (const sa of [-.14, .14]) gBeam(P(s + sa, -.05, y + hc), P(s + sa, 1.3, y + hc), .016, col);
+      gBox(P(s, .9, y + hc - .06), V3s(A3, .16), V3s(D3, .06), .06, '#e8e2d6'); // the trolley
+      gBeam(P(s, .9, y + hc - .06), P(s, .9, y + .35), .004, '#2a2a2a');
+    } else {
+      const hc = (steel ? 16 : 11) * ZS, col = steel ? '#c8603a' : '#8a6446';
+      gBox(P(s - .22, .32), [.022, 0, 0], [0, 0, .022], hc, col, steel ? 0 : M_PLANK);
+      gBeam(P(s - .22, .32, y + hc * .75), P(s - .22, .95, y + hc * 1.08), .012, col, steel ? 0 : M_PLANK);
+      gBeam(P(s - .22, .95, y + hc * 1.08), P(s - .22, .95, y + hc * .45), .003, '#2a2a2a');
+      gBox(P(s - .22, .95, y + hc * .38), [.03, 0, 0], [0, 0, .03], .04, '#9b7657', M_PLANK); // what it's lifting
+    }
+    // cargo on the quay
+    if (boxes) { const cols = ['#c0584f', '#3f7fb0', '#e0a43a', '#4e9a6a', '#7a5a9a']; for (let r2 = 0; r2 < 2; r2++) for (let c2 = 0; c2 < 3; c2++) { const nH = 1 + ((hash2(B.x + k, r2 * 3 + c2, 9) * 3) | 0); for (let l = 0; l < nH; l++) gBox(P(s - .25 + c2 * .17, .1 + r2 * .1, y + .03 + l * .05), V3s(A3, .075), V3s(D3, .04), .048, cols[(k + r2 + c2 + l) % cols.length]); } }
+    else for (let c2 = 0; c2 < 4; c2++) { const hh = hash2(B.x + k, c2, 13); gBox(P(s - .1 + c2 * .08, .18 + (c2 % 2) * .07), [.028, 0, 0], [0, 0, .028], .05 + hh * .03, hh < .5 ? '#a57c55' : '#8a6a4c', M_PLANK); }
+  }
+  // lamps at the ends of the quay
+  for (const s of [-L / 2 + .06, L / 2 - .06]) { gBox(P(s, .4), [.01, 0, 0], [0, 0, .01], 9 * ZS, '#4c4f58'); gBox(P(s, .4, y + 9 * ZS), [.025, 0, 0], [0, 0, .025], .04, '#fff3d0', 0, 2); }
+}
+
+// landmarks on their bigger lots
+function glBigHall(B, st) { // a grand town hall: a long range with a portico and a tower
+  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t];
+  const stone = hasTech('masonry'), wall = stone ? '#d9cfbd' : st.wall, h = 20 * ZS; GLB.wall = stone ? M_STONE : M_PLASTER;
+  gBox(P(0, -.05), V3s(A3, .85), V3s(D3, .3), h, wall, GLB.wall); gRoof(P(0, -.05), V3s(A3, .85), V3s(D3, .3), y + h, 7 * ZS, st.roof, wall);
+  gWins(P(0, .25), A3, D3, .8, y + .04, 3, 9, h / 3.3, B.x * 5 + B.y);
+  gBox(P(0, .3), V3s(A3, .26), V3s(D3, .08), .02, '#cfc6b4', M_STONE); // steps
+  for (let k = 0; k < 6; k++) gBox(P(-.22 + k * .088, .34, y + .02), [.014, 0, 0], [0, 0, .014], 12 * ZS, '#eee8dc', M_STONE); // columns
+  gBox(P(0, .34, y + .02 + 12 * ZS), V3s(A3, .27), V3s(D3, .06), .03, '#e4ddcf', M_STONE);
+  gBox(P(0, -.05, y + h), [.1, 0, 0], [0, 0, .1], 22 * ZS, wall, GLB.wall); // the tower
+  gBox(P(0, .055, y + h + 13 * ZS), [.03, 0, 0], [0, 0, .004], .06, '#f4f0e0', 0, .5); // its clock face, lit at night
+  GLB.mat = M_SLATE; glDomeAt(P(0, -.05)[0] - GLB.x, P(0, -.05)[2] - GLB.y, .1, (h + 22 * ZS) / ZS, 7, hasTech('steam') ? '#6f8f84' : st.roof, 0, M_SLATE);
+  GLB.wall = 0;
+}
+function glBigMuseum(B, st) { // a classical museum: stone, a colonnade, a pediment, and later a glass roof
+  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t];
+  const h = 15 * ZS; GLB.wall = M_STONE;
+  gBox(P(0, 0, y), V3s(A3, .88), V3s(D3, .42), .04, '#cfc6b4', M_STONE); // plinth
+  gBox(P(0, -.06, y + .04), V3s(A3, .8), V3s(D3, .3), h, '#e2dccf', M_STONE);
+  for (let k = 0; k < 10; k++) gBox(P(-.72 + k * .16, .3, y + .04), [.016, 0, 0], [0, 0, .016], h - .02, '#f2eee4', M_STONE);
+  gBox(P(0, .12, y + .02 + h), V3s(A3, .84), V3s(D3, .24), .03, '#e8e2d6', M_STONE);
+  gRoof(P(0, .12), V3s(A3, .84), V3s(D3, .24), y + .05 + h, 5 * ZS, '#8d8a86', '#efe9dd');
+  if (hasTech('computing')) { GLB.mat = M_GLASS; const c = P(0, -.25, y + .04 + h); glBoxW(c[0], c[2], .16, c[1], 8 * ZS, '#9fc4d8', .5); } // a glass lantern on the roof
+  GLB.wall = 0;
+}
+function glBigTheatre(B, st) { // a fly tower behind a rounded auditorium, lights round the front at night
+  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t];
+  const wall = hasTech('brick') ? '#b8684f' : st.wall; GLB.wall = hasTech('brick') ? M_BRICK : M_PLASTER;
+  gBox(P(-.35, -.05), V3s(A3, .35), V3s(D3, .32), 26 * ZS, wall, GLB.wall); gRoof(P(-.35, -.05), V3s(D3, .32), V3s(A3, .35), y + 26 * ZS, 5 * ZS, st.roof, wall); // the fly tower
+  const c = P(.25, 0); GLB.mat = GLB.wall; glCylAt(c[0] - GLB.x, c[2] - GLB.y, .42, 0, 15, wall, st.roof); // the auditorium
+  GLB.mat = M_SLATE; glDomeAt(c[0] - GLB.x, c[2] - GLB.y, .42, 15, 6, st.roof, 0, M_SLATE);
+  for (let k = 0; k < 12; k++) { const t = (k / 11 - .5) * 2.2, p = [c[0] + Math.cos(t) * .43 * d[0] + Math.sin(t) * .43 * a[0], y + 11 * ZS, c[2] + Math.cos(t) * .43 * d[1] + Math.sin(t) * .43 * a[1]]; glOBox(p, [.012, 0, 0], [0, 0, .012], [0, .012, 0], '#ffe7a0', .5); } // marquee lights
+  GLB.wall = 0;
+}
+function glBigUniversity(B, st) { // four ranges round a green quad, and a clock tower over the gate
+  const [lx, lz] = glLot(B), y = GLB.base, stone = hasTech('masonry'), wall = hasTech('brick') && !stone ? '#b8684f' : '#d8c9a8', h = 18 * ZS; GLB.wall = stone ? M_STONE : M_BRICK;
+  const R = [[0, -.72, 1, 0, .88, .16], [0, .72, 1, 0, .88, .16], [-.72, 0, 0, 1, .56, .16], [.72, 0, 0, 1, .56, .16]]; // x, z, along x, along z, half length, half depth
+  for (const [ox, oz, ax, az, hl, hd] of R) {
+    const c = [lx + ox, y, lz + oz], f = [ax * hl, 0, az * hl], r = [az * hd, 0, ax * hd];
+    gBox(c, f, r, h, wall, GLB.wall); gRoof(c, f, r, y + h, 6 * ZS, st.roof, wall);
+    for (const sg of [1, -1]) gWins(V3a(c, V3s(r, sg)), [ax, 0, az], V3s(r, sg), hl * .9, y + .03, 3, Math.round(hl * 9), h / 3.3, (lx * 11 + ox * 7 + sg) | 0);
+  }
+  gBox([lx, y, lz], [.55, 0, 0], [0, 0, .55], .012, '#6f9a52', M_GRASS); // the quad
+  glSmallTree(lx - GLB.x - .25, lz - GLB.y + .2, 0, .4, 1.1, '#5f9a4d'); glSmallTree(lx - GLB.x + .28, lz - GLB.y - .22, 0, .7, 1, '#6aa556');
+  const tw = [lx, y, lz + .72]; gBox(tw, [.1, 0, 0], [0, 0, .1], 34 * ZS, wall, GLB.wall); // the tower
+  gBox([tw[0], y + 26 * ZS, tw[2] + .102], [.035, 0, 0], [0, 0, .002], .07, '#f4f0e0', 0, .5); // clock
+  gSpire([tw[0], y + 34 * ZS, tw[2]], .11, 12 * ZS, st.roof);
+  GLB.wall = 0;
+}
+function glBigStadium(B) { // a bowl of stands round a striped pitch, floodlights on masts
+  const [lx, lz] = glLot(B), y = GLB.base, n = 28, rx = .95, rz = .95, ix = .62, iz = .45, top = y + 14 * ZS;
+  const P = (t, fx, fz, yy) => [lx + Math.cos(t) * fx, yy, lz + Math.sin(t) * fz];
+  GLB.ctr = [lx, y - 1, lz]; GLB.mat = M_STONE; const cs = gcol('#c9c2b6'), cw = gcol('#b0a898'), cr = gcol(hasTech('motor') ? '#c0584f' : '#8f8676');
+  for (let k = 0; k < n; k++) { const t0 = k / n * TAU, t1 = (k + 1) / n * TAU;
+    GLB.ctr = [lx, top + 2, lz]; gquad(P(t0, ix, iz, y + .02), P(t1, ix, iz, y + .02), P(t1, rx, rz, top), P(t0, rx, rz, top), k % 2 ? cs : cr); // the stands
+    GLB.ctr = [lx, y, lz]; gquad(P(t0, rx, rz, y), P(t1, rx, rz, y), P(t1, rx, rz, top + .02), P(t0, rx, rz, top + .02), cw); } // the outer wall
+  for (let k = 0; k < 6; k++) gBox([lx - ix * .8 + k * ix * .32, y, lz], [ix * .16, 0, 0], [0, 0, iz * .78], .012, k % 2 ? '#5f9a4d' : '#6aa556', M_GRASS); // the pitch
+  if (hasTech('electric')) for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = [lx + sx * .78, y, lz + sz * .78]; gBox(p, [.018, 0, 0], [0, 0, .018], 30 * ZS, '#8c9199'); gBox([p[0], y + 30 * ZS, p[2]], [.06, 0, 0], [0, 0, .02], .05, '#fff8e0', 0, 2); }
+}
+function glBigFusion(B) { // twin containment domes, a cooling ring and a blue glow
+  const [lx, lz] = glLot(B), y = GLB.base;
+  gBox([lx, y, lz], [.85, 0, 0], [0, 0, .85], .03, '#c4c9cf', M_STONE);
+  for (const sx of [-.42, .42]) { GLB.mat = M_PLASTER; glCylAt(lx + sx - GLB.x, lz - .15 - GLB.y, .3, 0, 8, '#e8edf2', '#e8edf2'); glDomeAt(lx + sx - GLB.x, lz - .15 - GLB.y, .3, 8, 12, '#eef2f6', 0, M_PLASTER); }
+  GLB.mat = 0; glCylAt(lx - GLB.x, lz + .45 - GLB.y, .26, 0, 3, '#7fe8e0', null); // the ring's glow
+  gBox([lx, y, lz + .45], [.3, 0, 0], [0, 0, .06], 4 * ZS, '#9aa3ad', M_PLASTER);
+  gBox([lx, y + 3 * ZS, lz + .45], [.02, 0, 0], [0, 0, .02], .02, '#7fe8e0', 0, 2);
+}
+const GL_BIG = { hall: glBigHall, museum: glBigMuseum, theatre: glBigTheatre, university: glBigUniversity, stadium: glBigStadium, fusion: glBigFusion };
 function glSheep(X, Z, y0, s, ang, ph = -1) { // a woolly body, a black face and four legs, in world units; ph >= 0: walking
   const f = [Math.cos(ang), 0, Math.sin(ang)], r = [-Math.sin(ang), 0, Math.cos(ang)], u = X - GLB.x, v = Z - GLB.y, zz = (y0 - GLB.base) / ZS;
   for (const [a, b, q] of [[.03, .018, 0], [.03, -.018, Math.PI], [-.03, .018, Math.PI], [-.03, -.018, 0]]) glLimb([X + f[0] * a * s + r[0] * b * s, y0 + 1.1 * s * ZS, Z + f[2] * a * s + r[2] * b * s], f, r, ph >= 0 ? Math.sin(ph + q) * .45 : 0, 1.1 * s * ZS, .007 * s, '#3a3430');
@@ -627,6 +772,57 @@ function glClick(sx, sy) {
   }
   GL3.follow = null; GL3.goto = [x, surfZ(i) * ZS, y]; GL3.cam.auto = false;
 }
+// what's on the water, the rails and in the air: ships by era, fishing boats, ferries, trains and planes
+function glTraffic() {
+  const ys = SEAZ * ZS, H3 = (h) => [[Math.cos(h), 0, Math.sin(h)], [-Math.sin(h), 0, Math.cos(h)]];
+  const hull = (c, f, r, L, Wd, D, col, deck) => { // a hull: a box with a pointed bow
+    const F = V3s(f, 1), R = V3s(r, 1), P = (s, t, y) => [c[0] + F[0] * s + R[0] * t, y, c[2] + F[2] * s + R[2] * t], cc = gcol(col), cd = gcol(deck), y0 = c[1] - D * .4, y1 = c[1] + D * .6;
+    GLB.ctr = [c[0], c[1] - .5, c[2]]; GLB.mat = 0;
+    const pts = [[-L, -Wd], [L * .55, -Wd], [L, 0], [L * .55, Wd], [-L, Wd]];
+    for (let k = 0; k < 5; k++) { const [s0, t0] = pts[k], [s1, t1] = pts[(k + 1) % 5]; gquad(P(s0, t0, y0), P(s1, t1, y0), P(s1, t1, y1), P(s0, t0, y1), cc); }
+    GLB.ctr = [c[0], y1 - .5, c[2]]; gtri(P(-L, -Wd, y1), P(L * .55, -Wd, y1), P(L * .55, Wd, y1), cd); gtri(P(-L, -Wd, y1), P(L * .55, Wd, y1), P(-L, Wd, y1), cd); gtri(P(L * .55, -Wd, y1), P(L, 0, y1), P(L * .55, Wd, y1), cd);
+    return y1;
+  };
+  const at = (c, f, r, s, t, y) => [c[0] + f[0] * s + r[0] * t, y, c[2] + f[2] * s + r[2] * t];
+  for (const sh of DYN.ships) {
+    const p = shipPos(sh); if (!p || p[2] < .2) continue;
+    const h = glHeading(sh, p[3], p[4]), [f, r] = H3(h), bob = Math.sin(GL3.t * 1.3 + (sh.id || 0) * 9) * .006, c = [p[0], ys + .02 + bob, p[1]], k = sh.kind;
+    if (k === 'sail') { const y1 = hull(c, f, r, .26, .065, .07, '#7a5238', '#b08a60'); for (const [s2, hm] of [[.08, .42], [-.1, .34]]) { gBeam(at(c, f, r, s2, 0, y1), at(c, f, r, s2, 0, y1 + hm), .006, '#5a4030'); gBox(at(c, f, r, s2 - .01, 0, y1 + hm * .3), V3s(f, .005), V3s(r, .1), hm * .62, '#f2ece0'); } }
+    else if (k === 'steamer') { const y1 = hull(c, f, r, .3, .07, .08, '#2f3a46', '#c9b79a'); gBox(at(c, f, r, 0, 0, y1), V3s(f, .1), V3s(r, .05), .06, '#ece6da'); gBox(at(c, f, r, -.04, 0, y1 + .06), [.02, 0, 0], [0, 0, .02], .1, '#c0392b'); }
+    else if (k === 'freighter') { const y1 = hull(c, f, r, .38, .085, .09, sh.col || '#3f6e8c', '#9aa0a6'); gBox(at(c, f, r, -.28, 0, y1), V3s(f, .06), V3s(r, .07), .1, '#ece6da'); gWins(at(c, f, r, -.22, 0, y1), r, f, .06, y1 + .02, 2, 3, .035, 9); for (let q = 0; q < 3; q++) gBox(at(c, f, r, -.12 + q * .14, 0, y1), V3s(f, .055), V3s(r, .06), .02, '#5a4a3c'); }
+    else if (k === 'boxship') { const y1 = hull(c, f, r, .45, .095, .09, sh.col || '#b8554a', '#6b737c'); gBox(at(c, f, r, -.36, 0, y1), V3s(f, .05), V3s(r, .085), .13, '#f2f2f0'); const cols = ['#c0584f', '#3f7fb0', '#e0a43a', '#4e9a6a', '#7a5a9a']; for (let q = 0; q < 5; q++) for (let l = 0; l < 2; l++) gBox(at(c, f, r, -.22 + q * .12, 0, y1 + l * .04), V3s(f, .055), V3s(r, .08), .038, cols[(q + l * 2 + ((sh.id || 0) * 10 | 0)) % 5]); }
+    else { GLB.ao = 1; const y1 = hull([c[0], c[1] + .04, c[2]], f, r, .32, .09, .06, '#f4f6f8', '#dfe7ef'); gBox(at(c, f, r, 0, 0, y1), V3s(f, .14), V3s(r, .06), .04, '#9fd6e8', 0, .5); gBox(at(c, f, r, 0, 0, c[1] - .02), V3s(f, .3), V3s(r, .08), .01, '#7fe8e0', 0, 2); }
+  }
+  for (const b of DYN.boats) { // fishing boats: a small hull, a wheelhouse or a mast
+    const p = boatPos(b); if (!p) continue; const h = glHeading(b, p[3], p[4]), [f, r] = H3(h), c = [p[0], ys + .015 + Math.sin(GL3.t * 2 + (b.ph || 0)) * .004, p[1]];
+    const y1 = hull(c, f, r, .1, .035, .04, hasTech('steam') ? '#3f6e8c' : '#8a5a3c', '#c9b79a');
+    if (hasTech('steam')) gBox(at(c, f, r, -.02, 0, y1), V3s(f, .03), V3s(r, .025), .035, '#ece6da'); else gBeam(at(c, f, r, .02, 0, y1), at(c, f, r, .02, 0, y1 + .14), .004, '#5a4030');
+  }
+  for (const o of DYN.ferries) { // ferries: a raft early, a barge with a cabin later
+    const p = ferryPos(o), i = idx(clamp(Math.round(p[0]), 0, W - 1), clamp(Math.round(p[1]), 0, H - 1)), h = glHeading(o, p[2], p[3]), [f, r] = H3(h);
+    const y = (M.water[i] === 1 ? ys : surfZ(i) * ZS) + .015, c = [p[0], y, p[1]];
+    if (!hasTech('wheel')) gBox([c[0], y - .01, c[2]], V3s(f, .12), V3s(r, .08), .02, '#8a6a4c', M_PLANK);
+    else { const y1 = hull(c, f, r, .16, .07, .04, '#ece6da', '#9aa0a6'); gBox(at(c, f, r, 0, 0, y1), V3s(f, .06), V3s(r, .05), .045, '#3f6e8c'); }
+  }
+  const mag = hasTech('maglev'), elec = hasTech('electric');
+  for (const tr of DYN.trains) for (let k = 0; k < 3; k++) { // trains: three cars on the rails
+    const s = clamp(tr.s - tr.dir * k * .75, 0, tr.r.path.length - 1), i0 = Math.floor(s), i1 = Math.min(tr.r.path.length - 1, i0 + 1), fr = s - i0, a = tr.r.path[i0], b = tr.r.path[i1];
+    const fx = lerp(a % W, b % W, fr), fy = lerp((a / W) | 0, (b / W) | 0, fr), z = lerp(M.water[a] ? landZ(a) + 3 : surfZ(a), M.water[b] ? landZ(b) + 3 : surfZ(b), fr) * ZS;
+    const dx = (b % W) - (a % W), dy = ((b / W) | 0) - ((a / W) | 0), h = Math.atan2(dy, dx), [f, r] = H3(h);
+    const col = mag ? '#f2f5f8' : elec ? (k === 0 ? '#c8553d' : '#e9d9b8') : (k === 0 ? '#3d3f47' : '#8a3f37'), c = [fx, z + (mag ? .04 : .02), fy];
+    gBox(c, V3s(f, .34), V3s(r, .075), .11, col); gWins([c[0], c[1], c[2]], f, r, .3, c[1] + .03, 1, 5, .05, k * 7 + i0);
+    if (!mag && !elec && k === 0) gBox(at(c, f, r, .2, 0, c[1] + .11), [.02, 0, 0], [0, 0, .02], .06, '#2a2a2a'); // the engine's stack
+    GLB.mat = 0; if (k === 0 && GL3.litNow) for (const sg of [1, -1]) glOBox(at(c, f, r, .35 * tr.dir, sg * .04, c[1] + .05), [.006, 0, 0], [0, 0, .006], [0, .006, 0], '#fff4d6', 2);
+  }
+  const planes = DYN.planes.slice(); for (const B of airfields()) { const a = DYN.af[B.id]; if (a && a.parked && a.pp) planes.push(a.pp); }
+  for (const pl of planes) { // planes: fuselage, wings and tail, on the apron or in the air
+    const k = pl.kind || planeKind(), [f, r] = H3(pl.h || 0), c = [pl.x, (pl.z || 0) * ZS + .03, pl.y], sz = k === 'prop' ? .7 : k === 'jet' ? 1 : 1.15;
+    const col = k === 'liner' ? '#f4f6f8' : k === 'jet' ? '#e8ecf0' : '#c9b79a';
+    gBox(c, V3s(f, .22 * sz), V3s(r, .03 * sz), .05 * sz, col); gBox(at(c, f, r, .02, 0, c[1] + .02 * sz), V3s(f, .05 * sz), V3s(r, .2 * sz), .01, col);
+    gBox(at(c, f, r, -.19 * sz, 0, c[1] + .03 * sz), V3s(f, .03 * sz), V3s(r, .004), .07 * sz, k === 'prop' ? '#c0392b' : '#3f6e8c'); gBox(at(c, f, r, -.19 * sz, 0, c[1] + .04 * sz), V3s(f, .025 * sz), V3s(r, .07 * sz), .008, col);
+    if (GL3.litNow) { GLB.mat = 0; glOBox(at(c, f, r, 0, .2 * sz, c[1] + .025), [.005, 0, 0], [0, 0, .005], [0, .005, 0], '#ff4a4a', 2); glOBox(at(c, f, r, 0, -.2 * sz, c[1] + .025), [.005, 0, 0], [0, 0, .005], [0, .005, 0], '#4aff7a', 2); }
+  }
+}
 /* ---------- people, pets, carts and cars: little jointed figures, rebuilt every frame ---------- */
 // a box in world units, turned to face heading h: c is its middle, a/b/u its half-extents along forward/right/up (vectors)
 function glOBox(c, f, r, u, col, e = 0) {
@@ -717,6 +913,7 @@ function glPeople() {
     }
     GLB.id = 0; GLB.ao = 1;
     for (const hd of DYN.herds) for (const m of hd.members) { const [fx, fy, z] = agentPos(m), bx = m.b % W - m.a % W, by = ((m.b / W) | 0) - ((m.a / W) | 0); glSheep(fx, fy, z * ZS, (m.size || 1) * (m.baby ? .6 : 1), glHeading(m, bx, by), m.pause > 0 ? -1 : DYN.t * 3 + (m.a % 7)); }
+    GLB.id = 0; GLB.ao = 1; try { glTraffic(); } catch (e) { if (QS.has('dev')) console.error(e); }
     for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; GLB.ao = .35 + .65 * aoAt(p[0], p[2] * ZS + .15, p[1], 0, 1, 0); glVehicle(c, p[0], p[1], p[2] * ZS, glHeading(c, p[4], p[5]), true); }
   } catch (e) { if (QS.has('dev')) console.error(e); } finally { GLB = null; }
   return v.a.subarray(0, v.length);

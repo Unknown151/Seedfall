@@ -321,7 +321,8 @@ function drawTileObjects(c, i, x, y, cx, cy) {
   if (!B && !bid && springAt(i)) drawSpring(c, i, cx, cy);
   if (!w && S.ferries && S.ferries.length) { const fl = ferryLandings().get(i); if (fl) drawLanding(c, i, cx, cy, fl); }
   if (M.road[i] && !w && !bid) drawVerge(c, i, x, y, cx, cy);
-  if (B && !FLAT_TYPES[B.type]) { drawBuilding(c, B, cx, cy, i); if (B.type === 'house' && B.prog >= 1) drawYard(c, B, x, y, cx, cy); }
+  if (B && fpBig(B)) { if (i === fpFront(B) && !FLAT_TYPES[B.type]) { const [ox, oy] = fpOff(B); drawBuilding(c, B, cx + ox, cy + oy, i); } } // a big lot is drawn once, from its front tile
+  else if (B && !FLAT_TYPES[B.type]) { drawBuilding(c, B, cx, cy, i); if (B.type === 'house' && B.prog >= 1) drawYard(c, B, x, y, cx, cy); }
   else if (!B && !bid && M.tree[i]) drawTrees(c, i, x, y, cx, cy);
   else if (!B && !w && (M.bio[i] === BIO.ROCK || M.bio[i] === BIO.HIGH) && hash2(x, y, 11) < 0.3 && !M.road[i]) drawRocks(c, x, y, cx, cy);
   else if (!B && !bid && !w && !M.road[i] && !M.rail[i] && !M.ruin[i]) drawGround(c, i, x, y, cx, cy);

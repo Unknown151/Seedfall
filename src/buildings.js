@@ -21,6 +21,7 @@ function matStyle(st, B) {
 }
 function drawBuilding0(c, B, cx, cy, i, st) {
   if (B.prog < 1) { drawConstruction(c, B, cx, cy, st, i); return; }
+  if (GLB && fpBig(B) && GL_BIG[B.type]) return GL_BIG[B.type](B, st); // (the 3D models for landmarks on bigger lots)
   const v = B.var || 0;
   switch (B.type) {
     case 'pod': return drawPod(c, B, cx, cy);
@@ -417,6 +418,7 @@ function drawClaypit(c, B, cx, cy, i) {
 
 /* ---------- the harbour: quay, warehouse, crane base, cargo; the crane's jib swings in the animated layer ---------- */
 function drawHarbour(c, B, cx, cy, st, i) {
+  if (GLB) return glHarbour(B);
   const d = B.dir || [1, 0], al = [-d[1], d[0]], hp = (a, o) => [a * al[0] + o * d[0], a * al[1] + o * d[1]];
   const ext = (ea, eo) => [Math.abs(al[0]) * ea + Math.abs(d[0]) * eo, Math.abs(al[1]) * ea + Math.abs(d[1]) * eo];
   const steel = hasTech('steam'), boxes = hasTech('computing');

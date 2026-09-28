@@ -21,6 +21,10 @@ const sameWater = (a, b) => { const w = waterBodies(); return w.id[a] && w.id[a]
 function waterNear(x, y, r) { let n = 0; for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const nx = x + dx, ny = y + dy; if (inb(nx, ny) && bigWater(idx(nx, ny))) n++; } return n; }
 
 /* ---------- harbours ---------- */
+function seaAhead(x, y, [dx, dy]) { // open water straight out from this tile, deep enough for ships
+  const a = [x + dx, y + dy], b = [x + dx * 2, y + dy * 2], c2 = [x + dx * 3, y + dy * 3]; if (!inb(...c2)) return false;
+  return bigWater(idx(...a)) && bigWater(idx(...b)) && M.water[idx(...c2)] === 1 && !M.road[idx(...a)];
+}
 function harbourSite(x, y) { // a shore tile with open water in front
   for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
     const a = [x + dx, y + dy], b = [x + dx * 2, y + dy * 2], c2 = [x + dx * 3, y + dy * 3];
@@ -40,8 +44,30 @@ function builtOf(type) {
   return a;
 }
 const harbours = () => builtOf('harbor').filter(B => B.dir);
-const moorTile = B => idx(B.x + B.dir[0], B.y + B.dir[1]);
+// a long harbour has a berth in front of each of its tiles along the shore; ships keep a berth each (DYN.slot['id:k'])
+const berths = B => Math.max(fpW(B), fpH(B));
+const berthTile = (B, k = 0) => { k = Math.min(k || 0, berths(B) - 1); return idx(B.x + (B.dir[0] || k), B.y + (B.dir[1] || k)); };
+const moorTile = B => berthTile(B, 0);
+const bkey = (B, k) => (B.id || B) + ':' + (k || 0);
+function freeBerth(B) { const n = berths(B), o = []; for (let k = 0; k < n; k++) if (!DYN.slot[bkey(B, k)]) o.push(k); return o.length ? pick(o) : -1; }
 const townHarbour = T => T.bl.map(id => S.B[id]).find(B => B && B.type === 'harbor' && B.prog >= 1 && B.dir);
+// harbours grow along the coast as their town does: a quay, a second berth, a port, then the container docks
+function harbourLen(T) { return !T ? 1 : 1 + (T.pop >= 1200 ? 1 : 0) + (hasTech('steam') && T.pop >= 3000 ? 1 : 0) + (hasTech('computing') && T.pop >= 7000 ? 1 : 0); }
+const HB_GROW = ['', '', 'The harbour of {T} lays a second stone quay along the shore. Two ships can tie up at once now.',
+  'The harbour of {T} grows into a proper port: piers out into deep water, warehouses in a row and cranes along the quay.',
+  'Container docks open at {T}: great gantry cranes, stacked boxes in every colour, and a quay that never quite sleeps.'];
+function yearlyHarbours() {
+  for (const B of harbours()) {
+    const T = S.T[B.sid], n = berths(B); if (n >= harbourLen(T) || !chance(.4)) continue;
+    let hz = -1; for (const t of fpTiles(B)) if (!M.water[t]) hz = Math.max(hz, surfZ(t)); // (the lot's land height: its corner may be out over the water)
+    const ok = (j) => { const z = hz;
+      const x = j % W, y = (j / W) | 0; if (!seaAhead(x, y, B.dir)) return false; // more of the same shore...
+      if (M.water[j] === 1) return !M.bld[j] && !M.road[j] && N4.some(([dx, dy]) => inb(x + dx, y + dy) && !M.water[idx(x + dx, y + dy)]); // ...or a quay built out over the shallows, on piles
+      const o = M.bld[j] && S.B[M.bld[j]]; return fpYield(j, z) || o && (o.type === 'house' || o.type === 'dock' || o.type === 'sandpit' || o.type === 'claypit') && !fpBig(o) && !M.road[j] && !M.plan[j] && surfZ(j) === z; // (docks may take any house, the old pier, a pit)
+    };
+    if (B.dir[0] ? fpGrow(B, 1, n + 1, ok) : fpGrow(B, n + 1, 1, ok)) { for (let k = 0; k <= n; k++) markDirty(berthTile(B, k)); if (T && HB_GROW[n + 1]) chron('⚓', HB_GROW[n + 1].replace('{T}', T.name), { T }); }
+  }
+}
 function seaLinked(A, B) { const a = townHarbour(A), b = townHarbour(B); return !!(a && b && sameWater(moorTile(a), moorTile(b))); }
 
 /* ---------- routes over open water, kept a little off the coast ---------- */
@@ -68,29 +94,29 @@ function shipKind() { return hasTech('hover') ? 'hover' : hasTech('computing') ?
 function spawnShip(fromB, toB, r) {
   if (DYN.ships.length >= shipCap()) return null;
   const hs = harbours(); if (!hs.length) return null;
-  const home = fromB || pick(hs);
-  const sh = { kind: shipKind(), r: r || pick(['wood', 'stone', 'clay', 'metal', 'goods']), col: pick(['#b8554a', '#3f6e8c', '#3d6b4f', '#8a5a3c', '#5b5f8a']), path: null, s: 0, st: 'moor', at: home.id, until: DYN.t + rf(10, 22), to: toB ? toB.id : 0, hx: -home.dir[1], hy: home.dir[0], id: rnd() };
+  const home = fromB || pick(hs), bk = Math.max(0, freeBerth(home));
+  const sh = { kind: shipKind(), r: r || pick(['wood', 'stone', 'clay', 'metal', 'goods']), col: pick(['#b8554a', '#3f6e8c', '#3d6b4f', '#8a5a3c', '#5b5f8a']), path: null, s: 0, st: 'moor', at: home.id, until: DYN.t + rf(10, 22), to: toB ? toB.id : 0, hx: -home.dir[1], hy: home.dir[0], id: rnd(), bk };
   DYN.ships.push(sh); return sh;
 }
 function arriveShip() { // a ship from over the horizon heading for one of the harbours
   const hs = harbours(); if (!hs.length || DYN.ships.length >= shipCap()) return;
-  const B = pick(hs), m = moorTile(B), e = edgeWater(m); if (e < 0) return;
+  const B = pick(hs), bk = Math.max(0, freeBerth(B)), m = berthTile(B, bk), e = edgeWater(m); if (e < 0) return;
   const path = seaRoute(e, m); if (!path || path.length < 4) return;
   const [ox, oy] = edgeOut(e), pre = [];
   for (let k = 4; k >= 1; k--) { const x = e % W + ox * k, y = ((e / W) | 0) + oy * k; pre.push({ x, y }); }
-  DYN.ships.push({ kind: shipKind(), r: pick(RES), col: pick(['#b8554a', '#3f6e8c', '#3d6b4f', '#8a5a3c', '#5b5f8a']), path, pre, s: -4, st: 'sail', to: B.id, hx: -ox, hy: -oy, id: rnd() });
+  DYN.ships.push({ kind: shipKind(), r: pick(RES), col: pick(['#b8554a', '#3f6e8c', '#3d6b4f', '#8a5a3c', '#5b5f8a']), path, pre, s: -4, st: 'sail', to: B.id, hx: -ox, hy: -oy, id: rnd(), tbk: bk });
 }
 function departShip(sh) {
   const A = S.B[sh.at]; if (!A) { sh.gone = 1; return; }
-  const from = moorTile(A), hs = harbours().filter(B => B !== A && sameWater(moorTile(B), from));
+  const from = berthTile(A, sh.bk), hs = harbours().filter(B => B !== A && sameWater(moorTile(B), from));
   let B = sh.to && S.B[sh.to] && S.B[sh.to] !== A ? S.B[sh.to] : null;
   if (!B && hs.length && chance(.65)) B = pick(hs);
   let path = null, off = null;
-  if (B) path = seaRoute(from, moorTile(B));
+  let tbk = 0; if (B) { tbk = Math.max(0, freeBerth(B)); path = seaRoute(from, berthTile(B, tbk)); }
   if (!path) { const e = edgeWater(from); if (e >= 0) { path = seaRoute(from, e); off = edgeOut(e); } B = null; }
   if (!path || path.length < 2) { sh.until = DYN.t + 20; return; }
-  sh.path = path; sh.s = 0; sh.st = 'sail'; sh.to = B ? B.id : 0; sh.off = off; sh.from = A.id;
-  if (DYN.slot[A.id] === sh) DYN.slot[A.id] = null;
+  sh.path = path; sh.s = 0; sh.st = 'sail'; sh.to = B ? B.id : 0; sh.tbk = tbk; sh.off = off; sh.from = A.id;
+  if (DYN.slot[bkey(A, sh.bk)] === sh) DYN.slot[bkey(A, sh.bk)] = null;
 }
 function stepShips(dt) {
   if (!S || !hasTech('boats')) return;
@@ -99,7 +125,7 @@ function stepShips(dt) {
   if (hs.length && DYN.t > (DYN.nextShip || 0)) {
     DYN.nextShip = DYN.t + rf(35, 80);
     const yards = Math.min(3, builtOf('shipyard').length), want = Math.min(6 + yards, 1 + Math.round(hs.length * 1.5) + yards);
-    if (DYN.ships.length < want) { if (chance(.5)) arriveShip(); else { const sh = spawnShip(); if (sh) { if (DYN.slot[sh.at]) { sh.gone = 1; } else DYN.slot[sh.at] = sh; } } }
+    if (DYN.ships.length < want) { if (chance(.5)) arriveShip(); else { const sh = spawnShip(); if (sh) { if (DYN.slot[bkey(sh.at, sh.bk)]) { sh.gone = 1; } else DYN.slot[bkey(sh.at, sh.bk)] = sh; } } }
   }
   for (const sh of DYN.ships) {
     if (sh.st === 'moor') {
@@ -110,12 +136,13 @@ function stepShips(dt) {
     const n = sh.path.length, spd = { sail: .45, steamer: .6, freighter: .75, boxship: .8, hover: 1.4 }[sh.kind] || .6;
     // wait offshore if someone else is at the quay
     const dest = sh.to && S.B[sh.to];
-    if (dest && sh.s > n - 5 && DYN.slot[dest.id] && DYN.slot[dest.id] !== sh) { sh.wait = 1; continue; }
+    const dk = dest && bkey(dest, sh.tbk);
+    if (dest && sh.s > n - 5 && DYN.slot[dk] && DYN.slot[dk] !== sh) { sh.wait = 1; continue; }
     sh.wait = 0;
     sh.s += dt * spd * (sh.s > n - 3 && dest ? .55 : 1);
-    if (dest && sh.s > n - 4) DYN.slot[dest.id] = sh;
+    if (dest && sh.s > n - 4) DYN.slot[dk] = sh;
     if (sh.s >= n - 1) {
-      if (dest) { sh.st = 'moor'; sh.at = dest.id; sh.until = DYN.t + rf(18, 40); sh.s = n - 1; sh.to = 0; sh.hx = -dest.dir[1]; sh.hy = dest.dir[0];
+      if (dest) { sh.st = 'moor'; sh.at = dest.id; sh.bk = sh.tbk || 0; sh.until = DYN.t + rf(18, 40); sh.s = n - 1; sh.to = 0; sh.hx = -dest.dir[1]; sh.hy = dest.dir[0];
         if (!S.flags.firstShip && sh.from && S.B[sh.from]) { S.flags.firstShip = 1; const A = S.T[S.B[sh.from].sid], B = S.T[dest.sid]; if (A && B && A !== B) chron('⛵', `The first ship sails into ${B.name} from ${A.name}. Half the town is on the quay to watch her tie up.`, { x: dest.x, y: dest.y, k: 'major', cap: 'The first ship' }); }
       } else if (sh.s >= n + 3) sh.gone = 1; // sailed off over the horizon
     }
@@ -126,7 +153,7 @@ function stepShips(dt) {
 function shipPos(sh) {
   if (sh.st === 'moor') {
     const B = S.B[sh.at]; if (!B) return null;
-    const i = moorTile(B); return [i % W - B.dir[0] * .18, ((i / W) | 0) - B.dir[1] * .18, 1, -B.dir[1], B.dir[0]];
+    const i = berthTile(B, sh.bk); return [i % W - B.dir[0] * .18, ((i / W) | 0) - B.dir[1] * .18, 1, -B.dir[1], B.dir[0]];
   }
   const n = sh.path.length;
   if (sh.s < 0) { // coming in from past the edge
