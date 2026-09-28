@@ -502,6 +502,7 @@ function drawSandpit(c, B, cx, cy, i) {
   if (v > .5) { const a = pt(cx, cy, -.1, -.3, 0); line(c, a[0], a[1], a[0] + 1.2, a[1] - 6, '#7a5a44', .6); }
 }
 function drawPod(c, B, cx, cy) {
+  if (GLB) return glPod(B);
   ell(c, cx + 1, cy, 15, 7, 'rgba(70,55,50,.22)');
   const age = S.year;
   if (age > 250) { // fence of honour

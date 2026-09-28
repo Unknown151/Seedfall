@@ -251,6 +251,26 @@ function glSmallTree(u, v, z, h, s, col) { // street, garden and park trees: a t
   glBlob(u, v, .15 * s, z + 7 * s, 3.4 * s, leafC(col)); glBlob(u + .05 * s, v - .04 * s, .1 * s, z + 9 * s, 2.4 * s, leafC(col));
 }
 function glTreeAt(cx, cy, u, v, h, s, col) { const lift = cy < 0 && !cx ? -cy : 0, [su, sv] = lift ? [0, 0] : gunscreen(cx, cy); glSmallTree(u + su, v + sv, lift, h, s, col); }
+// the First Pod: a silver capsule lying where it came down, half sunk and tipped, greening over the centuries
+function glPod(B) {
+  const a = -.55, d = [Math.cos(a), .14, Math.sin(a)], dl = Math.hypot(d[0], d[1], d[2]), D = V3(d, 1 / dl), side = [-Math.sin(a), 0, Math.cos(a)], up = [side[1] * D[2] - side[2] * D[1], side[2] * D[0] - side[0] * D[2], side[0] * D[1] - side[1] * D[0]]; // (side × along: pointing up, so the porthole and the moss are on top)
+  const L = .3, r = .13, c0 = [GLB.x, GLB.base + r * .72, GLB.y], P = (s, t, rr) => VA(c0, V3(D, s), V3(side, Math.cos(t) * rr), V3(up, Math.sin(t) * rr));
+  const rad = s => Math.abs(s) <= L ? r : r * Math.sqrt(Math.max(0, 1 - ((Math.abs(s) - L) / r) ** 2)), ss = [];
+  for (let k = 0; k <= 8; k++) ss.push(-L - r + k / 8 * r); for (let k = 1; k <= 10; k++) ss.push(-L + k / 10 * 2 * L); for (let k = 1; k <= 8; k++) ss.push(L + k / 8 * r);
+  GLB.mat = 0; const body = gcol('#dfe3ea'), band = gcol('#e5874f'), n = 14;
+  for (let j = 0; j < ss.length - 1; j++) {
+    const s0 = ss[j], s1 = ss[j + 1], col = (s0 + s1) / 2 > -.1 && (s0 + s1) / 2 < -.02 ? band : body;
+    GLB.ctr = VA(c0, V3(D, (s0 + s1) / 2));
+    for (let k = 0; k < n; k++) { const t0 = k / n * TAU, t1 = (k + 1) / n * TAU; gquad(P(s0, t0, rad(s0)), P(s1, t0, rad(s1)), P(s1, t1, rad(s1)), P(s0, t1, rad(s0)), col); }
+  }
+  glOBox(P(L * .8, Math.PI * .42, r * 1.01), V3(D, .035), V3(side, .03), V3(up, .004), '#7fcde6', .5); // the porthole, lit at night
+  glOBox(VA(c0, V3(D, -L - r - .012)), V3(D, .018), V3(side, .06), V3(up, .06), '#5b6170'); // the thruster
+  const age = S.year;
+  const on = (q, rr, rz, col, mat) => glBlob(q[0] - GLB.x, q[2] - GLB.y, rr, (q[1] - GLB.base) / ZS, rz, col, mat); // a lump sitting on the hull
+  if (age > 120) { on(P(-.12, Math.PI * .5, r - .01), .09, .8, leafC('#6a9a50')); on(P(.1, Math.PI * .7, r - .01), .06, .6, leafC('#78a85a')); } // moss
+  if (age > 600) for (let k = 0; k < 4; k++) on(P(-.16 + k * .045, Math.PI * (.45 + (k % 2) * .08), r + .018), .012, .35, FLOWERS[k % FLOWERS.length], 0); // and flowers in it
+  if (age > 250) for (let k = 0; k < 10; k++) { const t = k / 10 * TAU; GLB.mat = M_PLANK; glBoxW(GLB.x + Math.cos(t) * .44, GLB.y + Math.sin(t) * .44, .012, GLB.base, 3.5 * ZS, '#8a6d57'); } // the fence of honour
+}
 function glSheep(X, Z, y0, s, ang, ph = -1) { // a woolly body, a black face and four legs, in world units; ph >= 0: walking
   const f = [Math.cos(ang), 0, Math.sin(ang)], r = [-Math.sin(ang), 0, Math.cos(ang)], u = X - GLB.x, v = Z - GLB.y, zz = (y0 - GLB.base) / ZS;
   for (const [a, b, q] of [[.03, .018, 0], [.03, -.018, Math.PI], [-.03, .018, Math.PI], [-.03, -.018, 0]]) glLimb([X + f[0] * a * s + r[0] * b * s, y0 + 1.1 * s * ZS, Z + f[2] * a * s + r[2] * b * s], f, r, ph >= 0 ? Math.sin(ph + q) * .45 : 0, 1.1 * s * ZS, .007 * s, '#3a3430');
