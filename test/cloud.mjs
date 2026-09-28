@@ -58,7 +58,7 @@ const server = async () => { // what the cloud holds right now
 const b = await launch();
 const errs = [];
 const ctxs = [];
-const newCtx = async () => { const c = await b.newContext({ viewport: { width: 1600, height: 900 } }); ctxs.push(c); return c; };
+const newCtx = async () => { const c = await b.newContext({ viewport: { width: 1600, height: 900 } }); await c.addInitScript(() => { try { localStorage.setItem('sf3d', '0'); } catch (e) { } }); ctxs.push(c); return c; }; // (the 2D view: this is about saves and the voice, and headless 3D is too slow for the timings)
 const watch = (p, name) => { p.on('pageerror', e => errs.push(`${name}: ${e.message}`)); return p; };
 const ready = p => p.waitForFunction(() => typeof RUNNING !== 'undefined' && RUNNING && S && !S.flags.intro, null, { timeout: 60000 });
 const open = async (ctx, name, q = '') => { const p = watch(await ctx.newPage(), name); await p.goto(BASE + q); await ready(p); return p; };

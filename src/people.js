@@ -4,48 +4,48 @@ const LIVING_CAP = 140;
 
 // [universal, band0 ... band5]
 const Q_GUILTY = [
-  ['eating sunroot straight from the pot', 'gossip at the well', 'long naps in the middle of harvest', 'bad puns, told on purpose', 'hoarding pretty pebbles',
-    'licking the spoon', 'second breakfast', 'cheating at stone-toss', 'writing terrible love poems', 'feeding the loamhound under the table',
-    'pretending to have read the whole Archive', 'sugared glowcaps', 'napping inside the Pod', 'racing garden snails', 'dramatic sighing',
+  ['eating jam straight from the jar', 'gossip at the well', 'long naps in the middle of harvest', 'bad puns, told on purpose', 'hoarding pretty pebbles',
+    'licking the spoon', 'second breakfast', 'cheating at stone-toss', 'writing terrible love poems', 'feeding the dog under the table',
+    'pretending to have read the whole Archive', 'sugared almonds', 'napping inside the Pod', 'racing garden snails', 'dramatic sighing',
     'reading the last page first', 'singing in the bath, loudly', 'eavesdropping on the council', 'midnight melon', 'correcting other people’s star charts',
     'buying one more hat', 'sleeping in on festival days', 'eating the decorations', 'rereading their own letters'],
-  ['sneaking honey-reeds from the stores', 'sleeping in the warm vault room', 'naming every single mossback', 'hiding from chores in the glowcap grove'],
-  ['spiced sunroot wine', 'card games that go on for days', 'collecting market gossip', 'chapbooks about Earth'],
+  ['sneaking apples from the stores', 'sleeping in the warm vault room', 'naming every single sheep', 'hiding from chores in the hazel copse'],
+  ['mulled wine', 'card games that go on for days', 'collecting market gossip', 'chapbooks about Earth'],
   ['penny dreadfuls', 'riding the train to nowhere and back', 'fried everything', 'watching the works chimney like it’s a campfire'],
   ['soap-opera radio serials', 'the jukebox at the station café', 'frozen dinners, eaten cold', 'cinema matinees on workdays'],
-  ['mossback videos on the Weave', 'arguing with strangers on the Weave', 'ordering drones just to watch them land', 'reality shows about arcology life'],
+  ['cat videos on the Weave', 'arguing with strangers on the Weave', 'ordering drones just to watch them land', 'reality shows about arcology life'],
   ['zero-g karaoke', 'moon cheese (it is not really cheese)', 'instant noodles in orbit', 'watching seedship launches on repeat']
 ];
 const Q_FEAR = [
-  ['deep water', 'mossback stampedes (there has never been one)', 'the dark side of the far moon', 'being left out of the chronicle', 'loud clocks',
-    'making speeches', 'the Watcher noticing them', 'tall ladders', 'boiled sunroot', 'running out of ink', 'spiders (there are no spiders here)',
+  ['deep water', 'cattle stampedes (there has never been one)', 'the dark side of the far moon', 'being left out of the chronicle', 'loud clocks',
+    'making speeches', 'the Watcher noticing them', 'tall ladders', 'boiled cabbage', 'running out of ink', 'spiders (there are no spiders here)',
     'forgetting the Founder’s name', 'thunder', 'crowds', 'geese (nobody knows why)', 'the vault opening again', 'total silence',
     'being politely thanked', 'their own reflection in the dark', 'the bottom of the lake'],
   [], [], ['trains that are late', 'steam whistles'], ['the telephone ringing'], ['elevators', 'the Weave going down'], ['the space elevator, specifically', 'zero gravity']
 ];
 const Q_HOBBY = [
-  ['whittling', 'kite building', 'pressing flowers', 'watching skimmers', 'collecting Maker shards', 'knitting mossback wool', 'writing letters to the Watcher',
+  ['whittling', 'kite building', 'pressing flowers', 'birdwatching', 'collecting Maker shards', 'knitting', 'writing letters to the Watcher',
     'cloud spotting', 'baking', 'mapping the stars', 'river swimming', 'growing enormous melons', 'fiddle playing', 'map-making', 'yodelling',
-    'arguing about history', 'gardening', 'stacking rocks', 'teaching loamhounds tricks', 'beetle-keeping', 'carving tiny Pods', 'knot tying', 'ghost stories'],
+    'arguing about history', 'gardening', 'stacking rocks', 'teaching dogs tricks', 'beetle-keeping', 'carving tiny Pods', 'knot tying', 'ghost stories'],
   [], ['calligraphy', 'lens grinding'], ['restoring old carts', 'photography', 'model trains'], ['radio tinkering', 'ballroom dancing'],
   ['model rockets', 'building robots that water plants', 'Weave poetry'], ['orbital gardening', 'writing to the seedships']
 ];
 const Q_FOOD = [
-  ['sunroot pie', 'pickled glowcaps', 'blue barley bread', 'pink melon', 'mossback cheese', 'violet bean stew', 'fried river-fish', 'goldreed porridge',
-    'mint kale crisps', 'honey-reed cake', 'Earth wheat pancakes', 'glowcap soup'],
-  [], [], ['canned sunroot (unironically)'], ['ice cream'], ['gene-garden strawberries'], ['moon cheese', 'arcology dumplings']
+  ['apple pie', 'pickled herring', 'rye bread', 'strawberries', 'farmhouse cheese', 'bean stew', 'fried river-fish', 'oat porridge',
+    'kale crisps', 'honey cake', 'pancakes', 'mushroom soup'],
+  [], [], ['tinned peaches (unironically)'], ['ice cream'], ['gene-garden strawberries'], ['moon cheese', 'arcology dumplings']
 ];
-const Q_SAYS = ['“Boil it twice.”', '“The Pod didn’t fall for nothing.”', '“Slowly, slowly.”', '“Ask the mossback.”', '“Tomorrow is also a day.”',
+const Q_SAYS = ['“Boil it twice.”', '“The Pod didn’t fall for nothing.”', '“Slowly, slowly.”', '“Ask the cows.”', '“Tomorrow is also a day.”',
   '“Make it leak less.”', '“The Watcher sees, so tidy up.”', '“One more row.”', '“Measure twice, pray once.”', '“Everything is a kind of seed.”',
-  '“It worked on Earth.”', '“Good enough for the Founder.”', '“Tea first.”', '“We’ll need a bigger kiln.”', '“Nobody ever drowned in sunroot soup.”',
+  '“It worked on Earth.”', '“Good enough for the Founder.”', '“Tea first.”', '“We’ll need a bigger kiln.”', '“Nobody ever drowned in potato soup.”',
   '“If it’s stupid and it works…”', '“Where’s my other boot?”', '“The moons are watching too, you know.”', '“Rain is just the sky being generous.”',
   '“Bold of you to assume I’m lost.”', '“I’ll sleep when the vault’s empty.”', '“Hmm.”', '“Back in my day we had one moon.” (they did not)'];
 const Q_TAGS = ['Night owl', 'Early riser', 'Hopeless romantic', 'Terrible singer', 'Always late', 'Knows everyone', 'Talks to plants', 'Never lost a bet',
-  'Laughs too loud', 'Stubborn as a mossback', 'Excellent hugger', 'Chronic tinkerer', 'Remembers every birthday', 'Cannot whistle',
+  'Laughs too loud', 'Stubborn as a mule', 'Excellent hugger', 'Chronic tinkerer', 'Remembers every birthday', 'Cannot whistle',
   'Suspiciously good at cards', 'Collects small grudges', 'Hums while working', 'Gives terrible directions', 'Cries at weddings', 'Owns too many scarves'];
 const RIVAL_CAUSES = ['the Great Pie Contest of Year {y}', 'the business with the disputed kite', 'the argument over who really invented the three-legged stool',
-  'the ladder that was borrowed and never returned', 'the row about how to pronounce “sunroot”', 'the fence vote of Year {y}', 'a very small insult at a very big wedding',
-  'the argument over whose loamhound is the good boy', 'the melon-growing contest of Year {y}', 'someone ate the last honey-reed cake'];
+  'the ladder that was borrowed and never returned', 'the row about how to pronounce “scone”', 'the fence vote of Year {y}', 'a very small insult at a very big wedding',
+  'the argument over whose dog is the good boy', 'the melon-growing contest of Year {y}', 'someone ate the last honey cake'];
 
 // trades by era band: [craft, kindness, humour, curiosity, ambition]
 const JOBS = [
@@ -184,7 +184,7 @@ function stepRelations() {
     const star = isStarred(p) || isStarred(q), T = S.T[p.sid];
     if (star && chance(.35)) chron('💍', pick([
       `${named(p)} marries ${q.name}${descr(q)}.`,
-      `${p.name} and ${q.name} are married in ${T ? T.name : 'the valley'}. ${pick(['The party lasts three days.', 'Somebody cries at the wedding. It is ' + (p.q.tag === 'Cries at weddings' ? p.first : q.first) + '.', 'The cake is ' + p.q.food + ', by request.', 'The loamhounds are ring-bearers.'])}`
+      `${p.name} and ${q.name} are married in ${T ? T.name : 'the valley'}. ${pick(['The party lasts three days.', 'Somebody cries at the wedding. It is ' + (p.q.tag === 'Cries at weddings' ? p.first : q.first) + '.', 'The cake is ' + p.q.food + ', by request.', 'The dogs are ring-bearers.'])}`
     ]), T ? { T, nocap: !chance(.4) } : {});
   }
   // children

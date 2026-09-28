@@ -16,10 +16,10 @@ const ERAS = [
 const TECHS = [
   { id: 'shelter', era: 0, yr: 3, name: 'Shelter Weaving', txt: 'works out how to weave shelters from reedgrass and pod foil' },
   { id: 'hydro', era: 0, yr: 9, name: 'Vault Hydroponics', txt: 'coaxes the first Earth seeds out of the vault trays' },
-  { id: 'sunroot', era: 1, yr: 18, name: 'Sunroot Cultivation', txt: 'discovers that the orange sunroot is edible, if you boil it twice' },
+  { id: 'sunroot', era: 1, yr: 18, name: 'Potato Growing', txt: 'plants the vault’s potatoes and finds they love this soil' },
   { id: 'kiln', era: 1, yr: 34, name: 'Kiln Firing', txt: 'fires the first clay pot. It leaks, but it is a pot' },
   { id: 'wells', era: 1, yr: 50, name: 'Well Digging', txt: 'digs down to sweet water' },
-  { id: 'herding', era: 1, yr: 72, name: 'Grazer Herding', txt: 'befriends a mossback calf, and the herd follows' },
+  { id: 'herding', era: 1, yr: 72, name: 'Grazer Herding', txt: 'befriends a calf, and the herd follows' },
   { id: 'stone', era: 2, yr: 100, name: 'Stonecutting', txt: 'splits the valley stone along its grain' },
   { id: 'boats', era: 2, yr: 135, name: 'Reed Boats', txt: 'floats a reed boat, and falls out of it, twice' },
   { id: 'loom', era: 2, yr: 175, name: 'Loomcraft', txt: 'builds a loom from pod struts and bone' },
@@ -34,7 +34,7 @@ const TECHS = [
   { id: 'optics', era: 3, yr: 790, name: 'Lenses', txt: 'grinds a lens and sees the moons have mountains' },
   { id: 'steam', era: 4, yr: 890, name: 'Steam Power', txt: 'boils water hard enough to turn a wheel' },
   { id: 'rail', era: 4, yr: 990, name: 'Railways', txt: 'lays two iron lines and a very loud idea on top of them' },
-  { id: 'medicine', era: 4, yr: 1090, name: 'Medicine', txt: 'finds that glowcap mould cures the valley fever' },
+  { id: 'medicine', era: 4, yr: 1090, name: 'Medicine', txt: 'finds that bread mould cures the valley fever' },
   { id: 'brick', era: 4, yr: 1175, name: 'Brickworks', txt: 'bakes bricks by the thousand' },
   { id: 'chem', era: 4, yr: 1260, name: 'Chemistry', txt: 'writes down a table of what everything is made of' },
   { id: 'electric', era: 5, yr: 1350, name: 'Electricity', txt: 'makes a wire hum' },
@@ -119,7 +119,7 @@ const BT = {
   elevator: { n: 'Space Elevator', work: 200, h: 90, anim: 'tether' },
   monument: { n: 'Monument', work: 30, h: 80 },
   watertower: { n: 'Water Tower', work: 14, h: 44 },
-  pasture: { n: 'Mossback Pasture', work: 4, h: 12 },
+  pasture: { n: 'Sheep Pasture', work: 4, h: 12 },
   sandpit: { n: 'Sand Pit', work: 4, h: 10 },
   weaver: { n: 'Weaving House', work: 10, h: 22 },
   glassworks: { n: 'Glassworks', work: 16, h: 34, smoke: 1 },
@@ -179,40 +179,40 @@ const STYLES0 = [
   { name: 'Living Roof', wall: '#e6efe0', roof: '#6fae6a', accent: '#f0c24b', trim: '#7d9a78', glass: '#9fe0d0' },
   { name: 'Pearl', wall: '#f3eefb', roof: '#b59ae0', accent: '#5fd0c9', trim: '#9c8fb5', glass: '#c9e6ff' }
 ];
-const STYLE_WORDS = ['Coral', 'Moonstone', 'Saffron', 'Tidewater', 'Lantern', 'Opaline', 'Heather', 'Ember', 'Seaglass', 'Sunroot', 'Mossback',
-  'Glowcap', 'Amber', 'Driftwood', 'Cloudline', 'Ochre', 'Lilac', 'Copper', 'Frost', 'Honey', 'Ribbon', 'Pebble', 'Kite', 'Starling'];
+const STYLE_WORDS = ['Coral', 'Moonstone', 'Saffron', 'Tidewater', 'Lantern', 'Opaline', 'Heather', 'Ember', 'Seaglass', 'Barley', 'Meadow',
+  'Hawthorn', 'Amber', 'Driftwood', 'Cloudline', 'Ochre', 'Lilac', 'Copper', 'Frost', 'Honey', 'Ribbon', 'Pebble', 'Kite', 'Starling'];
 
-const CROPS = [
-  { n: 'sunroot', c: '#f0a04b' }, { n: 'blue barley', c: '#7fa7d9' }, { n: 'pink melons', c: '#e889a6' },
-  { n: 'goldreed', c: '#e8cf5a' }, { n: 'violet beans', c: '#9f7ad0' }, { n: 'Earth wheat', c: '#dcc37a' }, { n: 'mint kale', c: '#79c7a3' }
+const CROPS = [ // (the order matters: towns keep their crop as an index)
+  { n: 'potatoes', c: '#6f9748' }, { n: 'barley', c: '#d2b660' }, { n: 'rye', c: '#bfa56a' },
+  { n: 'oats', c: '#cdbf86' }, { n: 'flax', c: '#9fb384' }, { n: 'wheat', c: '#dcbf68' }, { n: 'cabbages', c: '#7fa86a' }
 ];
 
 const INVENTIONS = [
-  ['the fish trap', 'sunroot beer', 'the three-legged stool', 'a proper word for “homesick”', 'glowcap lanterns', 'the rain drum', 'woven sandals',
-    'a calendar with thirteen months', 'the first joke about the Pod', 'mossback-wool socks', 'a lullaby that isn’t about Earth', 'the sling', 'pickled glowcaps'],
+  ['the fish trap', 'barley beer', 'the three-legged stool', 'a proper word for “homesick”', 'tallow lanterns', 'the rain drum', 'woven sandals',
+    'a calendar with thirteen months', 'the first joke about the Pod', 'woolly socks', 'a lullaby that isn’t about Earth', 'the sling', 'pickled herring'],
   ['the pendulum clock', 'spectacles', 'the pocket compass', 'the accordion', 'a plough that doesn’t jam', 'the first cookbook', 'card games', 'the umbrella',
     'the pretzel', 'marbles', 'a map of the whole valley', 'the kite', 'the harmonica', 'waterproof boots'],
-  ['the bicycle', 'the steam whistle', 'canned sunroot', 'the postal service', 'the typewriter', 'photography', 'ice cream', 'the sewing machine',
+  ['the bicycle', 'the steam whistle', 'tinned beans', 'the postal service', 'the typewriter', 'photography', 'ice cream', 'the sewing machine',
     'the fountain pen', 'the fire brigade', 'the hot-air balloon', 'the zipper'],
   ['the jukebox', 'the toaster', 'cinema', 'the crossword', 'the vacuum cleaner', 'the neon sign', 'the washing machine', 'frozen dinners',
     'the electric guitar', 'the traffic light', 'sunglasses'],
-  ['the pocket terminal', 'the Weave’s first meme (a mossback wearing a hat)', 'e-paper', 'the hover-skateboard', 'noise-cancelling earmuffs',
+  ['the pocket terminal', 'the Weave’s first meme (a sheep wearing a hat)', 'e-paper', 'the hover-skateboard', 'noise-cancelling earmuffs',
     'the delivery drone', 'a translation engine for Founder-speak', 'the smart kettle (it is smug)'],
   ['zero-g ballet', 'moon cheese (it is not really cheese)', 'orbital postcards', 'the gravity hammock', 'weather-proof paper', 'sky-farming',
     'the self-tying shoelace', 'the thousand-year battery', 'a pocket garden']
 ];
-const ARTWORKS = ['a mural of the Pod falling', 'an epic poem about the Founder', 'a carved frieze of mossbacks', 'a quilt with every town stitched in',
+const ARTWORKS = ['a mural of the Pod falling', 'an epic poem about the Founder', 'a carved frieze of sheep', 'a quilt with every town stitched in',
   'a play about the first winter', 'a statue of a child holding a seed', 'a mosaic of the two moons', 'a symphony called “Seedfall”',
   'a novel about a lost Earth', 'a painting of the valley at noon', 'a tapestry of the Makers’ glyphs', 'a comic opera about the Wheel'];
 const SONG_A = ['Long', 'Quiet', 'Blue', 'Falling', 'Last', 'Golden', 'Seventh', 'Little', 'Borrowed', 'Faraway', 'Crooked', 'Second'];
-const SONG_B = ['Harvest', 'Sky', 'Seed', 'River', 'Watcher', 'Road', 'Lantern', 'Morning', 'Mossback', 'Moon', 'Winter', 'Homecoming'];
-const FESTIVALS = ['the Festival of First Light', 'Lantern Night', 'the Harvest Moot', 'the Kite Festival', 'the Mossback Parade', 'Seed Day',
-  'the Night of Two Moons', 'the Long Supper', 'the River Race', 'the Glowcap Fair'];
+const SONG_B = ['Harvest', 'Sky', 'Seed', 'River', 'Watcher', 'Road', 'Lantern', 'Morning', 'Meadow', 'Moon', 'Winter', 'Homecoming'];
+const FESTIVALS = ['the Festival of First Light', 'Lantern Night', 'the Harvest Moot', 'the Kite Festival', 'the Harvest Parade', 'Seed Day',
+  'the Night of Two Moons', 'the Long Supper', 'the River Race', 'the Apple Fair'];
 const SPORTS = [['stone-toss', 'the log run'], ['kickball', 'rowing'], ['kickball', 'the grand velocipede race'], ['kiteball', 'motor rallies'],
   ['kiteball', 'drone racing'], ['skyball', 'orbital relay']];
-const FAUNA = { grazer: 'mossbacks', pet: 'loamhounds', bird: 'skimmers', giant: 'a Longstrider' };
+const FAUNA = { grazer: 'sheep', pet: 'dogs', bird: 'swallows', giant: 'a great bull' };
 const STARS = ['Veil', 'Harrow', 'Oskar’s Lamp', 'the Green Eye', 'Kestrel', 'Nine Sisters', 'Tovan', 'the Far Seed', 'Lodestar', 'Brisa'];
-const SHIP_NAMES = ['Patience', 'Second Seed', 'Founder’s Dream', 'Long Way Home', 'Kindness', 'Mossback', 'Lantern', 'Hearthlight', 'Quiet Hope', 'Watcher’s Eye'];
+const SHIP_NAMES = ['Patience', 'Second Seed', 'Founder’s Dream', 'Long Way Home', 'Kindness', 'Meadowlark', 'Lantern', 'Hearthlight', 'Quiet Hope', 'Watcher’s Eye'];
 
 const LORE = [
   { t: 'Carved stones older than any memory stand in the grass. Someone lived here before the Pod.', h: 'The first ruin' },
@@ -236,7 +236,7 @@ const AGE_THEMES = [
 ];
 const WONDERS = [
   { n: 'The Founder’s Stone', k: 'statue' }, { n: 'The Great Lantern', k: 'lantern' }, { n: 'The Archive Spire', k: 'spire' },
-  { n: 'The Sky Harp', k: 'harp' }, { n: 'The Hanging Gardens', k: 'gardens' }, { n: 'The Mossback Colossus', k: 'colossus' },
+  { n: 'The Sky Harp', k: 'harp' }, { n: 'The Hanging Gardens', k: 'gardens' }, { n: 'The Great Colossus', k: 'colossus' },
   { n: 'The Hall of Voices', k: 'hall' }, { n: 'The Tide Clock', k: 'clock' }, { n: 'The Seed Obelisk', k: 'obelisk' },
   { n: 'The Glass Orchard', k: 'orchard' }, { n: 'The Long Memory', k: 'spire' }, { n: 'The Kite Tower', k: 'lantern' }
 ];

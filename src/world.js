@@ -1,8 +1,8 @@
 /* ============================== world ============================== */
 const BIO = { SEA: 0, FRESH: 1, SAND: 2, MEADOW: 3, LUSH: 4, HIGH: 5, ROCK: 6, SNOW: 7, BARREN: 8 };
-const BIO_NAME = ['Open water', 'Fresh water', 'Coral sand', 'Bluegrass meadow', 'Lush meadow', 'Ochre highland', 'Lilac stone', 'Snowcap', 'Rust flats'];
-const BIO_COL = ['#3f93b8', '#58b3cf', '#f1d6b3', '#94d4a6', '#77c69c', '#dfbb85', '#aea8c2', '#f4f3fb', '#e3b092'];
-const TREE_NAME = ['', 'Puffwood', 'Spirepine', 'Glowcap grove', 'Orchard'];
+const BIO_NAME = ['Open water', 'Fresh water', 'Sand', 'Meadow', 'Lush meadow', 'Heath', 'Grey rock', 'Snowcap', 'Moorland'];
+const BIO_COL = ['#3f93b8', '#58b3cf', '#e6d3a8', '#93bb6c', '#78ad5a', '#b8a86e', '#a09d98', '#f2f3f5', '#a99070']; // meadow greens, heath, grey rock, brown moor
+const TREE_NAME = ['', 'Oak', 'Pine', 'Birch', 'Orchard'];
 
 let M = null; // current map (alias of S.map)
 

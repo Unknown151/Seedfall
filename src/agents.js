@@ -324,7 +324,7 @@ function drawTrader(c, o, x, y, dx, dy, al, dl) {
   c.globalAlpha = al;
   ell(c, x, y, 3.4, 1.4, 'rgba(40,40,60,.18)');
   if (o.kind === 'wagon') {
-    ell(c, fx, fy - 1.6, 1.7, 1.15, '#8fa58a'); ell(c, fx - .2, fy - 2.2, 1.2, .6, '#a9c0a2'); // the mossback in front
+    ell(c, fx, fy - 1.6, 1.7, 1.15, '#7a5a40'); ell(c, fx - .2, fy - 2.2, 1.2, .6, '#8e6c4e'); // the horse in front
     box(c, x, y, 0, 0, hw, hd, .9, 1.5, '#9b7657');
     const [w1x, w1y] = pt(x, y, along ? -.1 : .075, along ? .075 : -.1, .8), [w2x, w2y] = pt(x, y, along ? .1 : .075, along ? .075 : .1, .8);
     circ(c, w1x, w1y, .9, '#5a4436'); circ(c, w2x, w2y, .9, '#5a4436');
@@ -531,13 +531,13 @@ function drawItem(c, kind, o, x, y, hid, p, detail) {
     case 11: { const [, , al, dx, dy] = p; drawShip(c, o, x, y, dx, dy, al, dl, o.st === 'sail' && !o.wait); break; }
     case 12: { const [, , dx, dy, mv] = p; drawFerry(c, o, x, y, dx, dy, mv, dl); break; }
     case 13: drawPlane(c, o, dl); break;
-    case 3: { // mossback, with plodding legs
+    case 3: { // sheep, with plodding legs
       const s = o.size * (o.baby ? .6 : 1), ph = DYN.t * 3 + (o.a % 7), mv = o.pause > 0 ? 0 : 1;
       ell(c, x, y, 2.4 * s, 1 * s, 'rgba(40,40,60,.15)');
-      c.fillStyle = '#b9ae9c';
+      c.fillStyle = '#3a3430';
       for (const [lx, q] of [[-1.5, 0], [1, Math.PI], [-.9, Math.PI], [1.5, 0]]) c.fillRect(x + lx * s, y - 1.8 * s + (mv ? Math.max(0, Math.sin(ph + q)) * .4 : 0), .55, 1.8 * s - (mv ? Math.max(0, Math.sin(ph + q)) * .4 : 0));
-      ell(c, x, y - 2.4 * s, 2.5 * s, 1.5 * s, '#cfc3ae'); ell(c, x - .2, y - 3.1 * s, 2 * s, .9 * s, '#8fbf88');
-      circ(c, x + 2.4 * s, y - 2.8 * s + (mv ? Math.sin(ph * 2) * .15 : 0), .9 * s, '#cfc3ae');
+      ell(c, x, y - 2.4 * s, 2.5 * s, 1.5 * s, '#e8e3d6'); ell(c, x - .2, y - 3.1 * s, 2 * s, .9 * s, '#f6f3ec');
+      circ(c, x + 2.4 * s, y - 2.8 * s + (mv ? Math.sin(ph * 2) * .15 : 0), .9 * s, '#3a3430');
       break;
     }
     case 4: { // train car
@@ -665,16 +665,16 @@ function drawMarks(c) {
 
 /* ---------- keeping the right number of people and vehicles around ---------- */
 function syncPeople() {
-  let total = 0;
+  let total = 0; const crowd = typeof GL3 !== 'undefined' && GL3.on ? 2.5 : 1; // the 3D view draws people cheaply enough to fill the streets
   const vt = hasTech('hover') ? 'hover' : hasTech('motor') ? 'car' : hasTech('wheel') ? 'cart' : null;
   for (const T of towns()) {
-    const want = Math.round(Math.min(56, (T.id === 1 && S.year < 20 ? 0 : 4) + Math.sqrt(T.pop) * 2.3));
+    const want = Math.round(Math.min(56 * crowd, (T.id === 1 && S.year < 20 ? 0 : 4) + Math.sqrt(T.pop) * 2.3 * crowd));
     const have = DYN.walkers.filter(w => w.tid === T.id && w.kind === 'p');
-    if (have.length < want && total < 380) { for (let k = 0; k < Math.min(4, want - have.length); k++) spawnWalker(T); }
+    if (have.length < want && total < 380 * crowd) { for (let k = 0; k < Math.min(4, want - have.length); k++) spawnWalker(T); }
     else if (have.length > want + 3) { const w = have.find(w => w.st === 'in') || have[0]; DYN.walkers.splice(DYN.walkers.indexOf(w), 1); }
     total += have.length;
     if (vt) {
-      const vw = Math.round(Math.min(16, T.pop / 90)), vh = DYN.vehicles.filter(v => v.tid === T.id);
+      const vw = Math.round(Math.min(16 * crowd, T.pop / 90 * Math.min(2, crowd))), vh = DYN.vehicles.filter(v => v.tid === T.id);
       if (vh.length < vw) spawnVehicle(T, vt);
       else if (vh.length > vw + 1) DYN.vehicles.splice(DYN.vehicles.indexOf(vh.find(v => v.st === 'in') || vh[0]), 1);
     }

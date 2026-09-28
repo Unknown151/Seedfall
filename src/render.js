@@ -41,6 +41,7 @@ function computeBB(i) {
 }
 
 function markDirty(i) {
+  if (GL3.on) glDirty(i);
   const a0 = BB.x0[i], b0 = BB.y0[i], a1 = BB.x1[i], b1 = BB.y1[i];
   const h0 = CH[i];
   computeBB(i); TV[i]++;
@@ -106,6 +107,7 @@ function renderAll() {
 /* ---------- primitives ---------- */
 function pt(cx, cy, u, v, z) { return [cx + (u - v) * 16, cy + (u + v) * 8 - z]; }
 function poly(c, p, col) {
+  if (GLB) return; // flat 2D shapes have no depth to give the 3D view
   c.fillStyle = col; c.beginPath(); c.moveTo(p[0][0], p[0][1]);
   for (let k = 1; k < p.length; k++) c.lineTo(p[k][0], p[k][1]);
   c.closePath(); c.fill();
@@ -114,6 +116,7 @@ function poly(c, p, col) {
 let DS = null, DM = null; // DM: the material of the building being drawn (timber, stone, brick, adobe)
 function dsRound() { return DS && (DS.shape === 'round' || DS.shape === 'organic'); }
 function box(c, cx, cy, u0, v0, hw, hd, z0, h, col, top) {
+  if (GLB) return glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top);
   if (dsRound()) { const [X, Y] = pt(cx, cy, u0, v0, 0); cyl(c, X, Y, Math.max(hw, hd) * 1.08, z0, h, col, top); return; }
   const P = (u, v, z) => pt(cx, cy, u0 + u, v0 + v, z);
   poly(c, [P(-hw, hd, z0), P(hw, hd, z0), P(hw, hd, z0 + h), P(-hw, hd, z0 + h)], shade(col, LT.fL));
@@ -138,11 +141,13 @@ function matLines(c, P, hw, hd, z0, h) {
   c.strokeStyle = DM === 'wood' ? 'rgba(70,40,20,.2)' : DM === 'brick' ? 'rgba(250,230,210,.18)' : 'rgba(60,55,70,.16)'; c.lineWidth = DM === 'brick' ? .3 : .35; c.stroke();
 }
 function flat(c, cx, cy, u0, v0, hw, hd, z, col) {
+  if (GLB) return glFlat(cx, cy, u0, v0, hw, hd, z, col);
   if (dsRound() && Math.abs(hw - hd) < .12) { const [X, Y] = pt(cx, cy, u0, v0, z), r = Math.max(hw, hd); ell(c, X, Y, r * 22.6, r * 11.3, col[0] === '#' ? topC(shade(col, LT.fG)) : col); return; }
   const P = (u, v) => pt(cx, cy, u0 + u, v0 + v, z);
   poly(c, [P(-hw, -hd), P(hw, -hd), P(hw, hd), P(-hw, hd)], col[0] === '#' ? topC(shade(col, LT.fG)) : col);
 }
 function cylWindows(c, cx, cy, u0, v0, r, z0, h, floors, n, col, onlyLit) {
+  if (GLB) return glCylWindows(cx, cy, u0, v0, r, z0, h, floors, n, col);
   const fh = h / floors, lit = LT.lit, hx = (cx * 8) | 0, hy = (cy * 8) | 0;
   for (let f = 0; f < floors; f++) {
     const zb = z0 + f * fh + fh * .32, wh = fh * .42;
@@ -157,6 +162,7 @@ function cylWindows(c, cx, cy, u0, v0, r, z0, h, floors, n, col, onlyLit) {
   }
 }
 function windows(c, cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col, colR, onlyLit) {
+  if (GLB) { if (!onlyLit || true) glWindows(cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col); return; }
   if (dsRound()) { cylWindows(c, cx, cy, u0, v0, Math.max(hw, hd) * 1.08 + .004, z0, h, floors, Math.min(cols + 1, 5), col, onlyLit); return; }
   const fh = h / floors, lit = LT.lit, cL = shade(col, LT.fWL), cR = colR ? shade(colR, LT.fWR) : shade(col, q2(.8 * LT.fWR / .8));
   const hx = (cx * 8) | 0, hy = (cy * 8) | 0;
@@ -176,6 +182,7 @@ function windows(c, cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col, colR, only
   }
 }
 function door(c, cx, cy, u0, v0, hd, w, h, col) {
+  if (GLB) return glDoor(cx, cy, u0, v0, hd, w, h, col);
   if (dsRound()) { u0 += hd * .74; v0 = v0 + hd * .74 - hd; }
   let dc = col;
   if (LT.lit && hash2((cx * 4) | 0, (cy * 4) | 0, 91) < LT.lit + .15) {
@@ -202,6 +209,7 @@ function dsRoof(c, cx, cy, u0, v0, hw, hd, z, rh, col) {
 }
 function roofGable(c, cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
   if (DS && dsRoof(c, cx, cy, u0, v0, hw, hd, z, rh, col)) return;
+  if (GLB) return glGable(cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU);
   const o = 0.05, P = (u, v, zz) => pt(cx, cy, u0 + u, v0 + v, zz), r = rh / 19.6;
   if (alongU) {
     poly(c, [P(-hw - o, -hd - o, z), P(hw + o, -hd - o, z), P(hw + o, 0, z + rh), P(-hw - o, 0, z + rh)], topC(shade(col, lf(0, -r, hd))));
@@ -215,12 +223,14 @@ function roofGable(c, cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
 }
 function roofPyr(c, cx, cy, u0, v0, hw, hd, z, rh, col) {
   if (DS && dsRoof(c, cx, cy, u0, v0, hw, hd, z, rh, col)) return;
+  if (GLB) return glPyr(cx, cy, u0, v0, hw, hd, z, rh, col);
   const o = 0.04, P = (u, v, zz) => pt(cx, cy, u0 + u, v0 + v, zz), r = rh / 19.6;
   const A = P(-hw - o, -hd - o, z), B = P(hw + o, -hd - o, z), C = P(hw + o, hd + o, z), D = P(-hw - o, hd + o, z), T = P(0, 0, z + rh);
   poly(c, [A, B, T], topC(shade(col, lf(0, -r, hd)))); poly(c, [D, A, T], topC(shade(col, lf(-r, 0, hw))));
   poly(c, [D, C, T], topC(shade(col, lf(0, r, hd)))); poly(c, [C, B, T], topC(shade(col, lf(r, 0, hw))));
 }
 function cone(c, x, y, r, h, col) {
+  if (GLB) return glCone(x, y, r, h, col);
   const rx = r * 22.6, ry = r * 11.3;
   const g = c.createLinearGradient(x - rx, 0, x + rx, 0);
   g.addColorStop(0, topC(shade(col, lf(-.6, .6, .55)))); g.addColorStop(.5, topC(shade(col, lf(.6, .6, .55)))); g.addColorStop(1, topC(shade(col, lf(.6, -.6, .55))));
@@ -228,6 +238,7 @@ function cone(c, x, y, r, h, col) {
 }
 const CYL_N = [[0, -.707, .707], [.146, 0, 1], [.5, .707, .707], [.854, 1, 0], [1, .707, -.707]];
 function cyl(c, x, y, r, z0, h, col, top) {
+  if (GLB) return glCyl(x, y, r, z0, h, col, top);
   const rx = r * 22.6, ry = r * 11.3, yb = y - z0, yt = y - z0 - h;
   const g = c.createLinearGradient(x - rx, 0, x + rx, 0);
   for (const [s, nx, ny] of CYL_N) g.addColorStop(s, shade(col, lf(nx, ny, 0)));
@@ -235,14 +246,15 @@ function cyl(c, x, y, r, z0, h, col, top) {
   c.fillStyle = topC(top || shade(col, LT.fT)); c.beginPath(); c.ellipse(x, yt, rx, ry, 0, 0, TAU); c.fill();
 }
 function dome(c, x, y, r, z0, h, col, alpha = 1) {
+  if (GLB) return glDome(x, y, r, z0, h, col);
   const rx = r * 22.6, ry = r * 11.3, yb = y - z0;
   const g = c.createRadialGradient(x + rx * .42 * LT.hx, yb - h * (.62 - .12 * LT.hy), 1, x, yb - h * .3, rx * 1.25);
   g.addColorStop(0, topC(shade(col, q2(LT.fT + .18)))); g.addColorStop(.5, shade(col, q2(LT.fT - .07))); g.addColorStop(1, shade(col, q2(LT.fR - .04)));
   c.globalAlpha = alpha; c.fillStyle = g; c.beginPath(); c.ellipse(x, yb, rx, h, 0, Math.PI, TAU, false); c.ellipse(x, yb, rx, ry, 0, 0, Math.PI, false); c.closePath(); c.fill(); c.globalAlpha = 1;
 }
-function line(c, x0, y0, x1, y1, col, w) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); }
-function circ(c, x, y, r, col) { c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
-function ell(c, x, y, rx, ry, col) { c.fillStyle = col; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill(); }
+function line(c, x0, y0, x1, y1, col, w) { if (GLB) return; c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); }
+function circ(c, x, y, r, col) { if (GLB) return; c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
+function ell(c, x, y, rx, ry, col) { if (GLB) return; c.fillStyle = col; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill(); }
 
 /* ---------- terrain ---------- */
 const STRATA = ['#a77a60', '#bb8f70', '#94705f', '#ad8671', '#86665b', '#9a7666'];
@@ -455,26 +467,24 @@ function drawTrees(c, i, x, y, cx, cy) {
     const [px, py] = pt(cx, cy, u, v, 0);
     ell(c, px + 1.5 * clamp(lsh, -1, 1), py + .5, 4.2 * s, 2 * s, 'rgba(40,50,70,.13)');
     const hv = hash2(x, y, 90 + k);
-    if (tt === 1 || tt === 0) { // puffwood
-      const cols = ['#a57ac6', '#b683c9', '#9570c2', '#c48ac4', '#8f79cf'];
+    if (tt === 1 || tt === 0) { // oak
+      const cols = ['#5f8f45', '#6a9a4a', '#557f3f', '#739f52', '#4f7f3c'];
       const col = cols[(hv * cols.length) | 0];
-      c.fillStyle = '#7b5e6e'; c.fillRect(px - .6, py - 7 * s, 1.2, 7 * s);
+      c.fillStyle = '#6b5040'; c.fillRect(px - .6, py - 7 * s, 1.2, 7 * s);
       circ(c, px, py - 10 * s, 4.8 * s, leafC(col, .82));
       circ(c, px + .6 * hx * s, py - 10.8 * s, 4.1 * s, leafC(col));
       circ(c, px + 1.7 * hx * s, py - 12 * s, 1.9 * s, topC(leafC(col, 1.18)));
-    } else if (tt === 2) { // spirepine
-      const col = hv < .5 ? '#4f9f95' : '#3f8f8a', d = hx <= 0 ? 1 : -1;
+    } else if (tt === 2) { // pine
+      const col = hv < .5 ? '#3f6f4a' : '#35604a', d = hx <= 0 ? 1 : -1;
       c.fillStyle = '#6b5a55'; c.fillRect(px - .6, py - 4 * s, 1.2, 4 * s);
       poly(c, [[px, py - 18 * s], [px - 4.4 * s, py - 3 * s], [px + 4.4 * s, py - 3 * s]], leafC(col, .85));
       poly(c, [[px, py - 18 * s], [px - 4.4 * d * s, py - 3 * s], [px + .3 * d * s, py - 3 * s]], leafC(col));
       poly(c, [[px, py - 22 * s], [px - 3 * s, py - 11 * s], [px + 3 * s, py - 11 * s]], topC(leafC(col, 1.08)));
-    } else if (tt === 3) { // glowcap
-      const col = hv < .5 ? '#ee92b6' : '#f3a37f';
-      c.fillStyle = '#efe2d4'; c.fillRect(px - .9 * s, py - 7 * s, 1.8 * s, 7 * s);
-      ell(c, px, py - 7 * s, 5.2 * s, 2.3 * s, shade(col, q2(.78 * LT.fG)));
-      c.fillStyle = topC(shade(col, LT.fG)); c.beginPath(); c.ellipse(px, py - 7.2 * s, 5.2 * s, 4.4 * s, 0, Math.PI, TAU); c.fill();
-      circ(c, px - 2 * s, py - 9.5 * s, .7 * s, '#fff5f8'); circ(c, px + 1.5 * s, py - 10.3 * s, .6 * s, '#fff5f8'); circ(c, px + .2 * s, py - 8.4 * s, .5 * s, '#fff5f8');
-      emit(px, py - 8 * s, 7 * s, col, .38); emit(px, py, 7 * s, col, .18, 1);
+    } else if (tt === 3) { // birch: a pale trunk with dark marks, a light airy crown
+      const col = hv < .5 ? '#8fb35a' : '#9dbb62';
+      c.fillStyle = '#ece8df'; c.fillRect(px - .55 * s, py - 12 * s, 1.1 * s, 12 * s);
+      c.fillStyle = '#3a3430'; for (let m = 0; m < 4; m++) c.fillRect(px - .55 * s, py - (2.5 + m * 2.6) * s, (.5 + (m % 2) * .4) * s, .45 * s);
+      ell(c, px, py - 13 * s, 3.2 * s, 5 * s, leafC(col, .85)); ell(c, px + .6 * hx * s, py - 14 * s, 2.3 * s, 3.8 * s, topC(leafC(col, 1.08)));
     } else { // orchard
       c.fillStyle = '#7b5e4e'; c.fillRect(px - .6, py - 5 * s, 1.2, 5 * s);
       circ(c, px, py - 7.5 * s, 3.6 * s, leafC('#6db873')); circ(c, px + .8 * hx * s, py - 8.2 * s, 2.6 * s, topC(leafC('#83c886')));
@@ -599,11 +609,12 @@ function drawRail(c, i, x, y, cx, cy) {
 // Everything here is chosen from hashes of the tile, so it's the same on every redraw and costs nothing to store.
 // Road tiles have three free corners (the lamp takes the fourth); what goes in them depends on the surface (so the
 // era), whether it's in town, and the town's quarter.
-function tuft(c, px, py, col) { c.strokeStyle = col; c.lineWidth = .45; c.beginPath(); c.moveTo(px - 1, py - 1.8); c.lineTo(px, py); c.lineTo(px + .2, py - 2.4); c.moveTo(px, py); c.lineTo(px + 1.1, py - 1.6); c.stroke(); }
-function flowers(c, px, py, h) { for (let k = 0; k < 3; k++) circ(c, px + (k - 1) * 1.1, py - .6 - (k % 2) * .6, .55, FLOWERS[(((h * 17) | 0) + k) % FLOWERS.length]); }
+function tuft(c, px, py, col) { if (GLB) return glTuft(px, py, col); c.strokeStyle = col; c.lineWidth = .45; c.beginPath(); c.moveTo(px - 1, py - 1.8); c.lineTo(px, py); c.lineTo(px + .2, py - 2.4); c.moveTo(px, py); c.lineTo(px + 1.1, py - 1.6); c.stroke(); }
+function flowers(c, px, py, h) { if (GLB) return glFlowers(px, py, h); for (let k = 0; k < 3; k++) circ(c, px + (k - 1) * 1.1, py - .6 - (k % 2) * .6, .55, FLOWERS[(((h * 17) | 0) + k) % FLOWERS.length]); }
 function bench(c, cx, cy, u, v, col) { box(c, cx, cy, u, v, .07, .03, 1, .5, col); box(c, cx, cy, u, v - .03, .07, .008, 1.5, 1.2, col); }
 function streetTree(c, cx, cy, u, v, h) {
-  const [px, py] = pt(cx, cy, u, v, 0), col = ['#6db873', '#5fae78', '#83c886', '#a57ac6'][(h * 4) | 0], s = .8 + h * .3;
+  if (GLB) return glTreeAt(cx, cy, u, v, h, .8 + h * .3, ['#5f9a4d', '#6aa556', '#7fae5e', '#ee9fbe'][(h * 4) | 0]);
+  const [px, py] = pt(cx, cy, u, v, 0), col = ['#5f9a4d', '#6aa556', '#7fae5e', '#ee9fbe'][(h * 4) | 0], s = .8 + h * .3;
   ell(c, px + 1, py + .3, 2.8 * s, 1.3 * s, 'rgba(40,50,70,.13)');
   c.fillStyle = '#7b5e4e'; c.fillRect(px - .45, py - 4.5 * s, .9, 4.5 * s);
   circ(c, px, py - 6.5 * s, 2.9 * s, leafC(col, .85)); circ(c, px + .7 * LT.hx, py - 7.2 * s, 2.1 * s, topC(leafC(col)));
@@ -656,21 +667,35 @@ function drawVerge(c, i, x, y, cx, cy) {
 // open grass: tufts, clover and wildflowers, thicker on lush ground
 function drawGround(c, i, x, y, cx, cy) {
   const b = M.bio[i]; if (b !== BIO.MEADOW && b !== BIO.LUSH && b !== BIO.HIGH && b !== BIO.BARREN) return;
-  const g = leafC(shade(BIO_COL[b], b === BIO.HIGH || b === BIO.BARREN ? .8 : .74)), n = b === BIO.LUSH ? 4 : b === BIO.MEADOW ? 3 : 1;
+  const g = leafC(shade(BIO_COL[b], b === BIO.HIGH || b === BIO.BARREN ? .8 : .74)), n = (b === BIO.LUSH ? 4 : b === BIO.MEADOW ? 3 : 1) * (GLB ? 2 : 1);
   for (let k = 0; k < n; k++) {
     const h = hash2(x, y, 400 + k); if (h < .3) continue;
     const [px, py] = pt(cx, cy, (hash2(x, y, 410 + k) - .5) * .8, (hash2(x, y, 420 + k) - .5) * .8, 0);
-    if (h > .9 && b !== BIO.HIGH && b !== BIO.BARREN) flowers(c, px, py, h); else if (h > .82 && b === BIO.LUSH) { circ(c, px, py - 1, 1.4, leafC('#5fae78', .9)); circ(c, px + .5, py - 1.5, .9, leafC('#6db873')); } else tuft(c, px, py, g);
+    if (h > .9 && b !== BIO.HIGH && b !== BIO.BARREN) flowers(c, px, py, h); else if (h > .82 && b === BIO.LUSH) { if (GLB) { const [u, v] = gunscreen(px, py); glBlob(u, v, .09, .8, 1.6, leafC('#5f9a52')); continue; } circ(c, px, py - 1, 1.4, leafC('#5fae78', .9)); circ(c, px + .5, py - 1.5, .9, leafC('#6db873')); } else tuft(c, px, py, g);
   }
 }
 // a little garden round the smaller houses: a hedge, a bush, a tree by the gate
 function drawYard(c, B, x, y, cx, cy) {
+  if (GLB) return glYard(B, x, y);
   if (B.tier > 3 || houseJoin(B)) return;
   const h = hash2(x, y, 500);
   if (h < .45) { circ(c, ...pt(cx, cy, -.42, .36, 1.2), 1.5, leafC('#5fae78', .85)); circ(c, ...pt(cx, cy, -.4, .38, 1.8), 1, leafC('#6db873')); }
   if (h > .3 && h < .6) { const a = pt(cx, cy, .44, -.3, 0), b = pt(cx, cy, .44, .3, 0); c.strokeStyle = leafC('#4f9f6a', .85); c.lineWidth = 1.8; c.beginPath(); c.moveTo(a[0], a[1] - 1); c.lineTo(b[0], b[1] - 1); c.stroke(); } // hedge
   if (h > .8 && B.tier >= 2) streetTree(c, cx, cy, -.4, -.4, hash2(x, y, 501));
   if (h > .6 && h < .75) flowers(c, ...pt(cx, cy, .3, .44, 0), h);
+}
+// the 3D garden: each free corner of the plot gets a bush, a flower bed, a tree or a clump of grass, and some plots a hedge
+function glYard(B, x, y) {
+  const row = houseJoin(B), big = B.tier > 3;
+  for (const [u, v, k] of [[-.42, -.42, 0], [-.42, .42, 1], [.42, .42, 2], [.42, -.42, 3]]) {
+    const h = hash2(x, y, 510 + k), X = pt(0, 0, u, v, 0);
+    if (row && h < .7) continue; // terraces keep to window boxes and the odd pot
+    if (h < .3) { glBlob(u, v, .075, 1, 1.7, leafC(h < .15 ? '#5a9a4e' : '#4f8a45')); glBlob(u + .05, v - .04, .05, .8, 1.2, leafC('#6aa556')); }
+    else if (h < .5) { glFlowers(...pt(0, 0, u, v - .05, 0), h); glFlowers(...pt(0, 0, u - .05, v + .03, 0), h + .3); }
+    else if (h < .58 && !big) glTreeAt(0, 0, u, v, h, .7 + h * .4, ['#5f9a4d', '#6aa556', '#7fae5e', '#ee9fbe'][((h * 40) | 0) % 4]);
+    else if (h < .8) glTuft(X[0], X[1], '#6aa556');
+  }
+  const hh = hash2(x, y, 500); if (!row && hh > .3 && hh < .6) { const sw = GLB.wall; GLB.wall = M_LEAF; glBox(0, 0, .45, 0, .03, .32, 0, 2.2, leafC('#4f8a45')); GLB.wall = sw; } // a clipped hedge
 }
 
 /* ---------- street lamps ---------- */
