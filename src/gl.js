@@ -23,7 +23,7 @@ function gcol(s) {
 }
 
 /* ---------- geometry: vertex = position, normal, colour, emissive (10 floats) ---------- */
-function gv(p, n, c, e) { GLB.v.push(p[0], p[1], p[2], n[0], n[1], n[2], c[0], c[1], c[2], e, GLB.id || 0); } // the last float is what the pixel belongs to (for picking)
+function gv(p, n, c, e) { GLB.v.push(p[0], p[1], p[2], n[0], n[1], n[2], c[0], c[1], c[2], e, GLB.id || 0, e ? 0 : GLB.mat || 0); } // then what the pixel belongs to (picking) and what it's made of (texture) // the last float is what the pixel belongs to (for picking)
 function gtri(a, b, c, col, e = 0) {
   const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
   let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
@@ -38,7 +38,7 @@ function gunscreen(X, Y) { const a = X / 16, b = Y / 8; return [(a + b) / 2, (b 
 function glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top) {
   if (dsRound()) { const [X, Y] = pt(cx, cy, u0, v0, 0); return glCyl(X, Y, Math.max(hw, hd) * 1.08, z0, h, col, top); }
   const c = gcol(col), ct = top ? gcol(top) : c, P = (u, v, z) => gw(u0 + u, v0 + v, z, cx, cy), z1 = z0 + h; GLB.ctr = P(0, 0, z0 + h / 2);
-  gquad(P(-hw, -hd, z1), P(-hw, hd, z1), P(hw, hd, z1), P(hw, -hd, z1), ct);
+  GLB.mat = 0; gquad(P(-hw, -hd, z1), P(-hw, hd, z1), P(hw, hd, z1), P(hw, -hd, z1), ct); GLB.mat = GLB.wall || 0;
   gquad(P(-hw, hd, z0), P(hw, hd, z0), P(hw, hd, z1), P(-hw, hd, z1), c);
   gquad(P(hw, hd, z0), P(hw, -hd, z0), P(hw, -hd, z1), P(hw, hd, z1), c);
   gquad(P(hw, -hd, z0), P(-hw, -hd, z0), P(-hw, -hd, z1), P(hw, -hd, z1), c);
@@ -46,43 +46,46 @@ function glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top) {
   const [sx, sy] = pt(cx, cy, u0, v0, 0); GLB.tops.push([sx, sy, z1]);
 }
 function glFlat(cx, cy, u0, v0, hw, hd, z, col) {
+  GLB.mat = 0;
   const c = gcol(col), P = (u, v) => gw(u0 + u, v0 + v, z + .25, cx, cy); GLB.ctr = gw(u0, v0, z - 20, cx, cy);
   gquad(P(-hw, -hd), P(-hw, hd), P(hw, hd), P(hw, -hd), c);
 }
 function glCylAt(u, v, r, z0, h, col, top, n = 12) {
   const c = gcol(col), ct = top ? gcol(top) : c, P = (a, z) => gw(u + Math.cos(a) * r, v + Math.sin(a) * r, z), C = gw(u, v, z0 + h); GLB.ctr = gw(u, v, z0 + h / 2);
-  for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gquad(P(a, z0), P(b, z0), P(b, z0 + h), P(a, z0 + h), c); gtri(C, P(b, z0 + h), P(a, z0 + h), ct); }
+  for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; GLB.mat = GLB.wall || 0; gquad(P(a, z0), P(b, z0), P(b, z0 + h), P(a, z0 + h), c); GLB.mat = 0; gtri(C, P(b, z0 + h), P(a, z0 + h), ct); }
 }
 function glCyl(X, Y, r, z0, h, col, top) { const [u, v] = gunscreen(X, Y); glCylAt(u, v, r, z0, h, col, top); GLB.tops.push([X, Y, z0 + h]); }
 function glCone(X, Y, r, h, col) {
   let zb = 0; // a cone is often drawn lifted onto whatever it tops: find that
   for (const [sx, sy, z] of GLB.tops) if (Math.abs(sx - X) < .7 && Math.abs(sy - z - Y) < 1.6) { zb = z; Y = sy; break; }
-  const [u, v] = gunscreen(X, Y), c = gcol(col), n = 12, A = gw(u, v, zb + h); GLB.ctr = gw(u, v, zb - 1);
+  const [u, v] = gunscreen(X, Y), c = gcol(col), n = 12, A = gw(u, v, zb + h); GLB.ctr = gw(u, v, zb - 1); GLB.mat = roofMat(c);
   for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gtri(gw(u + Math.cos(a) * r, v + Math.sin(a) * r, zb), gw(u + Math.cos(b) * r, v + Math.sin(b) * r, zb), A, c); }
 }
 function glDome(X, Y, r, z0, h, col) { const [u, v] = gunscreen(X, Y); glDomeAt(u, v, r, z0, h, col); }
-function glDomeAt(u, v, r, z0, h, col, e = 0) {
-  GLB.ctr = gw(u, v, z0); const c = gcol(col), n = 12, m = 4, P = (a, t) => gw(u + Math.cos(a) * r * Math.cos(t), v + Math.sin(a) * r * Math.cos(t), z0 + h * Math.sin(t));
+function glDomeAt(u, v, r, z0, h, col, e = 0, mat = 0) {
+  GLB.ctr = gw(u, v, z0); GLB.mat = mat; const c = gcol(col), n = 12, m = 4, P = (a, t) => gw(u + Math.cos(a) * r * Math.cos(t), v + Math.sin(a) * r * Math.cos(t), z0 + h * Math.sin(t));
   for (let j = 0; j < m; j++) { const t0 = j / m * Math.PI / 2, t1 = (j + 1) / m * Math.PI / 2; for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gquad(P(a, t0), P(b, t0), P(b, t1), P(a, t1), c, e); } }
 }
-function glBall(u, v, r, zc, rz, col, e = 0) { glDomeAt(u, v, r, zc, rz, col, e); glDomeAt(u, v, r, zc, -rz, col, e); }
+function glBall(u, v, r, zc, rz, col, e = 0, mat = 0) { glDomeAt(u, v, r, zc, rz, col, e, mat); glDomeAt(u, v, r, zc, -rz, col, e, mat); }
 function glGable(cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
   // the eaves hang out past the walls and drop a little, so the roof meets the top of the wall with no gap
   const c = gcol(col), cw = gcol(wall), o = .05, g = .02, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy); GLB.ctr = P(0, 0, z - 1);
+  const rm = roofMat(c), wm = GLB.wall || 0, sq = gquad, tr = gtri, gq = (...a) => { GLB.mat = rm; sq(...a); }, gt = (...a) => { GLB.mat = wm; tr(...a); };
   if (alongU) {
     const ze = z - rh * o / hd;
-    gquad(P(-hw - g, -hd - o, ze), P(-hw - g, 0, z + rh), P(hw + g, 0, z + rh), P(hw + g, -hd - o, ze), c);
-    gquad(P(hw + g, hd + o, ze), P(hw + g, 0, z + rh), P(-hw - g, 0, z + rh), P(-hw - g, hd + o, ze), c);
-    gtri(P(hw, -hd, z), P(hw, 0, z + rh), P(hw, hd, z), cw); gtri(P(-hw, hd, z), P(-hw, 0, z + rh), P(-hw, -hd, z), cw);
+    gq(P(-hw - g, -hd - o, ze), P(-hw - g, 0, z + rh), P(hw + g, 0, z + rh), P(hw + g, -hd - o, ze), c);
+    gq(P(hw + g, hd + o, ze), P(hw + g, 0, z + rh), P(-hw - g, 0, z + rh), P(-hw - g, hd + o, ze), c);
+    gt(P(hw, -hd, z), P(hw, 0, z + rh), P(hw, hd, z), cw); gt(P(-hw, hd, z), P(-hw, 0, z + rh), P(-hw, -hd, z), cw);
   } else {
     const ze = z - rh * o / hw;
-    gquad(P(-hw - o, hd + g, ze), P(0, hd + g, z + rh), P(0, -hd - g, z + rh), P(-hw - o, -hd - g, ze), c);
-    gquad(P(hw + o, -hd - g, ze), P(0, -hd - g, z + rh), P(0, hd + g, z + rh), P(hw + o, hd + g, ze), c);
-    gtri(P(-hw, hd, z), P(hw, hd, z), P(0, hd, z + rh), cw); gtri(P(hw, -hd, z), P(-hw, -hd, z), P(0, -hd, z + rh), cw);
+    gq(P(-hw - o, hd + g, ze), P(0, hd + g, z + rh), P(0, -hd - g, z + rh), P(-hw - o, -hd - g, ze), c);
+    gq(P(hw + o, -hd - g, ze), P(0, -hd - g, z + rh), P(0, hd + g, z + rh), P(hw + o, hd + g, ze), c);
+    gt(P(-hw, hd, z), P(hw, hd, z), P(0, hd, z + rh), cw); gt(P(hw, -hd, z), P(-hw, -hd, z), P(0, -hd, z + rh), cw);
   }
 }
+function roofMat(c) { return c[0] > c[2] + .1 && c[0] > c[1] ? M_ROOF : M_SLATE; } // red and brown roofs are tiled, grey and blue ones slated
 function glPyr(cx, cy, u0, v0, hw, hd, z, rh, col) {
-  const c = gcol(col), o = .04, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy), T = P(0, 0, z + rh); GLB.ctr = P(0, 0, z - 1);
+  const c = gcol(col), o = .04, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy), T = P(0, 0, z + rh); GLB.ctr = P(0, 0, z - 1); GLB.mat = roofMat(c);
   const ze = z - rh * o / Math.max(.05, Math.min(hw, hd)), A = P(-hw - o, -hd - o, ze), B = P(hw + o, -hd - o, ze), C = P(hw + o, hd + o, ze), D = P(-hw - o, hd + o, ze); // eaves drop to meet the walls
   gtri(B, A, T, c); gtri(A, D, T, c); gtri(D, C, T, c); gtri(C, B, T, c);
 }
@@ -119,23 +122,25 @@ function glBuildChunk(k) {
   try {
     for (let y = cy0; y < cy0 + GCH; y++) for (let x = cx0; x < cx0 + GCH; x++) {
       const i = idx(x, y), h = GT(i);
-      GLB = { v, x, y, base: surfZ(i) * ZS, tops: [], id: i + 1 };
+      GLB = { v, x, y, base: surfZ(i) * ZS, tops: [], id: i + 1, wall: 0, mat: 0 };
+      const bio = M.bio[i], gmat = M.water[i] ? 0 : bio === BIO.MEADOW || bio === BIO.LUSH ? M_GRASS : bio === BIO.ROCK || bio === BIO.SNOW ? M_STONE : bio === BIO.SAND ? 0 : M_EARTH;
       // ground
       const top = gcol(topColor(i)), sc = gcol(sideCol(i));
-      GLB.ctr = [x, h - 1, y]; gquad([x - .5, h, y - .5], [x - .5, h, y + .5], [x + .5, h, y + .5], [x + .5, h, y - .5], top, M.water[i] ? -1 : 0);
+      GLB.ctr = [x, h - 1, y]; GLB.mat = gmat; gquad([x - .5, h, y - .5], [x - .5, h, y + .5], [x + .5, h, y + .5], [x + .5, h, y - .5], top, M.water[i] ? -1 : 0);
       for (const [dx, dy] of N4) { // walls down to lower neighbours (and the island's edge)
         const nx = x + dx, ny = y + dy, nh = inb(nx, ny) ? GT(idx(nx, ny)) : -SLAB * ZS; if (nh >= h - .001) continue;
         const e = dx ? [[x + dx * .5, y - .5], [x + dx * .5, y + .5]] : [[x - .5, y + dy * .5], [x + .5, y + dy * .5]];
-        GLB.ctr = [x, (h + nh) / 2, y];
+        GLB.ctr = [x, (h + nh) / 2, y]; GLB.mat = M.water[i] ? 0 : bio === BIO.ROCK || bio === BIO.SNOW ? M_STONE : M_EARTH;
         gquad([e[0][0], nh, e[0][1]], [e[1][0], nh, e[1][1]], [e[1][0], h, e[1][1]], [e[0][0], h, e[0][1]], M.water[i] ? gcol('#4ea7c8') : sc, M.water[i] ? -1 : 0);
       }
       if (M.road[i]) glRoad(i, x, y);
       if (M.road[i] && !M.water[i] && rcls(i) >= 2 && (x + 2 * y) % (rcls(i) >= 4 ? 2 : 3) === 0 && !M.bld[i]) { // a lamp post, and a real light
         const b = GLB.base, L = [x + .36, b + 10 * ZS, y - .36]; GLB.base = b;
-        glBoxW(x + .36, y - .36, .025, b, 9.5 * ZS, '#4c4f58'); glBoxW(x + .36, y - .36, .05, b + 9.5 * ZS, 1.2 * ZS, '#fff3d0', 2); lamps.push(L);
+        GLB.mat = 0; glBoxW(x + .36, y - .36, .025, b, 9.5 * ZS, '#4c4f58'); glBoxW(x + .36, y - .36, .05, b + 9.5 * ZS, 1.2 * ZS, '#fff3d0', 2); lamps.push(L);
       }
       if (M.tree[i] && !M.bld[i]) glTrees(i, x, y);
       // what stands on the tile, drawn by the same art as the 2D view
+      { const Bw = M.bld[i] && S.B[M.bld[i]]; GLB.wall = Bw ? glWallMat(Bw) : M_PLANK; } // walls by what the building is made of; street furniture is wooden
       try { drawTileObjects(GSTUB, i, x, y, 0, 0); } catch (e) { }
       const B = M.bld[i] && S.B[M.bld[i]];
       if (B && !B.hid && FLAT_TYPES[B.type]) try { drawBuilding(GSTUB, B, 0, 0, i); } catch (e) { }
@@ -161,10 +166,10 @@ function glRoad(i, x, y) {
   GLB.ctr = [x, h - 1, y];
   const seg = (a, b, c, d, cc, hh) => gquad([x + a, hh, y + c], [x + a, hh, y + d], [x + b, hh, y + d], [x + b, hh, y + c], cc);
   const lay = (ww, cc, hh) => { seg(-ww / 2, ww / 2, -ww / 2, ww / 2, cc, hh); for (const [dx, dy] of nb) { if (dx) seg(dx > 0 ? 0 : -.5, dx > 0 ? .5 : 0, -ww / 2, ww / 2, cc, hh); else seg(-ww / 2, ww / 2, dy > 0 ? 0 : -.5, dy > 0 ? .5 : 0, cc, hh); } };
-  if (!br && sf >= R_COBBLE) lay(w + .13, gcol(PAVE_COL[sf]), h - .002);
-  lay(w, col, h);
-  if (br) glBoxW(x, y, .06, GT(i) - .2, h - GT(i) + .2, t >= 3 ? '#9c958c' : '#7e5f47');
-  if (sf === R_ASPHALT && !br) for (const [dx, dy] of nb) seg(dx ? (dx > 0 ? .12 : -.38) : -.012, dx ? (dx > 0 ? .38 : -.12) : .012, dy ? (dy > 0 ? .12 : -.38) : -.012, dy ? (dy > 0 ? .38 : -.12) : .012, gcol('#f3e2a8'), h + .002);
+  GLB.mat = M_STONE; if (!br && sf >= R_COBBLE) lay(w + .13, gcol(PAVE_COL[sf]), h - .002);
+  GLB.mat = br ? (t >= 3 ? M_STONE : M_PLANK) : ROAD_MAT[sf] || 0; lay(w, col, h);
+  GLB.mat = t >= 3 ? M_STONE : M_PLANK; if (br) glBoxW(x, y, .06, GT(i) - .2, h - GT(i) + .2, t >= 3 ? '#9c958c' : '#7e5f47');
+  GLB.mat = 0; if (sf === R_ASPHALT && !br) for (const [dx, dy] of nb) seg(dx ? (dx > 0 ? .12 : -.38) : -.012, dx ? (dx > 0 ? .38 : -.12) : .012, dy ? (dy > 0 ? .12 : -.38) : -.012, dy ? (dy > 0 ? .38 : -.12) : .012, gcol('#f3e2a8'), h + .002);
   if (sf === R_GLOW && !br) for (const [dx, dy] of nb) seg(dx ? Math.min(0, dx * .5) : -.015, dx ? Math.max(0, dx * .5) : .015, dy ? Math.min(0, dy * .5) : -.015, dy ? Math.max(0, dy * .5) : .015, gcol('#8fe3ec'), h + .003);
 }
 const G_PUFF = ['#a57ac6', '#b683c9', '#9570c2', '#c48ac4', '#8f79cf'];
@@ -173,9 +178,9 @@ function glTrees(i, x, y) {
   for (let k = 0; k < n; k++) {
     let u = (hash2(x, y, k * 3 + 1) - .5) * .6, v = (hash2(x, y, k * 3 + 2) - .5) * .6; if (n === 1) { u *= .4; v *= .4; }
     const s = .8 + hash2(x, y, k * 3 + 3) * .45, hv = hash2(x, y, 90 + k), X = x + u, Z = y + v;
-    if (tt === 2) { glBoxW(X, Z, .03 * s, b, 4 * s * ZS, '#6b5a55'); const c = gcol(leafC(hv < .5 ? '#4f9f95' : '#3f8f8a')); const A = [X, b + 18 * s * ZS, Z]; GLB.ctr = [X, b, Z]; for (let j = 0; j < 8; j++) { const a0 = j / 8 * TAU, a1 = (j + 1) / 8 * TAU, r = .2 * s; gtri([X + Math.cos(a0) * r, b + 3 * s * ZS, Z + Math.sin(a0) * r], [X + Math.cos(a1) * r, b + 3 * s * ZS, Z + Math.sin(a1) * r], A, c); } }
-    else if (tt === 3) { glBoxW(X, Z, .03 * s, b, 5 * s * ZS, '#efe6dc'); GLB.base = b; glDomeAt(X - GLB.x, Z - GLB.y, .2 * s, 5 * s, 4 * s, ['#ee92b6', '#f0a860', '#b9a2ff'][(hv * 3) | 0]); }
-    else { glBoxW(X, Z, .03 * s, b, 7 * s * ZS, tt === 4 ? '#7b5e4e' : '#7b5e6e'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .2 * s, 10 * s, 4.6 * s, leafC(tt === 4 ? '#6db873' : G_PUFF[(hv * G_PUFF.length) | 0])); }
+    if (tt === 2) { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 4 * s * ZS, '#6b5a55'); GLB.mat = M_LEAF; const c = gcol(leafC(hv < .5 ? '#4f9f95' : '#3f8f8a')); const A = [X, b + 18 * s * ZS, Z]; GLB.ctr = [X, b, Z]; for (let j = 0; j < 8; j++) { const a0 = j / 8 * TAU, a1 = (j + 1) / 8 * TAU, r = .2 * s; gtri([X + Math.cos(a0) * r, b + 3 * s * ZS, Z + Math.sin(a0) * r], [X + Math.cos(a1) * r, b + 3 * s * ZS, Z + Math.sin(a1) * r], A, c); } }
+    else if (tt === 3) { GLB.mat = 0; glBoxW(X, Z, .03 * s, b, 5 * s * ZS, '#efe6dc'); GLB.base = b; glDomeAt(X - GLB.x, Z - GLB.y, .2 * s, 5 * s, 4 * s, ['#ee92b6', '#f0a860', '#b9a2ff'][(hv * 3) | 0]); }
+    else { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 7 * s * ZS, tt === 4 ? '#7b5e4e' : '#7b5e6e'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .2 * s, 10 * s, 4.6 * s, leafC(tt === 4 ? '#6db873' : G_PUFF[(hv * G_PUFF.length) | 0]), 0, M_LEAF); }
   }
   GLB.base = surfZ(i) * ZS;
 }
@@ -183,18 +188,25 @@ function glDirty(i) { const x = i % W, y = (i / W) | 0; for (const [dx, dy] of [
 
 /* ---------- shaders ---------- */
 const GL_VS = `#version 300 es
-layout(location=0) in vec3 aP; layout(location=1) in vec3 aN; layout(location=2) in vec3 aC; layout(location=3) in float aE; layout(location=4) in float aI;
-uniform mat4 uVP, uSVP; out vec3 vP, vN, vC; out float vE; out vec4 vS; flat out float vI;
-void main(){ vP=aP; vN=aN; vC=aC; vE=aE; vI=aI; vS=uSVP*vec4(aP+aN*.02,1.); gl_Position=uVP*vec4(aP,1.); }`;
+layout(location=0) in vec3 aP; layout(location=1) in vec3 aN; layout(location=2) in vec3 aC; layout(location=3) in float aE; layout(location=4) in float aI; layout(location=5) in float aM;
+uniform mat4 uVP, uSVP; out vec3 vP, vN, vC; out float vE; out vec4 vS; flat out float vI, vM;
+void main(){ vP=aP; vN=aN; vC=aC; vE=aE; vI=aI; vM=aM; vS=uSVP*vec4(aP+aN*.02,1.); gl_Position=uVP*vec4(aP,1.); }`;
 const GL_FS = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
-in vec3 vP, vN, vC; in float vE; in vec4 vS; flat in float vI; out vec4 o;
+in vec3 vP, vN, vC; in float vE; in vec4 vS; flat in float vI, vM; out vec4 o;
+uniform highp sampler2DArray uTex; uniform vec3 uAvg[13]; uniform float uTS[13], uRaw[13];
 uniform float uHi, uFog0, uFogL; uniform vec3 uFogC; uniform vec3 uSun, uSunC, uSky, uGnd, uWin, uLamp, uEye; uniform float uLit, uShK, uT;
 uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64];
 float shadow(){ vec3 p=vS.xyz/vS.w*.5+.5; if(p.x<0.||p.x>1.||p.y<0.||p.y>1.) return 1.; float s=0.; vec2 d=vec2(1./2048.);
   for(int x=-1;x<=1;x++) for(int y=-1;y<=1;y++) s+=texture(uSh, vec3(p.xy+vec2(x,y)*d*1.2, p.z-.0015)); return s/9.; }
 void main(){
   vec3 n=normalize(vN), c=vC;
+  int m=int(vM+.5);
+  if(m>0){ // triplanar: the ground and roofs take the texture from above, walls from the side they face
+    vec3 a=abs(n); vec2 uv = a.y>.55 ? vP.xz : (a.x>a.z ? vec2(vP.z,-vP.y) : vec2(vP.x,-vP.y));
+    vec3 t=texture(uTex, vec3(uv*uTS[m], float(m))).rgb;
+    c=mix(c*t/uAvg[m], t, uRaw[m]);
+  }
   if(vE<-.5){ // water: a touch of shine
     vec3 v=normalize(uEye-vP), h=normalize(uSun+v); c=mix(c, vec3(1.), .12*pow(max(dot(vec3(0,1,0),h),0.),60.)*uShK*4.); n=vec3(0,1,0); }
   float nd=max(dot(n,uSun),0.), sh=mix(1., shadow(), uShK);
@@ -249,6 +261,11 @@ function glInit() {
   $('view').style.display = 'none'; document.body.insertBefore(c, $('view'));
   GL3.c = c; GL3.gl = gl; GL3.on = true;
   GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sh = glProg(gl, GL_SVS, GL_SFS); GL3.pk = glProg(gl, GL_PVS, GL_PFS);
+  { const t0 = performance.now(), T = glTextures(); GL3.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex);
+    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, TX.N, TX.N, TX.L, 0, gl.RGBA, gl.UNSIGNED_BYTE, T.data); gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    const af = gl.getExtension('EXT_texture_filter_anisotropic'); if (af) gl.texParameterf(gl.TEXTURE_2D_ARRAY, af.TEXTURE_MAX_ANISOTROPY_EXT, 8); // crisp at a slant
+    GL3.texAvg = T.avg; GL3.texMs = Math.round(performance.now() - t0); }
   GL3.pkF = gl.createFramebuffer(); GL3.pkC = gl.createRenderbuffer(); GL3.pkD = gl.createRenderbuffer(); GL3.pkW = 0; GL3.pkH = 0;
   GL3.shT = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, GL3.shT);
   gl.texStorage2D(gl.TEXTURE_2D, 1, gl.DEPTH_COMPONENT24, 2048, 2048);
@@ -316,7 +333,7 @@ function glFrame(dt) {
   const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
   // rebuild what changed, a few chunks a frame
-  let n = 0; for (const k of GL3.dirty) { if (n++ >= (GL3.first ? 3 : 64)) break; GL3.dirty.delete(k); const r = glBuildChunk(k), ch = GL3.chunks[k]; gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); gl.bufferData(gl.ARRAY_BUFFER, r.v, gl.STATIC_DRAW); ch.n = r.v.length / 11; ch.lamps = r.lamps; }
+  let n = 0; for (const k of GL3.dirty) { if (n++ >= (GL3.first ? 3 : 64)) break; GL3.dirty.delete(k); const r = glBuildChunk(k), ch = GL3.chunks[k]; gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); gl.bufferData(gl.ARRAY_BUFFER, r.v, gl.STATIC_DRAW); ch.n = r.v.length / 12; ch.lamps = r.lamps; }
   GL3.first = true;
   if (cam.auto) cam.yaw += dt * .05;
   const fw = GL3.follow && walkerPos(GL3.follow); if (fw) GL3.goto = [fw[0], fw[2] * ZS, fw[1]];
@@ -341,12 +358,12 @@ function glFrame(dt) {
   const lamps = []; if (lit > 0) { for (const ch of GL3.chunks) for (const L of ch.lamps) lamps.push(L); lamps.sort((a, b) => Math.hypot(a[0] - tgt[0], a[2] - tgt[2]) - Math.hypot(b[0] - tgt[0], b[2] - tgt[2])); lamps.length = Math.min(64, lamps.length); }
   const dyn = glPeople();
   const attrs = full => { // full: everything the lit view needs; 1: position and id (picking); 0: position only (shadows)
-    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 44, 0);
-    if (full === true) { for (const a of [1, 2, 3]) gl.enableVertexAttribArray(a); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 44, 12); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 44, 24); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 44, 36); }
-    if (full) { gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 1, gl.FLOAT, false, 44, 40); } else gl.disableVertexAttribArray(4);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 48, 0);
+    if (full === true) { for (const a of [1, 2, 3]) gl.enableVertexAttribArray(a); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 48, 12); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 48, 24); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 48, 36); gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 1, gl.FLOAT, false, 48, 44); } else gl.disableVertexAttribArray(5);
+    if (full) { gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 1, gl.FLOAT, false, 48, 40); } else gl.disableVertexAttribArray(4);
   };
   gl.bindBuffer(gl.ARRAY_BUFFER, GL3.dyn); gl.bufferData(gl.ARRAY_BUFFER, dyn, gl.STREAM_DRAW);
-  const drawAll = full => { for (const ch of GL3.chunks) if (ch.n) { gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, ch.n); } if (dyn.length) { gl.bindBuffer(gl.ARRAY_BUFFER, GL3.dyn); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, dyn.length / 11); } };
+  const drawAll = full => { for (const ch of GL3.chunks) if (ch.n) { gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, ch.n); } if (dyn.length) { gl.bindBuffer(gl.ARRAY_BUFFER, GL3.dyn); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, dyn.length / 12); } };
   gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
   // shadow pass
   gl.bindFramebuffer(gl.FRAMEBUFFER, GL3.shF); gl.viewport(0, 0, 2048, 2048); gl.clear(gl.DEPTH_BUFFER_BIT);
@@ -361,6 +378,7 @@ function glFrame(dt) {
   gl.uniform3fv(U.uWin, gcol((LIGHT.cur && LIGHT.cur.winC || ['#ffd07a'])[0])); gl.uniform3fv(U.uLamp, [1.25, .86, .5]);
   gl.uniform1f(U.uLit, lit); gl.uniform1f(U.uShK, shK); gl.uniform1f(U.uT, GL3.t);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, GL3.shT); gl.uniform1i(U.uSh, 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex); gl.uniform1i(U.uTex, 1); gl.uniform3fv(U.uAvg, GL3.texAvg); gl.uniform1fv(U.uTS, TX.SCALE); gl.uniform1fv(U.uRaw, TX.RAW); gl.activeTexture(gl.TEXTURE0);
   gl.uniform1i(U.uNL, lamps.length); if (lamps.length) gl.uniform3fv(U.uLP, new Float32Array(lamps.flat()));
   gl.uniform1f(U.uHi, GL3.hover || 0);
   gl.uniform1f(U.uFog0, dist + zz * 1.2); gl.uniform1f(U.uFogL, cam.persp ? 60 : 0); gl.uniform3fv(U.uFogC, bg.map(v => -Math.log(1 - Math.min(.97, v)) / 1.45)); // (the haze colour, undone through the tone curve so it lands on the sky)
@@ -412,7 +430,7 @@ function glClick(sx, sy) {
 }
 // people and carts, as little figures, rebuilt every frame
 function glPeople() {
-  const v = []; GLB = { v, x: 0, y: 0, base: 0, tops: [], id: 0 };
+  const v = []; GLB = { v, x: 0, y: 0, base: 0, tops: [], id: 0, mat: 0, wall: 0 };
   try {
     for (let k = 0; k < DYN.walkers.length; k++) {
       const w = DYN.walkers[k], p = walkerPos(w); if (!p || p[3] < .3) continue; GLB.id = w.pid ? GPID + k : 0; // a person you can point at
@@ -439,3 +457,66 @@ function glBtn() {
   if (innerWidth < 700) b.style.bottom = '104px'; // clear of the tool bar on a phone
   b.textContent = GL3.on ? 'Switch to 2D' : 'Try it in 3D';
 }
+
+/* ---------- textures, painted in code at start-up (no image files): one layer each in a texture array ---------- */
+// Materials: 0 none, 1 grass, 2 brick, 3 roof tiles, 4 bark, 5 leaves, 6 plaster, 7 stone, 8 planks, 9 cobbles, 10 asphalt, 11 earth.
+// The shader lays them on by world position (triplanar), so nothing needs unwrapping. RAW is how much of the texture's own
+// colour replaces the art's colour (grass and bark look real; plaster keeps the building's own colour and only gains grain).
+const TX = { N: 256, L: 13, SCALE: [1, .5, 1.8, 1.6, 3.5, 2.2, 1.2, 1.4, 2, 1.6, .7, .6, 1.8], RAW: [0, .85, .55, .4, .9, .7, 0, .35, .45, .55, .7, .7, .3] };
+const M_SLATE = 12, M_GRASS = 1, M_BRICK = 2, M_ROOF = 3, M_BARK = 4, M_LEAF = 5, M_PLASTER = 6, M_STONE = 7, M_PLANK = 8, M_COBBLE = 9, M_ASPHALT = 10, M_EARTH = 11;
+function glTextures() {
+  const N = TX.N, L = TX.L, out = new Uint8Array(N * N * 4 * L), avg = new Float32Array(L * 3);
+  const rng = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296, R = rng(7);
+  const nz = (seed, cx, cy = cx) => { const r = rng(seed), g = new Float32Array(cx * cy).map(() => r()); return (x, y) => { x = x / N * cx; y = y / N * cy; const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy), G = (i, j) => g[((j % cy + cy) % cy) * cx + ((i % cx + cx) % cx)]; return (G(x0, y0) * (1 - sx) + G(x0 + 1, y0) * sx) * (1 - sy) + (G(x0, y0 + 1) * (1 - sx) + G(x0 + 1, y0 + 1) * sx) * sy; }; };
+  const fbm = (seed, b, o = 4) => { const ns = [...Array(o)].map((_, k) => nz(seed + k * 97, b << k)); return (x, y) => { let v = 0, a = .5, t = 0; for (const n of ns) { v += n(x, y) * a; t += a; a *= .5; } return v / t; }; };
+  const mx = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const sm = (a, b, t) => { t = Math.min(1, Math.max(0, (t - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d');
+  const wrap = f => { for (const dx of [-N, 0, N]) for (const dy of [-N, 0, N]) { g.save(); g.translate(dx, dy); f(); g.restore(); } };
+  const put = (layer, fn, strokes) => {
+    const im = g.createImageData(N, N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const c = fn(x, y), i = (y * N + x) * 4; im.data[i] = c[0]; im.data[i + 1] = c[1]; im.data[i + 2] = c[2]; im.data[i + 3] = 255; }
+    g.putImageData(im, 0, 0); if (strokes) strokes();
+    const d = g.getImageData(0, 0, N, N).data; out.set(d, layer * N * N * 4);
+    let r = 0, gg = 0, b = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; } const n = d.length / 4 * 255;
+    avg[layer * 3] = r / n; avg[layer * 3 + 1] = gg / n; avg[layer * 3 + 2] = b / n;
+  };
+  put(0, () => [200, 200, 200]);
+  { const gm = fbm(11, 3), gd = fbm(23, 2), gs = nz(31, 32); // grass
+    put(M_GRASS, (x, y) => { const m = gm(x, y), d = Math.max(0, gd(x, y) - .58) * 3; let c = mx([62, 104, 38], [112, 146, 56], m); c = mx(c, [134, 126, 72], Math.min(.5, d)); return c.map(v => v * (.86 + gs(x, y) * .28)); },
+      () => { for (let k = 0; k < 2600; k++) { const x = R() * N, y = R() * N, l = 2 + R() * 4, a = -Math.PI / 2 + (R() - .5) * .9, col = R() < .5 ? `rgba(${40 + R() * 30},${80 + R() * 40},${24 + R() * 20},.55)` : `rgba(${120 + R() * 50},${160 + R() * 40},${60 + R() * 30},.45)`; wrap(() => { g.strokeStyle = col; g.lineWidth = .8; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke(); }); } }); }
+  { const bn = nz(41, 64), bs = fbm(43, 2), BW = 32, BH = 12, shade = [...Array(400)].map(() => [R(), R()]); // brick
+    put(M_BRICK, (x, y) => { const r = Math.floor(y / BH), off = r % 2 ? BW / 2 : 0, c = Math.floor((x + off) / BW) % (N / BW), bx = (x + off) % BW, by = y % BH, h = shade[(r * 17 + c) % 400];
+      if (bx < 2 || by < 2) return [180, 172, 158].map(v => v * (.85 + bn(x, y) * .25));
+      let col = mx([146, 62, 42], [178, 92, 58], h[0]); if (h[1] > .88) col = mx(col, [110, 60, 52], .6); if (h[1] < .08) col = mx(col, [196, 128, 88], .5);
+      return col.map(v => v * (.82 + bn(x, y) * .3) * (1 - .12 * bs(x, y))); }); }
+  { const rn = nz(51, 64), rm = fbm(53, 2), TW = 21, TH = 17, t = [...Array(400)].map(() => R()); // clay roof tiles
+    put(M_ROOF, (x, y) => { const r = Math.floor(y / TH), off = r % 2 ? TW / 2 : 0, c = Math.floor((x + off) / TW), tx = ((x + off) % TW) / TW, ty = (y % TH) / TH, h = t[(r * 13 + c * 7) % 400];
+      let col = mx([160, 72, 44], [190, 102, 60], h); if (h > .93) col = mx(col, [98, 58, 46], .55); col = mx(col, [120, 118, 96], Math.max(0, rm(x, y) - .6) * 1.4);
+      return col.map(v => v * (.72 + .38 * Math.sin(tx * Math.PI)) * (ty > .82 ? .62 : 1) * (.85 + rn(x, y) * .3) * (.78 + .22 * ty)); }); }
+  { const kA = nz(61, 14, 2), kB = nz(62, 28, 4), kC = nz(63, 64, 20), kw = nz(64, 2, 1), kCr = nz(65, 10, 2), kl = fbm(67, 3); // bark
+    put(M_BARK, (x, y) => { const wx = (x + kw(x, y) * 20 + N) % N, v = kA(wx, y) * .55 + kB(wx, y) * .3 + kC(wx, y) * .15, d = Math.abs(kCr(wx, y) * .7 + kB(wx, y) * .3 - .5), crack = 1 - sm(.012, .05, d), lip = sm(.05, .09, d) * (1 - sm(.09, .16, d));
+      let c = mx([70, 60, 52], [112, 98, 84], v); c = mx(c, [134, 118, 100], lip * .5); c = mx(c, [30, 24, 20], crack * .9); c = mx(c, [120, 132, 100], Math.max(0, kl(x, y) - .64) * 2 * (1 - crack));
+      return c.map(q => q * (.86 + R() * .2 * (1 - crack))); }); }
+  { const ln = fbm(71, 3); put(M_LEAF, () => [35, 64, 28], () => { for (let k = 0; k < 900; k++) { const x = R() * N, y = R() * N, s = 3 + R() * 4, a = R() * 7, v = ln(x, y) * .6 + R() * .4, col = `rgb(${34 + v * 90},${66 + v * 100},${26 + v * 40})`; wrap(() => { g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = col; g.beginPath(); g.ellipse(0, 0, s, s * .45, 0, 0, 7); g.fill(); g.restore(); }); } }); }
+  { const pn = fbm(81, 4), pg = nz(82, 128); put(M_PLASTER, (x, y) => { const v = .9 + pn(x, y) * .12 + pg(x, y) * .06 - Math.max(0, pn(x, y) - .7) * .3; return [226, 218, 204].map(q => q * v); }); }
+  { const sn = nz(91, 64), sb = [...Array(300)].map(() => R()); // dressed stone blocks, uneven courses
+    put(M_STONE, (x, y) => { const r = Math.floor(y / 20), off = (r * 37) % 44, c = Math.floor((x + off) / 44), bx = (x + off) % 44, by = y % 20, h = sb[(r * 11 + c) % 300];
+      if (bx < 2 || by < 2) return [120, 116, 108].map(v => v * (.9 + sn(x, y) * .2));
+      return mx([168, 160, 146], [206, 198, 182], h).map(v => v * (.84 + sn(x, y) * .26) * (Math.min(bx, 44 - bx, by, 20 - by) < 4 ? .93 : 1)); }); }
+  { const wn = nz(101, 4, 64), wk = [...Array(64)].map(() => R()); // weathered planks
+    put(M_PLANK, (x, y) => { const p = Math.floor(y / 16), py = y % 16, h = wk[p % 64], grain = wn((x + h * 200) % N, y); if (py < 1.5) return [58, 44, 34];
+      return mx([122, 90, 62], [168, 130, 92], h).map(v => v * (.78 + grain * .36) * (py > 13 ? .9 : 1)); }); }
+  { const cn = nz(111, 64), cs = [...Array(900)].map(() => R()); // cobbles: rounded setts in rows
+    put(M_COBBLE, (x, y) => { const r = Math.floor(y / 16), off = r % 2 ? 8 : 0, c = Math.floor((x + off) / 16), sx = ((x + off) % 16) / 16 - .5, sy = (y % 16) / 16 - .5, d = Math.hypot(sx * 1.1, sy), h = cs[(r * 31 + c) % 900];
+      if (d > .46) return [74, 70, 64]; return mx([118, 112, 104], [162, 154, 142], h).map(v => v * (1.05 - d * .5) * (.9 + cn(x, y) * .2)); }); }
+  { const an = nz(121, 128), am = fbm(122, 3); put(M_ASPHALT, (x, y) => { const v = .85 + an(x, y) * .25 + (R() - .5) * .12 - Math.max(0, am(x, y) - .66) * .4; return [78, 80, 84].map(q => q * v); }); }
+  { const en = fbm(131, 4), es = nz(132, 128); put(M_EARTH, (x, y) => mx([118, 92, 64], [156, 128, 92], en(x, y)).map(v => v * (.84 + es(x, y) * .3))); }
+  { const sn = nz(141, 64), sh = [...Array(600)].map(() => R()); // slates: overlapping grey rectangles
+    put(M_SLATE, (x, y) => { const r = Math.floor(y / 14), off = r % 2 ? 9 : 0, c = Math.floor((x + off) / 18), sx = (x + off) % 18, sy = y % 14, h = sh[(r * 23 + c) % 600];
+      if (sx < 1 || sy < 1.2) return [40, 42, 48]; return mx([78, 82, 92], [118, 122, 132], h).map(v => v * (.86 + sn(x, y) * .22) * (.8 + .2 * sy / 14)); }); }
+  return { data: out, avg };
+}
+// what a building's walls are made of
+function glWallMat(B) { if (!B) return M_PLASTER; if (B.mat === 'brick') return M_BRICK; if (B.mat === 'stone') return M_STONE; if (B.mat === 'wood') return M_PLANK; if (B.type === 'house' && B.tier >= 6) return 0; return M_PLASTER; }
+const ROAD_MAT = [0, M_EARTH, M_EARTH, M_COBBLE, M_BRICK, M_ASPHALT, M_PLASTER, 0];
