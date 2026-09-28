@@ -97,7 +97,7 @@ function fpFree(j, z) { return !M.bld[j] && !M.road[j] && !M.plan[j] && !M.water
 function fpYield(j, z) {
   if (M.road[j] || M.plan[j] || M.water[j] || M.ruin[j] || M.rail[j] || surfZ(j) !== z) return false;
   const B = M.bld[j] && S.B[M.bld[j]]; if (!B) return !M.bld[j];
-  return !fpBig(B) && (B.type === 'house' && B.tier <= 2 && B.up == null || B.type === 'farm' || B.type === 'pasture') && B.prog >= 1;
+  return !fpBig(B) && (B.type === 'house' && B.tier <= 3 && B.up == null || B.type === 'farm' || B.type === 'pasture') && B.prog >= 1;
 }
 // grow B to w × h round where it stands (any placement that keeps its tile); false when there's no room (it stays as it is)
 function fpGrow(B, w, h, ok = fpFree) {
@@ -120,6 +120,24 @@ const FP_BIG = { stadium: [2, 2], university: [2, 2], fusion: [2, 2], hall: [2, 
 function fpSettle(B) {
   const f = FP_BIG[B.type]; if (!f || fpBig(B) || B.prog < 1) return false;
   return fpGrow(B, f[0], f[1], fpYield) || (f[0] !== f[1] && fpGrow(B, f[1], f[0], fpYield));
+}
+// is there a w×h lot round (x, y) on ground that would give way? (either way round)
+function fpRoom(x, y, w, h) {
+  const z = surfZ(idx(x, y));
+  for (const [ww, hh] of w === h ? [[w, h]] : [[w, h], [h, w]]) for (let ay = y - hh + 1; ay <= y; ay++) for (let ax = x - ww + 1; ax <= x; ax++) {
+    if (ax < 0 || ay < 0 || ax + ww > W || ay + hh > H) continue;
+    let good = true; for (let yy = ay; yy < ay + hh && good; yy++) for (let xx = ax; xx < ax + ww; xx++) if (!fpYield(idx(xx, yy), z)) { good = false; break; }
+    if (good) return true;
+  }
+  return false;
+}
+// a full town with no plot left for a landmark: an old small house with room round it makes way (the lot spreads once it's built)
+function landmarkSite(T, type) {
+  const f = FP_BIG[type]; if (!f) return null;
+  const c = T.bl.map(id => S.B[id]).filter(B => B && B.type === 'house' && B.tier <= 3 && B.up == null && B.prog >= 1 && !fpBig(B) && fpRoom(B.x, B.y, f[0], f[1]));
+  if (!c.length) return null;
+  c.sort((a, b) => a.tier - b.tier || a.built - b.built);
+  const O = c[0], s = { x: O.x, y: O.y }; removeBuilding(O); return s;
 }
 function yearlyFootprints() { // finished landmarks spread onto their lot (and older worlds' landmarks catch up), a few a year
   let n = 0; for (const id in S.B) { const B = S.B[id]; if (FP_BIG[B.type] && !fpBig(B) && B.prog >= 1 && fpSettle(B) && ++n >= 3) break; }
@@ -517,7 +535,7 @@ function tryService(T) {
     if (sv.t === 'airfield' && wcount('airfield') >= Math.ceil(towns().length / 2)) continue;
     if (sv.t === 'lighthouse' && (!townHarbour(T) || anycount('lighthouse') >= 3)) continue;
     if (have >= want) continue;
-    const s = findSite(T, sv.site === 'shore' ? 'shore' : sv.site === 'ore' ? 'ore' : sv.site, 0, sv.t);
+    const s = findSite(T, sv.site === 'shore' ? 'shore' : sv.site === 'ore' ? 'ore' : sv.site, 0, sv.t) || landmarkSite(T, sv.t);
     if (!s) continue;
     const B = mkBuilding(sv.t, s.x, s.y, T, sv.t === 'dock' ? { dir: nearWaterDir(s.x, s.y) } : sv.t === 'harbor' ? { dir: harbourSite(s.x, s.y) } : sv.t === 'shops' ? { sub: shopKind() } : {});
     if (sv.t !== 'solar' && sv.t !== 'turbine') connectRoad(B);

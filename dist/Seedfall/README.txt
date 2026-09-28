@@ -218,6 +218,10 @@ HOW TOWNS LAY THEMSELVES OUT
   get hedges, bushes and a tree by the gate.
 
 QUARTERS, TERRACES AND REBUILDING
+  Some landmarks take more room once they're built: a town hall, museum or
+  theatre spreads over two plots, a university, stadium or fusion plant over
+  four (a small house or a field may make way). A full town with no plot left
+  for one clears an old cottage that has room round it.
   Nobody zones a Seedfall town but the town itself. Each one keeps a market
   quarter round its square, homes around that, a works quarter out on one edge
   once it has workshops (downwind of the houses, towards its raw materials and
@@ -243,7 +247,11 @@ BOATS, SHIPS AND PLANES
   across: a raft at first, later a proper ferry with a cabin. When a bridge
   makes it pointless, the old ferry retires.
   Bigger coastal towns build a harbour (from Masonry): a stone quay, a
-  warehouse and a crane that swings cargo on and off. Ships sail between
+  warehouse and a crane that swings cargo on and off. As the town grows, the
+  harbour grows along the shore (out over the shallows on piles where the coast
+  bends): a second quay, then a port with piers and a row of warehouses, then
+  container docks with gantry cranes. Each stretch of quay has its own berth,
+  so several ships can tie up at once. Ships sail between
   harbours, or off over the horizon and back: sailing ships, then steamers,
   freighters, container ships and finally hover-freighters. Towns with
   harbours can trade by sea even when no road joins them.

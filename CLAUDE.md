@@ -99,6 +99,7 @@ itself is covered by `glpick`, `glphone` and `soak`. Add `&2d` to a new test unl
 | `away` | Catch-up after time away: the 8 h and 250-year caps, the report card, the historian's letter (mocked). |
 | `zones` | Towns draw their quarters, works in the works quarter, houses off the greens, terraces that agree from both ends, redevelopment, shops, the Z view, tooltips, and an older save drawing its zones. |
 | `prayers` | Prayer words at three points in history: all well-formed (no `undefined`, lowercase sentence starts or overlong cards), 40+ different out of 60 per kind, early ones free of radios and seedships and late ones mentioning them. |
+| `lots` | Bigger lots: landmarks spreading onto 2×1/2×2 lots, harbours growing to several berths, ships at their own berths, every tile of a lot pointing at it, saves keeping lots, removal freeing them. `SHOTS=1` adds 3D pictures. |
 | `roads` | Road surfaces by era and material: dirt and gravel early, cobbles or bricks with Masonry, asphalt and concrete with Motorcars, glowlanes with Hovercraft, the market quarter keeping its cobbles, chronicle firsts, the tooltip, and an older save's roads converted. |
 | `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, kept worlds (new, switch, forget), a `?fresh` scratch tab saving nothing, and file:// staying cloud-free. Needs the root `npm install`. |
 
@@ -232,6 +233,14 @@ itself is covered by `glpick`, `glphone` and `soak`. Add `&2d` to a new test unl
 - **Roads.** `M.road` holds a surface (1 dirt, 2 gravel, 3 cobbles, 4 bricks, 5 asphalt, 6 concrete, 7 glowlane), not a tier. New roads go down as `laySurf()`; `paveTown` (every 3 months per town) upgrades a few tiles, centre first, paying `R_COST` from the town's stores (35% chance to go ahead anyway when short). Code that wants the old width/lamp/bridge tier uses `rcls(i)`. Saves from before (`S.roadV < 2`) are converted in `deserialize`.
 - **Zones.** `M.zone` is a saved map layer (older saves get zones drawn in `zonesOnLoad`). Zones are soft: `findSite(T, kind, extra, zt)` adds `zoneScore(zt, i)`, never filters, so pass the building type as `zt` from new callers. Redevelopment is rate-limited (one project per town every 4+ years, fields a bit faster); keep it that way or towns turn into permanent scaffolding.
 - **Houses and terraces.** `drawHouse` tints each house (`houseTint`) and rolls its extras from `hk(B, n)` (hashed from the id, so they're stable). Tier 3–5 houses on the same street join up (`houseJoin`: same axis `B.ax`, town, height of ground, not round styles) and are drawn by `drawRow` to the tile edge; data stays one building per tile. Anything that changes a house (`mkBuilding`, upgrade start, completion, `removeBuilding`) calls `houseNbrDirty` so the neighbours redraw. `casterDims` widens a joined house's shadow.
+- **Bigger lots.** A building can cover `B.w × B.h` tiles from `(B.x, B.y)` (sim.js, next to `mkBuilding`): every tile's `M.bld` points at it,
+  `fpTiles`/`fpFront`/`fpOff` give its tiles, the tile it's drawn from (nearest the viewer) and the shift to the lot's middle, and
+  `removeBuilding` frees them all. Only `mkBuilding`, `removeBuilding` and `fpGrow` write `M.bld`. Landmarks in `FP_BIG` spread once
+  built (`fpSettle`, a few a year in `yearlyFootprints`, so older worlds catch up) onto ground that gives way (`fpYield`: free, or a
+  house of tier ≤3, a field, a pasture); a full town clears an old cottage with room for the lot (`landmarkSite`). Harbours grow
+  along their shore (`yearlyHarbours`, `harbourLen` by population and era, over the shallows too) with a berth per tile
+  (`berths`, `berthTile`, ships keep `DYN.slot[bkey(B, k)]`). In 3D, `GL_BIG[type]` and `glHarbour` draw them; `glTraffic` draws ships,
+  fishing boats, ferries, trains and planes. `test/lots.mjs` checks all of it (`SHOTS=1` for pictures).
 - **Economy.** Building costs are paid per month of progress. With nothing in stock a building goes at
   35% speed; it never stops. Materials are chosen from local production. Trade needs a road (the wheel)
   or a harbour on both ends.
