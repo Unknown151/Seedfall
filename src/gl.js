@@ -5,7 +5,7 @@
 // and the purely 2D strokes (lines, circles, polygons) are skipped. Terrain, water, roads, trees, lamps and people
 // are built here. Lighting is per pixel, every frame: the sun (or moon) with a shadow map, sky and ground ambient,
 // lit windows at night, and street lamps as real point lights.
-const GL3 = { on: false, c: null, gl: null, chunks: [], dirty: new Set(), cam: { yaw: Math.PI / 4, pitch: .62, zoom: 14, tx: 32, ty: 0, tz: 32, auto: true }, lamps: [], hr: [null, 13, 18.6, 20.4, 23.5], hi: 0, drag: null, town: 0, t: 0 };
+const GL3 = { on: false, c: null, gl: null, chunks: [], dirty: new Set(), cam: { yaw: Math.PI / 4, pitch: .62, zoom: 14, tx: 32, ty: 0, tz: 32, auto: true, persp: true }, lamps: [], hr: [null, 13, 18.6, 20.4, 23.5], hi: 0, drag: null, town: 0, t: 0 };
 const GPID = 1 << 20, GCH = 8, GNC = W / GCH, ZS = 1 / 22; // chunk size in tiles; pixels of height to tile units
 let GLB = null; // the chunk being built: { v: floats, x, y, base (tile), tops: [[sx, sy, z]] }
 const GSTUB = new Proxy({}, { get: (t, k) => k in t ? t[k] : () => GRAD0, set: (t, k, v) => { t[k] = v; return true; } }), GRAD0 = { addColorStop() { } };
@@ -186,7 +186,7 @@ void main(){ vP=aP; vN=aN; vC=aC; vE=aE; vI=aI; vS=uSVP*vec4(aP+aN*.02,1.); gl_P
 const GL_FS = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vP, vN, vC; in float vE; in vec4 vS; flat in float vI; out vec4 o;
-uniform float uHi; uniform vec3 uSun, uSunC, uSky, uGnd, uWin, uLamp, uEye; uniform float uLit, uShK, uT;
+uniform float uHi, uFog0, uFogL; uniform vec3 uFogC; uniform vec3 uSun, uSunC, uSky, uGnd, uWin, uLamp, uEye; uniform float uLit, uShK, uT;
 uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64];
 float shadow(){ vec3 p=vS.xyz/vS.w*.5+.5; if(p.x<0.||p.x>1.||p.y<0.||p.y>1.) return 1.; float s=0.; vec2 d=vec2(1./2048.);
   for(int x=-1;x<=1;x++) for(int y=-1;y<=1;y++) s+=texture(uSh, vec3(p.xy+vec2(x,y)*d*1.2, p.z-.0015)); return s/9.; }
@@ -205,6 +205,7 @@ void main(){
   else if(vE>.45 && vE<.55 && uLit>0.) lit=mix(lit,uWin,.8*min(1.,uLit*2.));
   if(vE>1.5) lit=mix(c, uLamp*1.4, uLit>0.?1.:0.);
   if(uHi>0. && abs(vI-uHi)<.5) lit=mix(lit*1.2, vec3(1.,.84,.5), .28+.08*sin(uT*5.)); // what the pointer is on glows softly
+  if(uFogL>0.) lit=mix(lit, uFogC, clamp((length(vP-uEye)-uFog0)/uFogL,0.,.55)); // the far side of the valley fades into the sky
   lit=1.-exp(-lit*1.45); // a soft tone curve that keeps the colour
   float g=dot(lit,vec3(.299,.587,.114)); lit=clamp(mix(vec3(g),lit,1.18),0.,1.);
   o=vec4(lit,1.);
@@ -228,6 +229,7 @@ function glProg(gl, vs, fs) {
 
 /* ---------- matrices (column-major) ---------- */
 function m4mul(a, b) { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; }
+function m4persp(fy, a, n, f) { const o = new Float32Array(16), t = 1 / Math.tan(fy / 2); o[0] = t / a; o[5] = t; o[10] = (f + n) / (n - f); o[11] = -1; o[14] = 2 * f * n / (n - f); return o; }
 function m4ortho(l, r, b, t, n, f) { const o = new Float32Array(16); o[0] = 2 / (r - l); o[5] = 2 / (t - b); o[10] = -2 / (f - n); o[12] = -(r + l) / (r - l); o[13] = -(t + b) / (t - b); o[14] = -(f + n) / (f - n); o[15] = 1; return o; }
 function m4look(e, t, up) {
   let zx = e[0] - t[0], zy = e[1] - t[1], zz = e[2] - t[2], l = Math.hypot(zx, zy, zz); zx /= l; zy /= l; zz /= l;
@@ -276,7 +278,7 @@ function glInit() {
     }
     const d = GL3.drag; if (!d) return;
     if (!d[4] && Math.abs(e.clientX - d[0]) + Math.abs(e.clientY - d[1]) > (d[5] ? 10 : 4)) { d[4] = true; GL3.cam.auto = false; }
-    if (d[4]) { GL3.cam.yaw = d[2] - (e.clientX - d[0]) * .006; GL3.cam.pitch = clamp(d[3] + (e.clientY - d[1]) * .004, .2, 1.45); }
+    if (d[4]) { GL3.cam.yaw = d[2] - (e.clientX - d[0]) * .006; GL3.cam.pitch = clamp(d[3] + (e.clientY - d[1]) * .004, GL3.cam.persp ? .1 : .2, 1.45); }
   });
   const up = e => {
     P.delete(e.pointerId); if (P.size < 2) pinch = null;
@@ -291,11 +293,12 @@ function glInit() {
     const k = e.key.toLowerCase();
     if (k === 'r') GL3.cam.auto = !GL3.cam.auto;
     else if (k === 'n') { GL3.hi = (GL3.hi + 1) % GL3.hr.length; SF.hour(GL3.hr[GL3.hi]); toast(GL3.hr[GL3.hi] == null ? 'Time of day: live' : `Time of day: ${Math.floor(GL3.hr[GL3.hi])}:${String(Math.round(GL3.hr[GL3.hi] % 1 * 60)).padStart(2, '0')}`); }
+    else if (k === 'p') { GL3.cam.persp = !GL3.cam.persp; if (!GL3.cam.persp) GL3.cam.pitch = Math.max(.2, GL3.cam.pitch); toast(GL3.cam.persp ? 'Perspective view' : 'Isometric view'); }
     else if (k === 't') { GL3.town++; GL3.follow = null; GL3.goto = null; glFocusTown(); }
   });
   const hint = document.createElement('div'); hint.id = 'glHint';
   hint.style.cssText = 'position:fixed;right:16px;top:14px;max-width:430px;line-height:1.45;z-index:5;padding:8px 12px;border-radius:12px;background:rgba(255,251,245,.82);box-shadow:0 4px 18px rgba(60,40,60,.15);font:12.5px "Segoe UI",system-ui,sans-serif;color:#2b2833';
-  hint.innerHTML = (matchMedia('(pointer: coarse)').matches ? '<b>3D preview</b> · drag to turn · pinch to zoom · two fingers to move · tap anything to see what it is' : '<b>3D preview</b> (proof of concept) · drag to turn · wheel to zoom · <b>R</b> auto-rotate · <b>N</b> time of day · <b>T</b> next town · point at anything to see what it is, click a person to follow them') + ' <span id="glHideHint" style="cursor:pointer;opacity:.6">✕</span>';
+  hint.innerHTML = (matchMedia('(pointer: coarse)').matches ? '<b>3D preview</b> · drag to turn · pinch to zoom · two fingers to move · tap anything to see what it is' : '<b>3D preview</b> (proof of concept) · drag to turn · wheel to zoom · <b>R</b> auto-rotate · <b>N</b> time of day · <b>T</b> next town · <b>P</b> perspective or isometric · point at anything to see what it is, click a person to follow them') + ' <span id="glHideHint" style="cursor:pointer;opacity:.6">✕</span>';
   hint.querySelector('#glHideHint').onclick = () => hint.remove();
   if (innerWidth < 700) { hint.style.cssText += ';top:auto;right:12px;left:12px;bottom:150px;max-width:none;font-size:12px'; setTimeout(() => hint.remove(), 15000); } // phones: above the tool bar, and not for long
   document.body.appendChild(hint);
@@ -324,9 +327,11 @@ function glFrame(dt) {
   const sky = [lerp(.13, .36 + .06 * gold, day) * (1 + .3 * cover), lerp(.17, .41, day) * (1 + .3 * cover), lerp(.32, .52 - .08 * gold, day) * (1 + .3 * cover)], gnd = [lerp(.07, .27 + .05 * gold, day), lerp(.08, .25, day), lerp(.14, .23, day)];
   const lit = el > 6 ? 0 : clamp((6 - el) / 12, 0, .75);
   // cameras
-  const aspect = w / h, zz = cam.zoom, dir = [Math.cos(cam.pitch) * Math.sin(cam.yaw), Math.sin(cam.pitch), Math.cos(cam.pitch) * Math.cos(cam.yaw)];
-  const tgt = [cam.tx, cam.ty, cam.tz], eye = [tgt[0] + dir[0] * 90, tgt[1] + dir[1] * 90, tgt[2] + dir[2] * 90];
-  const VP = m4mul(m4ortho(-zz * aspect, zz * aspect, -zz, zz, 1, 220), m4look(eye, tgt, [0, 1, 0]));
+  const aspect = w / h, zz = cam.zoom; let dir = [Math.cos(cam.pitch) * Math.sin(cam.yaw), Math.sin(cam.pitch), Math.cos(cam.pitch) * Math.cos(cam.yaw)];
+  // perspective: a 38° lens backed off so the zoom still means "how much ground fits"; isometric: the flat lens of the 2D view
+  if (cam.persp) { const d0 = zz / Math.tan(19 * DEG); cam.pitch = Math.max(cam.pitch, Math.asin(Math.min(.95, 2.2 / d0))); dir[0] = Math.cos(cam.pitch) * Math.sin(cam.yaw); dir[1] = Math.sin(cam.pitch); dir[2] = Math.cos(cam.pitch) * Math.cos(cam.yaw); } // stay above the rooftops
+  const fov = 38 * DEG, dist = cam.persp ? zz / Math.tan(fov / 2) : 90, tgt = [cam.tx, cam.ty, cam.tz], eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
+  const VP = m4mul(cam.persp ? m4persp(fov, aspect, Math.max(.2, dist * .02), dist + 140) : m4ortho(-zz * aspect, zz * aspect, -zz, zz, 1, 220), m4look(eye, tgt, [0, 1, 0]));
   const sc = [32, 2, 32], se = [sc[0] + sd[0] * 80, sc[1] + sd[1] * 80, sc[2] + sd[2] * 80];
   const SVP = m4mul(m4ortho(-50, 50, -50, 50, 1, 180), m4look(se, sc, [0, 1, 0]));
   // lamps near the middle of the view light the streets
@@ -355,6 +360,7 @@ function glFrame(dt) {
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, GL3.shT); gl.uniform1i(U.uSh, 0);
   gl.uniform1i(U.uNL, lamps.length); if (lamps.length) gl.uniform3fv(U.uLP, new Float32Array(lamps.flat()));
   gl.uniform1f(U.uHi, GL3.hover || 0);
+  gl.uniform1f(U.uFog0, dist + zz * 1.2); gl.uniform1f(U.uFogL, cam.persp ? 60 : 0); gl.uniform3fv(U.uFogC, bg.map(v => -Math.log(1 - Math.min(.97, v)) / 1.45)); // (the haze colour, undone through the tone curve so it lands on the sky)
   drawAll(true);
   // what's under the pointer: the same scene again, each thing painted in its own id colour, read back one pixel
   if (GL3.pickReq && performance.now() - (GL3.pickT || 0) > 70 && UI.mouse.x >= 0) {
