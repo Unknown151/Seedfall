@@ -251,11 +251,12 @@ function glSmallTree(u, v, z, h, s, col) { // street, garden and park trees: a t
   glBlob(u, v, .15 * s, z + 7 * s, 3.4 * s, leafC(col)); glBlob(u + .05 * s, v - .04 * s, .1 * s, z + 9 * s, 2.4 * s, leafC(col));
 }
 function glTreeAt(cx, cy, u, v, h, s, col) { const lift = cy < 0 && !cx ? -cy : 0, [su, sv] = lift ? [0, 0] : gunscreen(cx, cy); glSmallTree(u + su, v + sv, lift, h, s, col); }
-function glSheep(X, Z, y0, s, ang) { // a woolly body, a black face and four legs, in world units
-  const ca = Math.cos(ang), sa = Math.sin(ang), u = X - GLB.x, v = Z - GLB.y, zz = (y0 - GLB.base) / ZS;
-  for (const [a, b] of [[-.03, -.018], [-.03, .018], [.03, -.018], [.03, .018]]) glBoxW(X + (a * ca - b * sa) * s, Z + (a * sa + b * ca) * s, .007 * s, y0, 1.1 * s * ZS, '#3a3430');
+function glSheep(X, Z, y0, s, ang, ph = -1) { // a woolly body, a black face and four legs, in world units; ph >= 0: walking
+  const f = [Math.cos(ang), 0, Math.sin(ang)], r = [-Math.sin(ang), 0, Math.cos(ang)], u = X - GLB.x, v = Z - GLB.y, zz = (y0 - GLB.base) / ZS;
+  for (const [a, b, q] of [[.03, .018, 0], [.03, -.018, Math.PI], [-.03, .018, Math.PI], [-.03, -.018, 0]]) glLimb([X + f[0] * a * s + r[0] * b * s, y0 + 1.1 * s * ZS, Z + f[2] * a * s + r[2] * b * s], f, r, ph >= 0 ? Math.sin(ph + q) * .45 : 0, 1.1 * s * ZS, .007 * s, '#3a3430');
+  const ca = f[0], sa = f[2];
   glBlob(u, v, .055 * s, zz + 2 * s, 1.1 * s, '#ece7da', 0); glBlob(u + .015 * ca * s, v + .015 * sa * s, .04 * s, zz + 2.7 * s, .7 * s, '#f6f3ec', 0);
-  glBlob(u + .062 * ca * s, v + .062 * sa * s, .02 * s, zz + 2.4 * s, .65 * s, '#3a3430', 0);
+  glBlob(u + .062 * ca * s, v + .062 * sa * s, .02 * s, zz + 2.4 * s + (ph >= 0 ? 0 : Math.sin(GL3.t * .7 + u * 9) * .4 - .3), .65 * s, '#3a3430', 0); // (grazing heads dip)
 }
 function glNbrs(k) { const a = k % GNC, b = (k / GNC) | 0, o = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && a + dx >= 0 && b + dy >= 0 && a + dx < GNC && b + dy < GNC) o.push((b + dy) * GNC + a + dx); return o; }
 function glEdge(k) { // a fingerprint of the chunk's height map near its edges
@@ -445,7 +446,7 @@ function glInit() {
     GL3.pickReq = !touchy(e); if (P.has(e.pointerId)) P.set(e.pointerId, [e.clientX, e.clientY]);
     if (pinch && P.size >= 2) { // zoom by the spread of the fingers, pan by where their middle goes
       const [a, b] = [...P.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-      GL3.cam.zoom = clamp(pinch.z * pinch.d / Math.max(20, d), 3, 44);
+      GL3.cam.zoom = clamp(pinch.z * pinch.d / Math.max(20, d), 1.2, 44);
       const k = GL3.cam.zoom * 2 / innerHeight, dx = (m[0] - pinch.m[0]) * k, dy = (m[1] - pinch.m[1]) * k / Math.sin(GL3.cam.pitch), cy = Math.cos(GL3.cam.yaw), sy = Math.sin(GL3.cam.yaw);
       GL3.cam.tx = pinch.tx - dx * cy - dy * sy; GL3.cam.tz = pinch.tz + dx * sy - dy * cy;
       return;
@@ -461,7 +462,7 @@ function glInit() {
   };
   c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
   c.addEventListener('pointerleave', e => { if (!touchy(e)) { GL3.hover = 0; $('tip').style.opacity = 0; } });
-  c.addEventListener('wheel', e => { GL3.cam.zoom = clamp(GL3.cam.zoom * Math.exp(e.deltaY * .001), 3, 44); e.preventDefault(); }, { passive: false });
+  c.addEventListener('wheel', e => { GL3.cam.zoom = clamp(GL3.cam.zoom * Math.exp(e.deltaY * .001), 1.2, 44); e.preventDefault(); }, { passive: false });
   addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     const k = e.key.toLowerCase();
@@ -481,7 +482,7 @@ function glInit() {
 }
 function glFocusTown() { const ts = towns().sort((a, b) => b.pop - a.pop); if (!ts.length) return; const T = ts[GL3.town % ts.length]; GL3.cam.tx = T.x; GL3.cam.tz = T.y; GL3.cam.ty = surfZ(idx(T.x, T.y)) * ZS; GL3.cam.zoom = clamp(townRadius(T) * .75 + 2.5, 5, 14); }
 function glFrame(dt) {
-  const gl = GL3.gl, c = GL3.c, cam = GL3.cam; GL3.t += dt;
+  const gl = GL3.gl, c = GL3.c, cam = GL3.cam; GL3.t += dt; GL3.dt = dt;
   LIGHT.sun = sunNow(); if (!LIGHT.season || (LIGHT.seasonT -= dt) <= 0) { LIGHT.season = LIGHT.forceSeason || seasonNow(); LIGHT.seasonT = 300; }
   stepWeather(dt); DIRTY.length = 0;
   const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
@@ -509,13 +510,17 @@ function glFrame(dt) {
   const aspect = w / h, zz = cam.zoom; let dir = [Math.cos(cam.pitch) * Math.sin(cam.yaw), Math.sin(cam.pitch), Math.cos(cam.pitch) * Math.cos(cam.yaw)];
   // perspective: a 38° lens backed off so the zoom still means "how much ground fits"; isometric: the flat lens of the 2D view
   if (cam.persp) { const d0 = zz / Math.tan(19 * DEG); cam.pitch = Math.max(cam.pitch, Math.asin(Math.min(.95, 2.2 / d0))); dir[0] = Math.cos(cam.pitch) * Math.sin(cam.yaw); dir[1] = Math.sin(cam.pitch); dir[2] = Math.cos(cam.pitch) * Math.cos(cam.yaw); } // stay above the rooftops
-  const fov = 38 * DEG, dist = cam.persp ? zz / Math.tan(fov / 2) : 90, tgt = [cam.tx, cam.ty, cam.tz], eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
+  const fov = 38 * DEG, dist = cam.persp ? zz / Math.tan(fov / 2) : 90, tgt = [cam.tx, cam.ty, cam.tz]; let eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
+  if (cam.persp) for (let k = 0; k < 24; k++) { // tall buildings: tip the camera up until neither it nor the middle of its view line is inside one
+    const g = Math.max(hfAt(eye[0], eye[2]) - eye[1], hfAt((eye[0] + tgt[0]) / 2, (eye[2] + tgt[2]) / 2) - (eye[1] + tgt[1]) / 2); if (g < -.35 || cam.pitch >= 1.45) break;
+    cam.pitch = Math.min(1.45, cam.pitch + .04); dir = [Math.cos(cam.pitch) * Math.sin(cam.yaw), Math.sin(cam.pitch), Math.cos(cam.pitch) * Math.cos(cam.yaw)]; eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
+  }
   const VP = m4mul(cam.persp ? m4persp(fov, aspect, Math.max(.2, dist * .02), dist + 520) : m4ortho(-zz * aspect, zz * aspect, -zz, zz, 1, 220), m4look(eye, tgt, [0, 1, 0]));
   const sc = [32, 2, 32], se = [sc[0] + sd[0] * 80, sc[1] + sd[1] * 80, sc[2] + sd[2] * 80];
   const SVP = m4mul(m4ortho(-50, 50, -50, 50, 1, 180), m4look(se, sc, [0, 1, 0]));
   // lamps near the middle of the view light the streets
-  const lamps = []; if (lit > 0) { for (const ch of GL3.chunks) for (const L of ch.lamps) lamps.push(L); lamps.sort((a, b) => Math.hypot(a[0] - tgt[0], a[2] - tgt[2]) - Math.hypot(b[0] - tgt[0], b[2] - tgt[2])); lamps.length = Math.min(64, lamps.length); }
-  const dyn = glPeople();
+  const dyn = glPeople(); // (first: the lanterns people carry are lights too)
+  const lamps = []; if (lit > 0) { for (const ch of GL3.chunks) for (const L of ch.lamps) lamps.push(L); for (const L of GL3.carry) lamps.push(L); lamps.sort((a, b) => Math.hypot(a[0] - tgt[0], a[2] - tgt[2]) - Math.hypot(b[0] - tgt[0], b[2] - tgt[2])); lamps.length = Math.min(64, lamps.length); }
   const attrs = full => { // full: everything the lit view needs; 1: position and id (picking); 0: position only (shadows)
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 52, 0);
     if (full === true) { for (const a of [1, 2, 3, 5, 6]) gl.enableVertexAttribArray(a); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 52, 12); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 52, 24); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 52, 36); gl.vertexAttribPointer(5, 1, gl.FLOAT, false, 52, 44); gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 52, 48); } else { gl.disableVertexAttribArray(5); gl.disableVertexAttribArray(6); }
@@ -594,18 +599,86 @@ function glClick(sx, sy) {
   }
   GL3.follow = null; GL3.goto = [x, surfZ(i) * ZS, y]; GL3.cam.auto = false;
 }
-// people and carts, as little figures, rebuilt every frame
+/* ---------- people, pets, carts and cars: little jointed figures, rebuilt every frame ---------- */
+// a box in world units, turned to face heading h: c is its middle, a/b/u its half-extents along forward/right/up (vectors)
+function glOBox(c, f, r, u, col, e = 0) {
+  const C = gcol(col), P = (i, j, k) => [c[0] + f[0] * i + r[0] * j + u[0] * k, c[1] + f[1] * i + r[1] * j + u[1] * k, c[2] + f[2] * i + r[2] * j + u[2] * k]; GLB.ctr = c;
+  gquad(P(-1, -1, 1), P(1, -1, 1), P(1, 1, 1), P(-1, 1, 1), C, e); gquad(P(-1, -1, -1), P(1, -1, -1), P(1, 1, -1), P(-1, 1, -1), C, e);
+  gquad(P(1, -1, -1), P(1, 1, -1), P(1, 1, 1), P(1, -1, 1), C, e); gquad(P(-1, -1, -1), P(-1, 1, -1), P(-1, 1, 1), P(-1, -1, 1), C, e);
+  gquad(P(-1, 1, -1), P(1, 1, -1), P(1, 1, 1), P(-1, 1, 1), C, e); gquad(P(-1, -1, -1), P(1, -1, -1), P(1, -1, 1), P(-1, -1, 1), C, e);
+}
+const V3 = (a, k) => [a[0] * k, a[1] * k, a[2] * k], VA = (...v) => v.reduce((o, a) => [o[0] + a[0], o[1] + a[1], o[2] + a[2]], [0, 0, 0]);
+// a limb hanging from a pivot, swung forward by angle a (radians) about the body's right axis
+function glLimb(pv, f, r, a, len, w, col, e = 0) {
+  const dn = VA(V3([0, -1, 0], Math.cos(a)), V3(f, Math.sin(a))), fw = VA(V3(f, Math.cos(a)), V3([0, 1, 0], Math.sin(a)));
+  glOBox(VA(pv, V3(dn, len / 2)), V3(fw, w), V3(r, w), V3(dn, -len / 2), col, e);
+  return VA(pv, V3(dn, len)); // where it ends (a hand, a foot)
+}
+function glHeading(o, dx, dy) { // turn smoothly towards the way they're going
+  if (dx || dy) { const t = Math.atan2(dy, dx); if (o._gh == null) o._gh = t; let d = t - o._gh; d = Math.atan2(Math.sin(d), Math.cos(d)); o._gh += d * Math.min(1, (GL3.dt || .016) * 9); }
+  return o._gh || 0;
+}
+function glPerson(o, X, Z, y0, h, moving, carryLamp) {
+  const s = o.kid ? .72 : 1, f = [Math.cos(h), 0, Math.sin(h)], r = [-Math.sin(h), 0, Math.cos(h)], ph = o.ph || 0;
+  const sw = moving ? Math.sin(ph) : 0, bob = moving ? Math.abs(Math.cos(ph)) * .007 * s : Math.sin(GL3.t * 1.6 + ph) * .0015; // a step's bob, or breathing
+  const hip = y0 + .105 * s + bob, sh = y0 + .21 * s + bob, B = (dx, dr, y) => [X + f[0] * dx + r[0] * dr, y, Z + f[2] * dx + r[2] * dr];
+  for (const sg of [1, -1]) glLimb(B(0, sg * .016 * s, hip), f, r, sw * sg * .55, .105 * s, .012 * s, o.pants || '#555'); // legs
+  glOBox(B(0, 0, (hip + sh) / 2 + .006 * s), V3(f, .02 * s), V3(r, .033 * s), [0, (sh - hip) / 2 + .01 * s, 0], o.col || '#e5874f'); // body
+  if (o.kind === 'founder') glOBox(B(.001, 0, hip + .045 * s), V3(f, .0205 * s), V3(r, .0335 * s), [0, .006 * s, 0], '#f2f0ea'); // the founder's sash
+  let hand = null;
+  for (const sg of [1, -1]) { const e = glLimb(B(0, sg * .043 * s, sh), f, r, -sw * sg * .45 + (carryLamp && sg > 0 ? .5 : 0), .095 * s, .0095 * s, sg > 0 ? o.col : shade(o.col || '#e5874f', .85)); if (sg > 0) hand = e; } // arms swing against the legs
+  glOBox(B(0, 0, sh + .012 * s), V3(f, .01 * s), V3(r, .01 * s), [0, .012 * s, 0], o.skin || '#e0b090'); // neck
+  const hy = sh + .045 * s, hc = B(0, 0, hy), u = hc[0], v = hc[2];
+  glBlob(u, v, .026 * s, hy / ZS, .6 * s, o.skin || '#e0b090', 0); // head
+  const hb = B(-.006 * s, 0, hy + .006 * s); glBlob(hb[0], hb[2], .0275 * s, (hy + .006 * s) / ZS, .5 * s, o.hair || '#5a3a28', 0); // hair, sitting back on the head
+  if (!o.kid && (o.hat || 1) < .22) { const era = S.era;
+    if (era <= 3) { glOBox([u, hy + .024 * s, v], V3(f, .046 * s), V3(r, .046 * s), [0, .003, 0], '#d8b86a'); glBlob(u, v, .026 * s, (hy + .026 * s) / ZS, .5 * s, '#caa458', 0); } // a straw hat
+    else if (era <= 6) { glBlob(u, v, .028 * s, (hy + .012 * s) / ZS, .55 * s, shade(o.pants || '#555', .8), 0); glOBox(B(.028 * s, 0, hy + .012 * s), V3(f, .014 * s), V3(r, .022 * s), [0, .002, 0], shade(o.pants || '#555', .8)); } } // a cap
+  if (carryLamp && hand) { glOBox([hand[0], hand[1] - .012, hand[2]], [.008, 0, 0], [0, 0, .008], [0, .012, 0], '#ffd08a', 2); GL3.carry.push([hand[0], hand[1], hand[2]]); } // a lantern
+  if (o.pet) { // the dog trots at their heel
+    const d = B(-.07, .05, y0), dph = ph * 1.35;
+    for (const [lf, lr, q] of [[.022, .012, 0], [.022, -.012, Math.PI], [-.022, .012, Math.PI], [-.022, -.012, 0]]) glLimb([d[0] + f[0] * lf + r[0] * lr, y0 + .028, d[2] + f[2] * lf + r[2] * lr], f, r, moving ? Math.sin(dph + q) * .6 : 0, .028, .005, '#7a5e46');
+    glOBox([d[0], y0 + .036, d[2]], V3(f, .032), V3(r, .012), [0, .011, 0], '#9a7a5c');
+    const hd = [d[0] + f[0] * .036, y0 + .052, d[2] + f[2] * .036]; glOBox(hd, V3(f, .012), V3(r, .01), [0, .01, 0], '#9a7a5c');
+    const tw = Math.sin(GL3.t * 9 + ph) * .4; glLimb([d[0] - f[0] * .03, y0 + .044, d[2] - f[2] * .03], V3(f, -1), r, -1.1 + tw, .025, .004, '#9a7a5c');
+  }
+}
+function glVehicle(c, X, Z, y0, h, moving) {
+  const f = [Math.cos(h), 0, Math.sin(h)], r = [-Math.sin(h), 0, Math.cos(h)], B = (dx, dr, y) => [X + f[0] * dx + r[0] * dr, y, Z + f[2] * dx + r[2] * dr], ph = (c.s || 0) * 22;
+  const wheel = (dx, dr, rad, col) => glOBox(B(dx, dr, y0 + rad), V3(f, rad), V3(r, .008), [0, rad, 0], col);
+  if (c.kind === 'cart') { // a farm cart and the horse that pulls it
+    for (const [dx, dr] of [[-.03, .045], [-.03, -.045]]) wheel(dx, dr, .03, '#5a4432');
+    glOBox(B(-.03, 0, y0 + .055), V3(f, .06), V3(r, .04), [0, .018, 0], '#9b7657'); glOBox(B(-.03, 0, y0 + .08), V3(f, .055), V3(r, .036), [0, .008, 0], '#8fa58a'); // with a load under a cloth
+    const hx = .12; for (const [lf, lr, q] of [[.035, .014, 0], [.035, -.014, Math.PI], [-.03, .014, Math.PI], [-.03, -.014, 0]]) glLimb(B(hx + lf, lr, y0 + .07), f, r, moving ? Math.sin(ph + q) * .5 : 0, .07, .007, '#5a3e2c');
+    glOBox(B(hx, 0, y0 + .085), V3(f, .052), V3(r, .02), [0, .02, 0], '#7a5238'); // body
+    glLimb(B(hx + .045, 0, y0 + .1), V3(f, -1), r, Math.PI * .8, .05, .012, '#7a5238'); // neck
+    glOBox(B(hx + .085, 0, y0 + .128), V3(f, .022), V3(r, .011), [0, .012, 0], '#6a4630'); // head
+    for (const sg of [1, -1]) glOBox(B(.045, sg * .02, y0 + .07), V3(f, .04), [0, .002, 0], V3(r, .002), '#6b5040'); // shafts
+    return;
+  }
+  if (c.kind === 'car') { const k = 1.6, S3 = (a, m) => V3(a, m * k); // cars are drawn a bit bigger than life, so they read next to the houses
+    for (const [dx, dr] of [[.045, .036], [.045, -.036], [-.045, .036], [-.045, -.036]]) glOBox(B(dx * k, dr * k, y0 + .017 * k), S3(f, .017), S3(r, .008), [0, .017 * k, 0], '#2a2c30');
+    glOBox(B(0, 0, y0 + .035 * k), S3(f, .075), S3(r, .036), [0, .018 * k, 0], c.col || '#c0392b');
+    glOBox(B(-.01 * k, 0, y0 + .064 * k), S3(f, .042), S3(r, .032), [0, .012 * k, 0], '#bcd3e0'); glOBox(B(-.01 * k, 0, y0 + .077 * k), S3(f, .04), S3(r, .033), [0, .002 * k, 0], c.col || '#c0392b');
+    if (GL3.litNow) for (const sg of [1, -1]) glOBox(B(.076 * k, sg * .022 * k, y0 + .038 * k), [.005, 0, 0], [0, 0, .005], [0, .005, 0], '#fff4d6', 2); // headlamps
+    return;
+  }
+  const hov = Math.sin(GL3.t * 2 + (c.s || 0)) * .006; // hover pods float
+  glOBox(B(0, 0, y0 + .09 + hov), V3(f, .07), V3(r, .04), [0, .02, 0], '#f4f6f8'); glOBox(B(0, 0, y0 + .065 + hov), V3(f, .05), V3(r, .03), [0, .004, 0], '#7fe8e0', 2);
+}
 function glPeople() {
-  const v = []; GLB = { v, x: 0, y: 0, base: 0, tops: [], id: 0, mat: 0, wall: 0 };
+  const v = []; GLB = { v, x: 0, y: 0, base: 0, tops: [], id: 0, mat: 0, wall: 0 }; GL3.carry = [];
+  const night = LIGHT.emK > .02; GL3.litNow = night;
   try {
     for (let k = 0; k < DYN.walkers.length; k++) {
       const w = DYN.walkers[k], p = walkerPos(w); if (!p || p[3] < .3) continue; GLB.id = w.pid ? GPID + k : 0; // a person you can point at
-      const X = p[0], Z = p[1], y0 = p[2] * ZS, s = w.kid ? .7 : 1; GLB.ao = .35 + .65 * aoAt(X, y0 + .15, Z, 0, 1, 0); // darker down an alley
-      glBoxW(X, Z, .035 * s, y0, 3.2 * s * ZS, w.pants || '#555'); glBoxW(X, Z, .045 * s, y0 + 3.2 * s * ZS, 3 * s * ZS, w.col || '#e5874f'); glBoxW(X, Z, .035 * s, y0 + 6.2 * s * ZS, 1.8 * s * ZS, w.skin || '#e0b090');
+      const X = p[0], Z = p[1], y0 = p[2] * ZS; GLB.ao = .35 + .65 * aoAt(X, y0 + .15, Z, 0, 1, 0); // darker down an alley
+      glPerson(w, X, Z, y0, glHeading(w, p[4], p[5]), !!p[6], night && w.ln < (S.era === 0 ? .6 : .12));
     }
-    GLB.id = 0; for (const h of DYN.herds) for (const m of h.members) { const [fx, fy, z] = agentPos(m), bx = m.b % W - m.a % W, by = ((m.b / W) | 0) - ((m.a / W) | 0); glSheep(fx, fy, z * ZS, (m.size || 1) * (m.baby ? .6 : 1), bx || by ? Math.atan2(by, bx) : m.a); }
-    for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; GLB.ao = .35 + .65 * aoAt(p[0], p[2] * ZS + .15, p[1], 0, 1, 0); glBoxW(p[0], p[1], .09, p[2] * ZS, 4 * ZS, c.col || '#c0392b'); glBoxW(p[0], p[1], .06, p[2] * ZS + 4 * ZS, 2.2 * ZS, '#dfe7ef'); }
-  } catch (e) { } finally { GLB = null; }
+    GLB.id = 0; GLB.ao = 1;
+    for (const hd of DYN.herds) for (const m of hd.members) { const [fx, fy, z] = agentPos(m), bx = m.b % W - m.a % W, by = ((m.b / W) | 0) - ((m.a / W) | 0); glSheep(fx, fy, z * ZS, (m.size || 1) * (m.baby ? .6 : 1), glHeading(m, bx, by), m.pause > 0 ? -1 : DYN.t * 3 + (m.a % 7)); }
+    for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; GLB.ao = .35 + .65 * aoAt(p[0], p[2] * ZS + .15, p[1], 0, 1, 0); glVehicle(c, p[0], p[1], p[2] * ZS, glHeading(c, p[4], p[5]), true); }
+  } catch (e) { if (QS.has('dev')) console.error(e); } finally { GLB = null; }
   return new Float32Array(v);
 }
 
