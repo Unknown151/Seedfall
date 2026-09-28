@@ -78,7 +78,7 @@ newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chrom
 `Math.random`), so ±10–15% in population between runs is noise.
 
 Pages open in **3D** by default, and headless Chromium draws 3D in software at about 1 fps, which starves clicks and
-slow catch-ups. Tests of the sim and the panels (`hover`, `needs`, `away`, `faith1`) therefore add `&2d`; the 3D view
+slow catch-ups. Tests of the sim, the panels and saves (`hover`, `needs`, `away`, `faith1`, `flow`, `streetmig`, `cloud`) therefore use 2D; the 3D view
 itself is covered by `glpick`, `glphone` and `soak`. Add `&2d` to a new test unless it is about the 3D view.
 
 **Regression tests:**
