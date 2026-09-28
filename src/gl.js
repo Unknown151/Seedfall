@@ -38,7 +38,7 @@ function gunscreen(X, Y) { const a = X / 16, b = Y / 8; return [(a + b) / 2, (b 
 function glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top) {
   if (dsRound()) { const [X, Y] = pt(cx, cy, u0, v0, 0); return glCyl(X, Y, Math.max(hw, hd) * 1.08, z0, h, col, top); }
   const c = gcol(col), ct = top ? gcol(top) : c, P = (u, v, z) => gw(u0 + u, v0 + v, z, cx, cy), z1 = z0 + h; GLB.ctr = P(0, 0, z0 + h / 2);
-  GLB.mat = 0; gquad(P(-hw, -hd, z1), P(-hw, hd, z1), P(hw, hd, z1), P(hw, -hd, z1), ct); GLB.mat = GLB.wall || 0;
+  GLB.mat = GLB.wall && z1 > 6 ? M_TAR : 0; gquad(P(-hw, -hd, z1), P(-hw, hd, z1), P(hw, hd, z1), P(hw, -hd, z1), ct); GLB.mat = GLB.wall || 0;
   gquad(P(-hw, hd, z0), P(hw, hd, z0), P(hw, hd, z1), P(-hw, hd, z1), c);
   gquad(P(hw, hd, z0), P(hw, -hd, z0), P(hw, -hd, z1), P(hw, hd, z1), c);
   gquad(P(hw, -hd, z0), P(-hw, -hd, z0), P(-hw, -hd, z1), P(hw, -hd, z1), c);
@@ -46,7 +46,8 @@ function glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top) {
   const [sx, sy] = pt(cx, cy, u0, v0, 0); GLB.tops.push([sx, sy, z1]);
 }
 function glFlat(cx, cy, u0, v0, hw, hd, z, col) {
-  GLB.mat = 0;
+  GLB.mat = GLB.flat === 'farm' ? (col === '#bd8f68' ? M_SOIL : M_CROP) : GLB.flat === 'green' ? M_GRASS : GLB.flat === 'paved' ? M_STONE : 0;
+  if (GLB.mat === M_CROP && hd < .1 || GLB.mat === M_CROP && hw < .1) { const sv = GLB.wall; GLB.wall = M_CROP; glBox(cx, cy, u0, v0, hw < .1 ? hw * .75 : hw, hd < .1 ? hd * .75 : hd, 0, z + .9, col); GLB.wall = sv; return; } // a crop row stands up
   const c = gcol(col), P = (u, v) => gw(u0 + u, v0 + v, z + .25, cx, cy); GLB.ctr = gw(u0, v0, z - 20, cx, cy);
   gquad(P(-hw, -hd), P(-hw, hd), P(hw, hd), P(hw, -hd), c);
 }
@@ -123,7 +124,7 @@ function glBuildChunk(k) {
     for (let y = cy0; y < cy0 + GCH; y++) for (let x = cx0; x < cx0 + GCH; x++) {
       const i = idx(x, y), h = GT(i);
       GLB = { v, x, y, base: surfZ(i) * ZS, tops: [], id: i + 1, wall: 0, mat: 0 };
-      const bio = M.bio[i], gmat = M.water[i] ? 0 : bio === BIO.MEADOW || bio === BIO.LUSH ? M_GRASS : bio === BIO.ROCK || bio === BIO.SNOW ? M_STONE : bio === BIO.SAND ? 0 : M_EARTH;
+      const bio = M.bio[i], gmat = M.water[i] ? 0 : bio === BIO.MEADOW || bio === BIO.LUSH ? M_GRASS : bio === BIO.ROCK || bio === BIO.SNOW ? M_STONE : bio === BIO.SAND ? M_SAND : M_EARTH;
       // ground
       const top = gcol(topColor(i)), sc = gcol(sideCol(i));
       GLB.ctr = [x, h - 1, y]; GLB.mat = gmat; gquad([x - .5, h, y - .5], [x - .5, h, y + .5], [x + .5, h, y + .5], [x + .5, h, y - .5], top, M.water[i] ? -1 : 0);
@@ -143,7 +144,7 @@ function glBuildChunk(k) {
       { const Bw = M.bld[i] && S.B[M.bld[i]]; GLB.wall = Bw ? glWallMat(Bw) : M_PLANK; } // walls by what the building is made of; street furniture is wooden
       try { drawTileObjects(GSTUB, i, x, y, 0, 0); } catch (e) { }
       const B = M.bld[i] && S.B[M.bld[i]];
-      if (B && !B.hid && FLAT_TYPES[B.type]) try { drawBuilding(GSTUB, B, 0, 0, i); } catch (e) { }
+      if (B && !B.hid && FLAT_TYPES[B.type]) { GLB.flat = B.type === 'farm' ? 'farm' : B.type === 'park' || B.type === 'pasture' ? 'green' : B.type === 'plaza' || B.type === 'airfield' ? 'paved' : ''; try { drawBuilding(GSTUB, B, 0, 0, i); } catch (e) { } GLB.flat = ''; }
     }
   } finally { GLB = null; LT = svLT; EMQ = svEM; }
   return { v: new Float32Array(v), lamps };
@@ -172,17 +173,43 @@ function glRoad(i, x, y) {
   GLB.mat = 0; if (sf === R_ASPHALT && !br) for (const [dx, dy] of nb) seg(dx ? (dx > 0 ? .12 : -.38) : -.012, dx ? (dx > 0 ? .38 : -.12) : .012, dy ? (dy > 0 ? .12 : -.38) : -.012, dy ? (dy > 0 ? .38 : -.12) : .012, gcol('#f3e2a8'), h + .002);
   if (sf === R_GLOW && !br) for (const [dx, dy] of nb) seg(dx ? Math.min(0, dx * .5) : -.015, dx ? Math.max(0, dx * .5) : .015, dy ? Math.min(0, dy * .5) : -.015, dy ? Math.max(0, dy * .5) : .015, gcol('#8fe3ec'), h + .003);
 }
-const G_PUFF = ['#a57ac6', '#b683c9', '#9570c2', '#c48ac4', '#8f79cf'];
+const G_PUFF = ['#5f8f45', '#6a9a4a', '#557f3f', '#739f52', '#4f7f3c']; // oak greens
 function glTrees(i, x, y) {
   const n = M.tree[i], tt = M.ttype[i], b = GT(i);
   for (let k = 0; k < n; k++) {
     let u = (hash2(x, y, k * 3 + 1) - .5) * .6, v = (hash2(x, y, k * 3 + 2) - .5) * .6; if (n === 1) { u *= .4; v *= .4; }
     const s = .8 + hash2(x, y, k * 3 + 3) * .45, hv = hash2(x, y, 90 + k), X = x + u, Z = y + v;
-    if (tt === 2) { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 4 * s * ZS, '#6b5a55'); GLB.mat = M_LEAF; const c = gcol(leafC(hv < .5 ? '#4f9f95' : '#3f8f8a')); const A = [X, b + 18 * s * ZS, Z]; GLB.ctr = [X, b, Z]; for (let j = 0; j < 8; j++) { const a0 = j / 8 * TAU, a1 = (j + 1) / 8 * TAU, r = .2 * s; gtri([X + Math.cos(a0) * r, b + 3 * s * ZS, Z + Math.sin(a0) * r], [X + Math.cos(a1) * r, b + 3 * s * ZS, Z + Math.sin(a1) * r], A, c); } }
-    else if (tt === 3) { GLB.mat = 0; glBoxW(X, Z, .03 * s, b, 5 * s * ZS, '#efe6dc'); GLB.base = b; glDomeAt(X - GLB.x, Z - GLB.y, .2 * s, 5 * s, 4 * s, ['#ee92b6', '#f0a860', '#b9a2ff'][(hv * 3) | 0]); }
-    else { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 7 * s * ZS, tt === 4 ? '#7b5e4e' : '#7b5e6e'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .2 * s, 10 * s, 4.6 * s, leafC(tt === 4 ? '#6db873' : G_PUFF[(hv * G_PUFF.length) | 0]), 0, M_LEAF); }
+    if (tt === 2) { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 4 * s * ZS, '#6b5a55'); GLB.mat = M_LEAF; const c = gcol(leafC(hv < .5 ? '#3f6f4a' : '#35604a')); const A = [X, b + 18 * s * ZS, Z]; GLB.ctr = [X, b, Z]; for (let j = 0; j < 8; j++) { const a0 = j / 8 * TAU, a1 = (j + 1) / 8 * TAU, r = .2 * s; gtri([X + Math.cos(a0) * r, b + 3 * s * ZS, Z + Math.sin(a0) * r], [X + Math.cos(a1) * r, b + 3 * s * ZS, Z + Math.sin(a1) * r], A, c); } }
+    else if (tt === 3) { GLB.mat = 0; glBoxW(X, Z, .022 * s, b, 12 * s * ZS, '#ece8df'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .14 * s, 13 * s, 5.5 * s, leafC(hv < .5 ? '#8fb35a' : '#9dbb62'), 0, M_LEAF); } // birch
+    else { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 7 * s * ZS, tt === 4 ? '#7b5e4e' : '#6b5040'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .2 * s, 10 * s, 4.6 * s, leafC(tt === 4 ? '#6db873' : G_PUFF[(hv * G_PUFF.length) | 0]), 0, M_LEAF); }
   }
   GLB.base = surfZ(i) * ZS;
+}
+/* ---------- foliage and small life: the 2D streetscape's tufts, flowers, bushes and trees, in 3D ---------- */
+// small things drawn at a screen point; a negative cy with no cx is art lifting them onto a roof
+function glAt(X, Y) { for (const [sx, sy, z] of GLB.tops) if (Math.abs(sx - X) < .7 && Math.abs(sy - z - Y) < 1.6) return [...gunscreen(sx, sy), z]; return [...gunscreen(X, Y), 0]; }
+function glBlob(u, v, r, zc, rz, col, mat = M_LEAF) { // a low-poly ball (bushes, flowers, sheep)
+  const c = gcol(col), n = 7, P = (a, t) => gw(u + Math.cos(a) * r * Math.cos(t), v + Math.sin(a) * r * Math.cos(t), zc + rz * Math.sin(t)); GLB.ctr = gw(u, v, zc); GLB.mat = mat;
+  for (let j = -2; j < 2; j++) { const t0 = j / 2 * Math.PI / 2, t1 = (j + 1) / 2 * Math.PI / 2; for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gquad(P(a, t0), P(b, t0), P(b, t1), P(a, t1), c); } }
+}
+function glTuft(X, Y, col) { // a clump of grass blades
+  const [u, v, z] = glAt(X, Y), c = gcol(mix(col, '#3f6f35', .35)), h0 = hash2((u * 97) | 0, (v * 89) | 0, 7); GLB.mat = 0; GLB.ctr = gw(u, v, z - 5);
+  for (let k = 0; k < 6; k++) { const a = (h0 + k / 6) * TAU, du = Math.cos(a) * .012, dv = Math.sin(a) * .012, ou = Math.cos(a * 3) * .03, ov = Math.sin(a * 3) * .03; gtri(gw(u + ou - dv, v + ov + du, z), gw(u + ou + dv, v + ov - du, z), gw(u + ou * 1.8, v + ov * 1.8, z + 1.2 + (k % 3) * .35), c); }
+}
+function glFlowers(X, Y, h) { // a clump of stems and blooms
+  const [u, v, z] = glAt(X, Y); GLB.mat = 0;
+  for (let k = 0; k < 3; k++) { const du = (k - 1) * .05, dv = ((k % 2) - .5) * .05; glBoxW(GLB.x + u + du, GLB.y + v + dv, .006, GLB.base + z * ZS, 1.4 * ZS, '#4f8a45'); glBlob(u + du, v + dv, .022, z + 1.6, .6, FLOWERS[(((h * 17) | 0) + k) % FLOWERS.length], 0); }
+}
+function glSmallTree(u, v, z, h, s, col) { // street, garden and park trees: a trunk and a leafy crown
+  GLB.mat = M_BARK; glBoxW(GLB.x + u, GLB.y + v, .022 * s, GLB.base + z * ZS, 5 * s * ZS, '#6b5040');
+  glBlob(u, v, .15 * s, z + 7 * s, 3.4 * s, leafC(col)); glBlob(u + .05 * s, v - .04 * s, .1 * s, z + 9 * s, 2.4 * s, leafC(col));
+}
+function glTreeAt(cx, cy, u, v, h, s, col) { const lift = cy < 0 && !cx ? -cy : 0, [su, sv] = lift ? [0, 0] : gunscreen(cx, cy); glSmallTree(u + su, v + sv, lift, h, s, col); }
+function glSheep(X, Z, y0, s, ang) { // a woolly body, a black face and four legs, in world units
+  const ca = Math.cos(ang), sa = Math.sin(ang), u = X - GLB.x, v = Z - GLB.y, zz = (y0 - GLB.base) / ZS;
+  for (const [a, b] of [[-.03, -.018], [-.03, .018], [.03, -.018], [.03, .018]]) glBoxW(X + (a * ca - b * sa) * s, Z + (a * sa + b * ca) * s, .007 * s, y0, 1.1 * s * ZS, '#3a3430');
+  glBlob(u, v, .055 * s, zz + 2 * s, 1.1 * s, '#ece7da', 0); glBlob(u + .015 * ca * s, v + .015 * sa * s, .04 * s, zz + 2.7 * s, .7 * s, '#f6f3ec', 0);
+  glBlob(u + .062 * ca * s, v + .062 * sa * s, .02 * s, zz + 2.4 * s, .65 * s, '#3a3430', 0);
 }
 function glDirty(i) { const x = i % W, y = (i / W) | 0; for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (inb(nx, ny)) GL3.dirty.add(((ny / GCH) | 0) * GNC + ((nx / GCH) | 0)); } }
 
@@ -194,7 +221,7 @@ void main(){ vP=aP; vN=aN; vC=aC; vE=aE; vI=aI; vM=aM; vS=uSVP*vec4(aP+aN*.02,1.
 const GL_FS = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vP, vN, vC; in float vE; in vec4 vS; flat in float vI, vM; out vec4 o;
-uniform highp sampler2DArray uTex; uniform vec3 uAvg[13]; uniform float uTS[13], uRaw[13];
+uniform highp sampler2DArray uTex; uniform vec3 uAvg[18]; uniform float uTS[18], uRaw[18];
 uniform float uHi, uFog0, uFogL; uniform vec3 uFogC; uniform vec3 uSun, uSunC, uSky, uGnd, uWin, uLamp, uEye; uniform float uLit, uShK, uT;
 uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64];
 float shadow(){ vec3 p=vS.xyz/vS.w*.5+.5; if(p.x<0.||p.x>1.||p.y<0.||p.y>1.) return 1.; float s=0.; vec2 d=vec2(1./2048.);
@@ -207,8 +234,10 @@ void main(){
     vec3 t=texture(uTex, vec3(uv*uTS[m], float(m))).rgb;
     c=mix(c*t/uAvg[m], t, uRaw[m]);
   }
-  if(vE<-.5){ // water: a touch of shine
-    vec3 v=normalize(uEye-vP), h=normalize(uSun+v); c=mix(c, vec3(1.), .12*pow(max(dot(vec3(0,1,0),h),0.),60.)*uShK*4.); n=vec3(0,1,0); }
+  if(vE<-.5 && n.y>.5){ // water: ripples that move, a deeper colour, and the sun's glint
+    vec2 q=vP.xz; n=normalize(vec3(sin(q.x*9.+uT*1.3)*.06+sin(q.y*13.7-uT*1.7)*.04+sin((q.x+q.y)*21.-uT*2.3)*.025, 1., cos(q.y*8.3+uT*1.1)*.06+cos((q.x-q.y)*17.+uT*1.9)*.03));
+    vec3 v=normalize(uEye-vP), h=normalize(uSun+v); float sp=pow(max(dot(n,h),0.),120.);
+    c=mix(c*vec3(.72,.86,.92), vec3(.8,.9,.95), .25*(1.-max(dot(n,v),0.))); c+=vec3(1.,.95,.85)*sp*2.2*uShK; }
   float nd=max(dot(n,uSun),0.), sh=mix(1., shadow(), uShK);
   vec3 amb=mix(uGnd,uSky,n.y*.5+.5);
   vec3 bounce=uSunC*.22*max(dot(n,normalize(vec3(-uSun.x,.35,-uSun.z))),0.); // light thrown back off the sunny side of things
@@ -437,7 +466,8 @@ function glPeople() {
       const X = p[0], Z = p[1], y0 = p[2] * ZS, s = w.kid ? .7 : 1;
       glBoxW(X, Z, .035 * s, y0, 3.2 * s * ZS, w.pants || '#555'); glBoxW(X, Z, .045 * s, y0 + 3.2 * s * ZS, 3 * s * ZS, w.col || '#e5874f'); glBoxW(X, Z, .035 * s, y0 + 6.2 * s * ZS, 1.8 * s * ZS, w.skin || '#e0b090');
     }
-    GLB.id = 0; for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; glBoxW(p[0], p[1], .09, p[2] * ZS, 4 * ZS, c.col || '#c0392b'); glBoxW(p[0], p[1], .06, p[2] * ZS + 4 * ZS, 2.2 * ZS, '#dfe7ef'); }
+    GLB.id = 0; for (const h of DYN.herds) for (const m of h.members) { const [fx, fy, z] = agentPos(m), bx = m.b % W - m.a % W, by = ((m.b / W) | 0) - ((m.a / W) | 0); glSheep(fx, fy, z * ZS, (m.size || 1) * (m.baby ? .6 : 1), bx || by ? Math.atan2(by, bx) : m.a); }
+    for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; glBoxW(p[0], p[1], .09, p[2] * ZS, 4 * ZS, c.col || '#c0392b'); glBoxW(p[0], p[1], .06, p[2] * ZS + 4 * ZS, 2.2 * ZS, '#dfe7ef'); }
   } catch (e) { } finally { GLB = null; }
   return new Float32Array(v);
 }
@@ -462,8 +492,8 @@ function glBtn() {
 // Materials: 0 none, 1 grass, 2 brick, 3 roof tiles, 4 bark, 5 leaves, 6 plaster, 7 stone, 8 planks, 9 cobbles, 10 asphalt, 11 earth.
 // The shader lays them on by world position (triplanar), so nothing needs unwrapping. RAW is how much of the texture's own
 // colour replaces the art's colour (grass and bark look real; plaster keeps the building's own colour and only gains grain).
-const TX = { N: 256, L: 13, SCALE: [1, .5, 1.8, 1.6, 3.5, 2.2, 1.2, 1.4, 2, 1.6, .7, .6, 1.8], RAW: [0, .85, .55, .4, .9, .7, 0, .35, .45, .55, .7, .7, .3] };
-const M_SLATE = 12, M_GRASS = 1, M_BRICK = 2, M_ROOF = 3, M_BARK = 4, M_LEAF = 5, M_PLASTER = 6, M_STONE = 7, M_PLANK = 8, M_COBBLE = 9, M_ASPHALT = 10, M_EARTH = 11;
+const TX = { N: 256, L: 18, SCALE: [1, .5, 1.8, 1.6, 3.5, 2.2, 1.2, 1.4, 2, 1.6, .7, .6, 1.8, 1, 2.2, .6, 1.2, 1.4], RAW: [0, .85, .55, .4, .9, .7, 0, .35, .45, .55, .7, .7, .3, .75, .35, .7, .5, .25] };
+const M_SOIL = 13, M_CROP = 14, M_SAND = 15, M_TAR = 16, M_GLASS = 17, M_SLATE = 12, M_GRASS = 1, M_BRICK = 2, M_ROOF = 3, M_BARK = 4, M_LEAF = 5, M_PLASTER = 6, M_STONE = 7, M_PLANK = 8, M_COBBLE = 9, M_ASPHALT = 10, M_EARTH = 11;
 function glTextures() {
   const N = TX.N, L = TX.L, out = new Uint8Array(N * N * 4 * L), avg = new Float32Array(L * 3);
   const rng = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296, R = rng(7);
@@ -515,8 +545,13 @@ function glTextures() {
   { const sn = nz(141, 64), sh = [...Array(600)].map(() => R()); // slates: overlapping grey rectangles
     put(M_SLATE, (x, y) => { const r = Math.floor(y / 14), off = r % 2 ? 9 : 0, c = Math.floor((x + off) / 18), sx = (x + off) % 18, sy = y % 14, h = sh[(r * 23 + c) % 600];
       if (sx < 1 || sy < 1.2) return [40, 42, 48]; return mx([78, 82, 92], [118, 122, 132], h).map(v => v * (.86 + sn(x, y) * .22) * (.8 + .2 * sy / 14)); }); }
+  { const sn = fbm(151, 3), sg = nz(152, 128); put(M_SOIL, (x, y) => { const f = Math.sin(y / N * 32 * Math.PI) * .5 + .5; return mx([96, 70, 48], [140, 106, 76], sn(x, y) * .6 + f * .4).map(v => v * (.85 + sg(x, y) * .25) * (.8 + .2 * f)); }); } // ploughed furrows
+  { const cn = nz(161, 64); put(M_CROP, (x, y) => [150, 140, 90].map(v => v * (.8 + cn(x, y) * .3)), () => { for (let k = 0; k < 3200; k++) { const x = R() * N, y = R() * N, l = 3 + R() * 5, v = R(); wrap(() => { g.strokeStyle = `rgba(${90 + v * 120},${80 + v * 110},${40 + v * 50},.6)`; g.lineWidth = .9; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (R() - .5) * 2, y - l); g.stroke(); }); } }); } // standing stalks
+  { const sn = fbm(171, 4), sg = nz(172, 128); put(M_SAND, (x, y) => mx([206, 186, 144], [232, 216, 178], sn(x, y)).map(v => v * (.9 + sg(x, y) * .15 + (R() - .5) * .06))); }
+  { const tn = nz(181, 128); put(M_TAR, (x, y) => { const v = .8 + tn(x, y) * .3 + (R() - .5) * .18; return [120, 118, 112].map(q => q * v); }); } // gravel and tar on flat roofs
+  { const gn = fbm(191, 2); put(M_GLASS, (x, y) => { const px = x % 32, py = y % 42, frame = px < 3 || py < 3; if (frame) return [150, 156, 164]; const sky = gn(x, y), v = .7 + .5 * sky + (py / 42) * .15; return [110 * v, 150 * v, 180 * v]; }); } // curtain wall panes
   return { data: out, avg };
 }
 // what a building's walls are made of
-function glWallMat(B) { if (!B) return M_PLASTER; if (B.mat === 'brick') return M_BRICK; if (B.mat === 'stone') return M_STONE; if (B.mat === 'wood') return M_PLANK; if (B.type === 'house' && B.tier >= 6) return 0; return M_PLASTER; }
+function glWallMat(B) { if (!B) return M_PLASTER; if (B.type === 'house' && B.tier >= 6) return M_GLASS; if (B.mat === 'brick') return M_BRICK; if (B.mat === 'stone') return M_STONE; if (B.mat === 'wood') return M_PLANK; return M_PLASTER; }
 const ROAD_MAT = [0, M_EARTH, M_EARTH, M_COBBLE, M_BRICK, M_ASPHALT, M_PLASTER, 0];

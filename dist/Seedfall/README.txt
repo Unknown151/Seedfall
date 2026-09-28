@@ -125,7 +125,7 @@ WHAT THE TOWNS ARE BUILT FROM
   forest edge, quarries in rocky ground, clay pits on riverbanks and sandy
   shores, mines on ore, and workshops and works for goods. Building draws the
   stores down again.
-  Two small chains came later. Mossbacks are fenced into pastures and their
+  Two small chains came later. Sheep are fenced into pastures and their
   wool is spun at home, but a weaving house turns it into real cloth (from
   Loomcraft): houses and markets are fitted out with it. Sand pits on the
   dunes feed a glassworks (from Masonry), and glass goes into windows,
