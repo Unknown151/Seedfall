@@ -2,7 +2,7 @@ import { launch, ROOT, HTTP } from './env.mjs';
 const b = await launch();
 const p = await b.newPage({viewport:{width:1920,height:1080}});
 const errs=[]; p.on('pageerror', e=>errs.push('PAGEERR '+e.message+' '+(e.stack||'').split('\n').slice(0,3).join(' | ')));
-await p.goto(ROOT+'seedfall.html?seed=4242&fresh&nointro');
+await p.goto(ROOT+'seedfall.html?seed=4242&fresh&nointro&2d'); // (the 2D view's tooltips; the 3D ones are glpick's)
 await p.waitForTimeout(800);
 await p.evaluate(()=>{ SF.hour(13); SF.ff(320); SF.state().settings.captions=false; const T=biggestTown(); focusOn(T.x,T.y,2.2,999); });
 await p.waitForTimeout(6000);

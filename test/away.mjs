@@ -14,7 +14,7 @@ const away = async (ms, pace = 'normal') => {
   return { y0, y1: await p.evaluate(() => yr()), shown: await p.isVisible('#away.show'), when: await p.textContent('#awayWhen') };
 };
 
-await p.goto(ROOT + 'seedfall.html?seed=4242&fresh&nointro');
+await p.goto(ROOT + 'seedfall.html?seed=4242&fresh&nointro&2d'); // (catch-up is the same in both views; 3D is glpick's)
 await p.waitForTimeout(800);
 await p.evaluate(() => { SF.ff(300); SF.weather('clear', 9999); SF.hour(13); });
 await p.waitForTimeout(500);

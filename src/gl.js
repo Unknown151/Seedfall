@@ -1,4 +1,4 @@
-/* ============================== ?gl: a proof of concept of the world in real 3D (WebGL2) ============================== */
+/* ============================== the world in real 3D (WebGL2): the default view; ?2d or the switch gives the flat one ============================== */
 // Opened with ?gl, the world is drawn as real 3D geometry instead of the 2D isometric canvas. The sim, UI and saves
 // are untouched. The building art is reused as it is: while a chunk is being built (GLB set), the drawing
 // primitives in render.js (box, cyl, cone, dome, roofs, windows, doors, flat) emit triangles instead of painting,
@@ -429,7 +429,7 @@ function m4look(e, t, up) {
 function glInit() {
   const c = document.createElement('canvas'); c.id = 'gl3'; c.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;display:block;touch-action:none';
   const gl = c.getContext('webgl2', { antialias: false, alpha: false }); // (smoothing comes from the multisampled view below)
-  if (!gl) { toast('This browser has no WebGL2, so the 3D preview can’t run here.'); return false; }
+  if (!gl) { toast('This browser has no WebGL2, so the 3D view can’t run here. Here’s the 2D one.'); return false; }
   $('view').style.display = 'none'; document.body.insertBefore(c, $('view'));
   GL3.c = c; GL3.gl = gl; GL3.on = true;
   GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sky = glProg(gl, GL_KVS, GL_KFS);
@@ -495,8 +495,8 @@ function glInit() {
     else if (k === 't') { GL3.town++; GL3.follow = null; GL3.goto = null; glFocusTown(); }
   });
   const hint = document.createElement('div'); hint.id = 'glHint';
-  hint.style.cssText = 'position:fixed;right:16px;top:14px;max-width:430px;line-height:1.45;z-index:5;padding:8px 12px;border-radius:12px;background:rgba(255,251,245,.82);box-shadow:0 4px 18px rgba(60,40,60,.15);font:12.5px "Segoe UI",system-ui,sans-serif;color:#2b2833';
-  hint.innerHTML = (matchMedia('(pointer: coarse)').matches ? '<b>3D preview</b> · drag to turn · pinch to zoom · two fingers to move · tap anything to see what it is' : '<b>3D preview</b> (proof of concept) · drag to turn · wheel to zoom · <b>R</b> auto-rotate · <b>N</b> time of day · <b>T</b> next town · <b>P</b> perspective or isometric · point at anything to see what it is, click a person to follow them') + ' <span id="glHideHint" style="cursor:pointer;opacity:.6">✕</span>';
+  hint.style.cssText = 'position:fixed;right:16px;top:14px;max-width:430px;line-height:1.45;z-index:4;padding:8px 12px;border-radius:12px;background:rgba(255,251,245,.82);box-shadow:0 4px 18px rgba(60,40,60,.15);font:12.5px "Segoe UI",system-ui,sans-serif;color:#2b2833';
+  hint.innerHTML = (matchMedia('(pointer: coarse)').matches ? '<b>3D view</b> · drag to turn · pinch to zoom · two fingers to move · tap anything to see what it is' : '<b>3D view</b> · drag to turn · wheel to zoom · <b>R</b> auto-rotate · <b>N</b> time of day · <b>T</b> next town · <b>P</b> perspective or isometric · point at anything to see what it is, click a person to follow them') + ' <span id="glHideHint" style="cursor:pointer;opacity:.6">✕</span>';
   hint.querySelector('#glHideHint').onclick = () => hint.remove();
   if (innerWidth < 700) { hint.style.cssText += ';top:auto;right:12px;left:12px;bottom:150px;max-width:none;font-size:12px'; setTimeout(() => hint.remove(), 15000); } // phones: above the tool bar, and not for long
   document.body.appendChild(hint);
@@ -722,8 +722,8 @@ function glPeople() {
   return v.a.subarray(0, v.length);
 }
 
-/* ---------- switching between the 2D and 3D views (the preview build starts in 3D) ---------- */
-const GL_DEFAULT = true; // proof-of-concept preview only: a merged build would start in 2D
+/* ---------- switching between the 2D and 3D views (3D by default) ---------- */
+const GL_DEFAULT = true; // new worlds and new browsers open in 3D (the choice is remembered)
 function glWanted() { if (QS.has('2d')) return false; if (QS.has('gl')) return true; try { const v = localStorage.getItem('sf3d'); if (v) return v === '1'; } catch (e) { } return GL_DEFAULT; }
 function glToggle() {
   const want = !GL3.on; try { localStorage.setItem('sf3d', want ? '1' : '0'); } catch (e) { }
@@ -733,7 +733,7 @@ function glToggle() {
 }
 function glBtn() {
   let b = $('glBtn');
-  if (!b) { b = document.createElement('button'); b.id = 'glBtn'; b.onclick = glToggle; b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:6;padding:8px 14px;border:0;border-radius:12px;background:rgba(255,251,245,.9);box-shadow:0 4px 18px rgba(60,40,60,.18);font:600 13px "Segoe UI",system-ui,sans-serif;color:#2b2833;cursor:pointer'; document.body.appendChild(b); }
+  if (!b) { b = document.createElement('button'); b.id = 'glBtn'; b.onclick = glToggle; b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:4;padding:8px 14px;border:0;border-radius:12px;background:rgba(255,251,245,.9);box-shadow:0 4px 18px rgba(60,40,60,.18);font:600 13px "Segoe UI",system-ui,sans-serif;color:#2b2833;cursor:pointer'; document.body.appendChild(b); }
   if (innerWidth < 700) b.style.bottom = '104px'; // clear of the tool bar on a phone
   b.textContent = GL3.on ? 'Switch to 2D' : 'Try it in 3D';
 }

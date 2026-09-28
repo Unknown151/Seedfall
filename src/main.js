@@ -52,7 +52,7 @@ function frame(now) {
   if (frameN++ % 45 === 0) syncWalkers();
   updateDyn(dt);
   stepCamera(dt);
-  if (GL3.on) glFrame(dt); // the 3D preview (?gl) draws the world itself
+  if (GL3.on) { if (!CATCH || performance.now() - (GL3.catchT || 0) > 2500) { glFrame(dt); GL3.catchT = performance.now(); } } // the 3D view draws the world itself (only now and then while catching up, so the years go by quickly)
   else { lightTick(dt); flushDirty(); drawFrame(); updateTip(); }
   uiT += dt;
   if (uiT > .5) { uiT = 0; renderHUD(); renderTools(); renderFaith(); if (UI.panel) renderPanel(false); }

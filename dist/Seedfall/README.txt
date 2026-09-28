@@ -254,13 +254,29 @@ BOATS, SHIPS AND PLANES
   world, and come back in to land. Propeller planes first, jets later, then
   the sleek liners of the late ages, with wingtip lights at night.
 
+THE 3D VIEW
+  The world opens in real 3D: sun and moon light with soft shadows, a sky that
+  goes gold and rose at sunset and fills with stars at night, lamps and lit
+  windows that glow, haze over the far side of the valley and the open sea out
+  to the horizon. People walk the streets with their dogs, carts roll behind
+  their horses, sheep graze in the pastures.
+  Drag to turn, scroll to zoom (right down to the street), point at anything to
+  see what it is, and click a person to follow them. On a phone: one finger
+  turns, two pinch and move, a tap shows what's there.
+  The button in the bottom corner switches between 3D and the flat 2D view, and
+  Seedfall remembers which you like. On a slow PC, 2D is the lighter one.
+
 KEYS
   C        chronicle, towns, people, lore
   1 - 5    nudges: rain, supply pod, inspire, starfall, bloom (then click the world;
            each costs Reverence)
   6        speak to your people
   F        fullscreen
-  Z        zone view: the quarters each town has drawn for itself
+  Z        zone view: the quarters each town has drawn for itself (2D)
+  R        3D: slowly turn round the town
+  N        3D: step through the times of day (and back to live)
+  T        3D: fly to the next town
+  P        3D: perspective or the flat isometric lens
   Space    pause
   Shift+D  debug card: leap 10, 20, 50 or 100 years ahead (the world really
            moves on and is saved; handy for seeing slow changes play out)
