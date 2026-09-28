@@ -42,6 +42,7 @@ function computeBB(i) {
 
 function markDirty(i) {
   if (GL3.on) glDirty(i);
+  if (!SC) return; // (no 2D canvas yet: switching to 2D repaints everything)
   const a0 = BB.x0[i], b0 = BB.y0[i], a1 = BB.x1[i], b1 = BB.y1[i];
   const h0 = CH[i];
   computeBB(i); TV[i]++;
@@ -90,10 +91,13 @@ function flushDirty() {
   return rs.length;
 }
 
+// the 2D canvases (the whole valley at 2×, twice over, plus the glow layers: ~100 MB) only exist once the 2D view is shown
+function ensure2D() { if (!SC) { initStatic(); initLight(); } }
 function renderAll() {
   LIGHT.job = null; LIGHT.fade = -1; LIGHT.next = null; LIGHT.q = [];
   LIGHT.sun = sunNow(); LIGHT.season = LIGHT.forceSeason || seasonNow(); LIGHT.seasonT = 300;
   LIGHT.cur = LT = mkLight(envNow());
+  if (!SC) { DIRTY = []; return; } // 3D: the light's colours are all the art needs
   clearCanvas(SX, SC, RS); clearCanvas(EMX, EMC, RSE); SPR.clear();
   for (let i = 0; i < W * H; i++) computeBB(i);
   for (let s = 0; s <= W + H - 2; s++) {

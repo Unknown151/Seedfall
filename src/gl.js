@@ -728,7 +728,7 @@ function glWanted() { if (QS.has('2d')) return false; if (QS.has('gl')) return t
 function glToggle() {
   const want = !GL3.on; try { localStorage.setItem('sf3d', want ? '1' : '0'); } catch (e) { }
   if (want) { if (!GL3.gl) glInit(); else { GL3.on = true; GL3.c.style.display = 'block'; $('view').style.display = 'none'; for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); } }
-  else { GL3.on = false; GL3.c.style.display = 'none'; $('view').style.display = 'block'; const h = $('glHint'); if (h) h.remove(); $('tip').style.opacity = 0; renderAll(); relightNow(); }
+  else { ensure2D(); GL3.on = false; GL3.c.style.display = 'none'; $('view').style.display = 'block'; const h = $('glHint'); if (h) h.remove(); $('tip').style.opacity = 0; renderAll(); relightNow(); }
   glBtn();
 }
 function glBtn() {

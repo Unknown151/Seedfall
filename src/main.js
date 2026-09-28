@@ -20,6 +20,7 @@ function startWorld(isNew) {
   UIDIRTY.prayers = true; FAITH.shown = '';
   renderHUD(); renderTools(); renderFolderStatus(); faithRecalc(); renderFaith();
   if (glWanted()) { if (!GL3.on) glInit(); else for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); }
+  if (!GL3.on && !SC) { ensure2D(); renderAll(); } // no WebGL2 here: the 2D view after all
   glBtn();
   if (!RUNNING) { RUNNING = true; requestAnimationFrame(frame); }
 }
@@ -156,7 +157,7 @@ SF.pray = k => { const c = prayerCandidates().filter(x => !k || x[0] === k); if 
 SF.season = s => { LIGHT.forceSeason = s ? Object.assign({ autumn: 0, winter: 0, spring: 0 }, s) : null; LIGHT.seasonT = 0; LIGHT.chk = 0; };
 
 async function boot() {
-  initView(); initStatic(); initLight(); bindUI(); bindAI(); bindFaith(); bindAway(); bindDebug(); bindWorlds();
+  initView(); LT = mkLight(defaultEnv()); if (!glWanted()) ensure2D(); bindUI(); bindAI(); bindFaith(); bindAway(); bindDebug(); bindWorlds();
   if (DEV) $('fps').style.display = 'block';
   try { await IDB.open(); } catch (e) { }
   try { await aiLoad(); } catch (e) { }
