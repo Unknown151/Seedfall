@@ -530,7 +530,7 @@ function ageProject(T) {
   }
   const o = {};
   if (type === 'shrine') { if (!hasTech('stone')) return; }
-  if (type === 'monument') { const w = pick(WONDERS.filter(w => w.k !== 'statue')); o.sub = th === 'lanterns' ? 'lantern' : w.k; o.name = th === 'lanterns' ? `The ${pick(SONG_A)} Lantern` : `The ${pick(['Memory', 'Harvest', 'Makers', 'Founders', 'Second Seed', 'Mossback', 'Long Road'])} ${pick(['Stone', 'Spire', 'Arch', 'Column', 'Garden'])}`; }
+  if (type === 'monument') { const w = pick(WONDERS.filter(w => w.k !== 'statue')); o.sub = th === 'lanterns' ? 'lantern' : w.k; o.name = th === 'lanterns' ? `The ${pick(SONG_A)} Lantern` : `The ${pick(['Memory', 'Harvest', 'Makers', 'Founders', 'Second Seed', 'Sheep', 'Long Road'])} ${pick(['Stone', 'Spire', 'Arch', 'Column', 'Garden'])}`; }
   if (type === 'dock') o.dir = nearWaterDir(s.x, s.y);
   const B = mkBuilding(type, s.x, s.y, T, o);
   if (type !== 'park') connectRoad(B);
@@ -593,12 +593,12 @@ function buildTown(T) {
 }
 const FIRST_TXT = {
   house: null,
-  farm: 'The first field is turned over near {T}. Earth wheat and sunroot, side by side.',
+  farm: 'The first field is turned over near {T}. Wheat and potatoes, side by side.',
   well: '{T} digs its first well. The water tastes faintly of violets.',
   granary: 'A granary is raised in {T}. Winter will be less frightening now.',
   shrine: 'A shrine goes up in {T}, to the Founder, the Pod, and whatever else might be listening.',
-  dock: 'The first pier juts into the water at {T}. Fish-that-are-not-quite-fish are on the menu.',
-  market: 'Market day comes to {T}. Mossback wool for sunroot beer, fair and square.',
+  dock: 'The first pier juts into the water at {T}. Herring and cod are on the menu.',
+  market: 'Market day comes to {T}. Wool for barley beer, fair and square.',
   school: 'The first schoolhouse opens in {T}. The children hate it immediately.',
   workshop: 'Hammers ring in the first workshop of {T}.',
   mine: 'A mine is opened in the hills above {T}. The first cart of ore comes out red and heavy.',
@@ -609,7 +609,7 @@ const FIRST_TXT = {
   hall: '{T} builds a town hall with a clock that is almost always right.',
   library: 'The Library of {T} opens. The Archive has a second home.',
   observatory: 'An observatory is built above {T}. Someone stays up every night now.',
-  works: 'The first works belches steam in {T}. The mossbacks are unimpressed.',
+  works: 'The first works belches steam in {T}. The cows are unimpressed.',
   station: 'A rail station is finished in {T}, waiting for its trains.',
   clinic: 'A clinic opens in {T}. The valley fever has nowhere to hide.',
   power: 'The power house of {T} hums to life. Lights flicker on in every window.',
@@ -632,9 +632,9 @@ const FIRST_TXT = {
   dome: 'A garden dome is finished in {T}. It rains inside it on Tuesdays.',
   elevator: 'The Space Elevator is finished at {T}. A thread to the sky, and a queue to ride it.',
   watchstone: 'A Watchstone is raised above {T}, facing the sky. For the Watcher.',
-  pasture: 'Mossbacks are fenced into a pasture outside {T}. Their wool is soft and faintly green.',
+  pasture: 'Sheep are fenced into a pasture outside {T}. The first shearing is a village holiday.',
   sandpit: 'Sand is dug from the dunes near {T} and carted off to be melted into glass.',
-  weaver: 'A weaving house opens in {T}. The first bolt of mossback cloth is the colour of spring moss.',
+  weaver: 'A weaving house opens in {T}. The first bolt of woollen cloth is the colour of oatmeal.',
   warehouse: '{T} builds a warehouse. For the first time there is more room than stuff.',
   theatre: 'The first theatre opens in {T}. The opening night runs four hours over, and nobody minds.',
   bathhouse: '{T} builds a bathhouse over the hot spring. The old people of the town move in, more or less.',
@@ -941,7 +941,7 @@ function pickFresh(pool, key) {
   r.push(v); if (r.length > Math.min(12, pool.length - 1)) r.shift();
   return v;
 }
-const TOPICS = ['whose turn it is to feed the mossbacks', 'the correct way to boil sunroot', 'a boundary stone', 'who saw the comet first', 'the name of a hill', 'a borrowed wheelbarrow', 'the rules of the game itself'];
+const TOPICS = ['whose turn it is to feed the pigs', 'the correct way to boil potatoes', 'a boundary stone', 'who saw the comet first', 'the name of a hill', 'a borrowed wheelbarrow', 'the rules of the game itself'];
 function invBand() { return S.era <= 2 ? 0 : S.era <= 3 ? 1 : S.era <= 4 ? 2 : S.era <= 5 ? 3 : S.era <= 6 ? 4 : 5; }
 function sportNow() { return SPORTS[Math.min(5, invBand())]; }
 const EVENTS = [
@@ -952,25 +952,25 @@ const EVENTS = [
   { k: 'invent', w: 3, when: () => S.year > 15, run() { const T = randTown(); const p = cast('inventor', T, q => q.st.cur + q.st.cft + (q.role === 'inventor' ? 3 : 0), { minAge: 14 }); const th = pickFresh(INVENTIONS[invBand()], 'inv'); p.deeds.push(th); chron('🔧', `${whoOf(p, T)} invents ${th}.`, { T }); } },
   { k: 'storm', w: 2, when: () => S.year > 5, run() { const T = randTown(); const bs = T.bl.map(id => S.B[id]).filter(B => B && !FLAT_TYPES[B.type] && !OUTDOOR[B.type] && B.type !== 'monument' && B.type !== 'lighthouse' && B.prog >= 1); chron('⛈️', bs.length && chance(.6) ? `A summer storm tears the roof off a ${BT[pick(bs).type].n.toLowerCase()} in ${T.name}. The neighbours have it fixed within the month.` : 'A great summer storm rolls over the valley and leaves everything washed and shining.', { T }); fx('rain', { x: T.x, y: T.y, big: 1 }); } },
   { k: 'drought', w: 1, when: () => !S.drought && S.year > 30 && !hasTech('climate'), run() { S.drought = ri(2, 5); const T = randTown(); chron('☀️', `A dry spell settles over the valley. The fields around ${T.name} turn gold too early.`, { T }); } },
-  { k: 'herd', w: 3, run() { const T = randTown(); chron('🐾', pick([`A herd of mossbacks wanders straight through ${T.name}. Nobody minds.`, `Mossback calves are born in the meadows above ${T.name}.`, `The mossbacks migrate early this year, past ${T.name} and down to the water.`]), { T }); fx('herd', { x: T.x, y: T.y }); } },
-  { k: 'pets', w: 3, once: 1, when: () => hasTech('herding'), run() { const T = randTown(); S.flags.pets = 1; chron('🐕', `Children in ${T.name} adopt a loamhound pup. Within a generation every house has one.`, { T }); } },
+  { k: 'herd', w: 3, run() { const T = randTown(); chron('🐾', pick([`A herd of sheep wanders straight through ${T.name}. Nobody minds.`, `Calves are born in the meadows above ${T.name}.`, `The sheep migrate early this year, past ${T.name} and down to the water.`]), { T }); fx('herd', { x: T.x, y: T.y }); } },
+  { k: 'pets', w: 3, once: 1, when: () => hasTech('herding'), run() { const T = randTown(); S.flags.pets = 1; chron('🐕', `Children in ${T.name} adopt a puppy. Within a generation every house has one.`, { T }); } },
   { k: 'giant', w: .7, when: () => S.year > 50, run() { chron('🦒', pick(['A Longstrider walks through the valley, taller than the Pod. The children follow it to the river.', 'A Longstrider is seen crossing the far meadows, slow as a cloud.']), { k: 'major' }); fx('giant', {}); } },
   { k: 'meteors', w: 1.2, run() { const T = randTown(); chron('🌠', `Shooting stars fall all night. ${T.name} stays up to count them.`, { T }); fx('meteors', {}); } },
   { k: 'rivalry', w: 2.5, when: () => towns().length >= 2, run() { const ts = shuffle(towns().slice()); const A = ts[0], B = ts[1], sp = pick(sportNow()), win = pick([A, B]); chron('🏆', `${A.name} and ${B.name} settle an argument about ${pick(TOPICS)} with a match of ${sp}. ${win.name} wins; everyone shares the beer.`, { T: win }); } },
   { k: 'comet', w: .8, run() { const T = randTown(); const nm = nameWord(S.lang, 2); chron('☄️', `A comet hangs in the sky for a season. ${T.name} names it ${nm}.`, { T }); fx('comet', {}); } },
   { k: 'fever', w: 1, when: () => !hasTech('medicine') && S.year > 40, run() { const T = randTown(); T.pop *= .97; chron('🤒', `A fever season in ${T.name}. It passes with the spring, and the town is quieter for a while.`, { T }); } },
   { k: 'accord', w: 3, once: 1, when: () => towns().length >= 3 && hasTech('script'), run() { const nm = nameWord(S.lang, 2); S.accord = nm; chron('🤝', `The towns of the valley sign the ${nm} Accord: no walls between them, ever.`, { k: 'major' }); } },
-  { k: 'book', w: 1.5, when: () => hasTech('script'), run() { const T = randTown(); const p = cast('sage', T, q => q.st.cur * 2 + q.st.wit, { minAge: 20 }); const title = `${pick(['On', 'A History of', 'Letters from', 'The Book of', 'Notes on'])} ${pick(['the Pod', 'Mossbacks', 'the Makers', T.name, 'Sunroot', 'the Two Moons', 'Rain', 'the Watcher', 'Small Things'])}`; p.deeds.push(`“${title}”`); chron('📖', `${whoOf(p, T)} writes “${title}”.`, { T }); } },
+  { k: 'book', w: 1.5, when: () => hasTech('script'), run() { const T = randTown(); const p = cast('sage', T, q => q.st.cur * 2 + q.st.wit, { minAge: 20 }); const title = `${pick(['On', 'A History of', 'Letters from', 'The Book of', 'Notes on'])} ${pick(['the Pod', 'Sheep', 'the Makers', T.name, 'Potatoes', 'the Two Moons', 'Rain', 'the Watcher', 'Small Things'])}`; p.deeds.push(`“${title}”`); chron('📖', `${whoOf(p, T)} writes “${title}”.`, { T }); } },
   { k: 'climb', w: 2, once: 1, when: () => S.year > 150, run() { const T = randTown(); chron('🏔️', `An expedition from ${T.name} climbs the highest peak on the valley’s rim and names it ${nameWord(S.lang, 1)} Top.`, { T }); } },
-  { k: 'weave', w: 1.2, when: () => hasTech('net'), run() { chron('📡', pick(['The most watched channel on the Weave is a live feed of a sleeping mossback.', 'A Weave poll decides the valley’s favourite vegetable. Sunroot wins, again.', 'Someone uploads the entire Archive to the Weave as a joke. It crashes for a day.']), {}); } },
+  { k: 'weave', w: 1.2, when: () => hasTech('net'), run() { chron('📡', pick(['The most watched channel on the Weave is a live feed of a sleeping cat.', 'A Weave poll decides the valley’s favourite vegetable. Potatoes win, again.', 'Someone uploads the entire Archive to the Weave as a joke. It crashes for a day.']), {}); } },
   { k: 'oldest', w: 1, when: () => living().some(p => age(p) >= 95), run() { const p = living().sort((a, b) => a.born - b.born)[0]; const T = S.T[p.sid]; chron('🎂', `${p.name}${T ? ' of ' + T.name : ''} turns ${age(p)}. The whole town gets ${p.q.food}.`, T ? { T } : {}); } },
-  { k: 'skimmers', w: 1.5, run() { const T = randTown(); chron('🐦', `A flock of skimmers nests on the rooftops of ${T.name}. Considered very good luck.`, { T }); fx('birds', { x: T.x, y: T.y }); } },
+  { k: 'swallows', w: 1.5, run() { const T = randTown(); chron('🐦', `A flock of swallows nests on the rooftops of ${T.name}. Considered very good luck.`, { T }); fx('birds', { x: T.x, y: T.y }); } },
   { k: 'wedding', w: .5, when: () => towns().length >= 2, run() { const ts = shuffle(towns().slice()); chron('💍', `A wedding joins two old families of ${ts[0].name} and ${ts[1].name}; the party lasts three days.`, { T: ts[0] }); } },
   { k: 'moon', w: 3, once: 1, when: () => hasTech('rocketry') && S.moons, run() { chron('🌘', `Colonists walk on ${S.moons[0]}. They leave a flag and a small jar of valley soil.`, { k: 'major' }); } },
   { k: 'seedship', w: 1.5, when: () => hasTech('seedships') && S.year - S.lastSeedship > 50, run() { S.lastSeedship = S.year; const sh = pick(SHIP_NAMES), st = pick(STARS); chron('🚀', `The seedship ${sh} departs for ${st}, carrying a vault of sleeping children and a copy of this chronicle.`, { k: 'major' }); fx('seedship', {}); } },
   { k: 'lore', w: 1, when: () => S.lore < LORE.length && S.year > 400 && S.ruins.every(r => M.ruin[idx(r.x, r.y)] !== 1), run() { revealLore(null); } },
   { k: 'election', w: .6, run() { electAnnounce(randTown()); } },
-  { k: 'play', w: 2, when: () => wcount('theatre') > 0, run() { const B = pick(builtOf('theatre')), T = B && S.T[B.sid]; if (!T) return; const p = cast('artist', T, q => q.st.wit + q.st.cft + (q.role === 'artist' ? 3 : 0), { minAge: 18 }); const pl = pickFresh(PLAYS, 'play'); p.deeds.push(`“${pl}”`); chron('🎭', `The theatre of ${T.name} stages “${pl}”, by ${p.name}. ${pick(['It runs for a year.', 'Half the audience cries.', 'Nobody agrees what the ending means.', 'The critics hate it; everyone else loves it.', 'The mossback in the second act steals the show.'])}`, { x: B.x, y: B.y }); gainRev(3, 'a premiere'); } }
+  { k: 'play', w: 2, when: () => wcount('theatre') > 0, run() { const B = pick(builtOf('theatre')), T = B && S.T[B.sid]; if (!T) return; const p = cast('artist', T, q => q.st.wit + q.st.cft + (q.role === 'artist' ? 3 : 0), { minAge: 18 }); const pl = pickFresh(PLAYS, 'play'); p.deeds.push(`“${pl}”`); chron('🎭', `The theatre of ${T.name} stages “${pl}”, by ${p.name}. ${pick(['It runs for a year.', 'Half the audience cries.', 'Nobody agrees what the ending means.', 'The critics hate it; everyone else loves it.', 'The sheep in the second act steals the show.'])}`, { x: B.x, y: B.y }); gainRev(3, 'a premiere'); } }
 ];
 function rollEvent() {
   const theme = S.age ? AGE_THEMES.find(a => a.k === S.age.k) : null;
@@ -1129,7 +1129,7 @@ function omen(txt) {
   const f = person(S.founder);
   if (S.omens === 1) chron('✨', `${txt} ${f.died === null ? f.name : 'The elders'} say${f.died === null ? 's' : ''} someone is watching over them. They call it the Watcher.`, { k: 'major', nocap: true });
   else if (S.omens === 7) chron('✨', `${txt} There are priests of the Watcher now. They mostly argue about what the Watcher wants.`, { nocap: true });
-  else if (S.omens === 15) chron('✨', `${txt} Watcher’s Day becomes a holiday. People leave sunroot cakes on high places, just in case.`, { nocap: true });
+  else if (S.omens === 15) chron('✨', `${txt} Watcher’s Day becomes a holiday. People leave potatoes cakes on high places, just in case.`, { nocap: true });
   else if (S.omens % 25 === 0) chron('✨', `${txt} Scholars count ${S.omens} signs from the Watcher since Landfall.`, { nocap: true });
   else chron('✨', txt, { nocap: true });
 }

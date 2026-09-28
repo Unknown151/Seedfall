@@ -447,31 +447,34 @@ function drawLighthouse(c, B, cx, cy, st) {
 }
 
 function parkTree(c, cx, cy, u, v, h) {
+  if (GLB) return glTreeAt(cx, cy, u, v, h, 1.1, ['#5f9a4d', '#6aa556', '#ee9fbe', '#7fae5e'][((h * 7) | 0) % 4]);
   const [px, py] = pt(cx, cy, u, v, 0);
   ell(c, px + 1, py + .4, 3.3, 1.5, 'rgba(40,50,70,.13)');
   c.fillStyle = '#7b5e4e'; c.fillRect(px - .5, py - 5, 1, 5);
-  const col = ['#6db873', '#a57ac6', '#ee92b6', '#83c886'][((h * 7) | 0) % 4];
+  const col = ['#5f9a4d', '#6aa556', '#ee9fbe', '#7fae5e'][((h * 7) | 0) % 4]; // (and the odd cherry in blossom)
   circ(c, px, py - 7.5, 3.4, leafC(col, .85)); circ(c, px + .75 * LT.hx, py - 8.2, 2.6, topC(leafC(col)));
 }
 
-// a mossback standing still (the walking ones are drawn with the other agents)
-function mossback(c, x, y, s, left) {
+// a sheep standing still (the walking ones are drawn with the other agents)
+function sheep(c, x, y, s, left) {
+  if (GLB) { const [u, v] = gunscreen(x, y); return glSheep(GLB.x + u, GLB.y + v, GLB.base, s / 2.6, left ? Math.PI * .75 : -Math.PI * .25); }
   const d = left ? -1 : 1;
   ell(c, x, y, 2.4 * s, s, 'rgba(40,40,60,.15)');
-  c.fillStyle = '#b9ae9c'; for (const lx of [-1.5, -.9, 1, 1.5]) c.fillRect(x + lx * s * d, y - 1.8 * s, .55, 1.8 * s);
-  ell(c, x, y - 2.4 * s, 2.5 * s, 1.5 * s, '#cfc3ae'); ell(c, x - .2 * d, y - 3.1 * s, 2 * s, .9 * s, '#8fbf88');
-  circ(c, x + 2.4 * s * d, y - 2.8 * s, .9 * s, '#cfc3ae');
+  c.fillStyle = '#3a3430'; for (const lx of [-1.5, -.9, 1, 1.5]) c.fillRect(x + lx * s * d, y - 1.8 * s, .55, 1.8 * s);
+  ell(c, x, y - 2.4 * s, 2.5 * s, 1.5 * s, '#e8e3d6'); ell(c, x - .2 * d, y - 3.1 * s, 2 * s, .9 * s, '#f6f3ec');
+  circ(c, x + 2.4 * s * d, y - 2.8 * s, .9 * s, '#3a3430'); // a woolly sheep with a black face
 }
 function drawPasture(c, B, cx, cy, st) {
   const v = B.var || 0, P = (u, w, z) => pt(cx, cy, u, w, z), E = .43;
   flat(c, cx, cy, 0, 0, .46, .46, .15, '#b3d98c');
   for (let k = 0; k < 7; k++) { const [tx, ty] = P(hash2(B.x * 7 + k, B.y, 21) * .8 - .4, hash2(B.x, B.y * 7 + k, 22) * .8 - .4, .2); ell(c, tx, ty, 1.4, .6, '#94c47a'); } // grazed tufts
   const corners = [[-E, -E], [E, -E], [E, E], [-E, E]];
+  if (GLB) { const sw = GLB.wall; GLB.wall = M_PLANK; for (const z of [1.2, 2.3]) { box(c, cx, cy, 0, -E, E, .008, z, .35, '#8a6446'); box(c, cx, cy, 0, E, E, .008, z, .35, '#8a6446'); box(c, cx, cy, -E, 0, .008, E, z, .35, '#8a6446'); box(c, cx, cy, E, 0, .008, E, z, .35, '#8a6446'); } for (const [u, w] of corners.concat([[0, -E], [E, 0], [0, E], [-E, 0]])) box(c, cx, cy, u, w, .014, .014, 0, 2.8, '#7a5a44'); GLB.wall = sw; } // a post-and-rail fence
   for (let k = 0; k < 4; k++) { const a = corners[k], b = corners[(k + 1) % 4]; for (const z of [1.2, 2.3]) { const p0 = P(a[0], a[1], z), p1 = P(b[0], b[1], z); line(c, p0[0], p0[1], p1[0], p1[1], '#8a6446', .5); } }
   for (const [u, w] of corners.concat([[0, -E], [E, 0], [0, E], [-E, 0]])) { const a = P(u, w, 0), b = P(u, w, 2.8); line(c, a[0], a[1], b[0], b[1], '#7a5a44', .7); }
   box(c, cx, cy, -.25, -.25, .1, .08, 0, 4, mix(st.wall, '#a57f5e', .5)); roofGable(c, cx, cy, -.25, -.25, .12, .1, 4, 2.4, st.roof, st.wall, true);
   box(c, cx, cy, .18, -.26, .09, .03, 0, 1.2, '#8a6446');
-  mossback(c, ...P(.06, .12, 0), 2.2, v < .5); mossback(c, ...P(.28, -.1, 0), 1.8, v >= .5); if (v > .3) mossback(c, ...P(-.18, .26, 0), 1.2, true);
+  sheep(c, ...P(.06, .12, 0), 2.2, v < .5); sheep(c, ...P(.28, -.1, 0), 1.8, v >= .5); if (v > .3) sheep(c, ...P(-.18, .26, 0), 1.2, true);
 }
 function drawShipyard(c, B, cx, cy, st) {
   const d = B.dir || [1, 0], P = (a, b, z) => pt(cx, cy, d[0] * a + d[1] * b, d[1] * a + d[0] * b, z); // a: out to the water, b: across
@@ -499,6 +502,7 @@ function drawSandpit(c, B, cx, cy, i) {
   if (v > .5) { const a = pt(cx, cy, -.1, -.3, 0); line(c, a[0], a[1], a[0] + 1.2, a[1] - 6, '#7a5a44', .6); }
 }
 function drawPod(c, B, cx, cy) {
+  if (GLB) return glPod(B);
   ell(c, cx + 1, cy, 15, 7, 'rgba(70,55,50,.22)');
   const age = S.year;
   if (age > 250) { // fence of honour

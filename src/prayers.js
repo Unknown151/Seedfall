@@ -4,7 +4,7 @@
 // and quirks) and says nothing (null) when it doesn't fit. Recently used pieces are skipped (S.prayRecent), so the
 // same words rarely come round twice in a sitting.
 const town = p => (S.T[p.sid] || {}).name || 'the valley';
-const crop = p => { const T = S.T[p.sid]; return T ? CROPS[T.crop % CROPS.length].n : 'sunroot'; };
+const crop = p => { const T = S.T[p.sid]; return T ? CROPS[T.crop % CROPS.length].n : 'potatoes'; };
 const spouse = p => (p.sp && S.P[p.sp] ? S.P[p.sp].first : 'my love');
 const sp3 = p => (p.sp && S.P[p.sp] ? S.P[p.sp].first : 'their sweetheart'); // the same, told by someone else
 // the world around the one praying
@@ -46,7 +46,7 @@ const PRAYERS = {
     (p, c) => c.drought ? `My ${crop(p)} are wilting and the well tastes of dust. Rain for ${town(p)}?` : null,
     (p, c) => c.drought ? `The river's so low the children are catching fish by hand. Send rain before it's gone altogether.` : null,
     (p, c) => c.drought ? `We've started saving the washing-up water for the ${crop(p)}. It's come to that.` : null,
-    (p, c) => c.drought ? `The mossbacks keep staring at the sky. I think they're praying too.` : null,
+    (p, c) => c.drought ? `The sheep keep staring at the sky. I think they're praying too.` : null,
     p => `If it rained on ${town(p)} this week, I'd stop complaining about everything else. For a while.`,
     p => `The ${crop(p)} could use a drink. So could I, but mostly the ${crop(p)}.`,
     () => `I told the whole market it would rain before harvest. Please don't make a liar of me.`,
@@ -57,7 +57,7 @@ const PRAYERS = {
     (p, c) => c.wx === 'clear' ? `Not a cloud in days. Lovely for picnics, terrible for ${crop(p)}.` : null,
     (p, c) => c.wx === 'rain' || c.wx === 'storm' ? `I know it's raining over the hills. Could it wander over to my fields too?` : null,
     p => `My knees say rain is coming. My knees have been wrong for three weeks now.`,
-    p => /herd/.test(p.role) ? `The mossbacks' pond is more mud than pond. A good soaking for ${town(p)}?` : null,
+    p => /herd/.test(p.role) ? `The sheep's pond is more mud than pond. A good soaking for ${town(p)}?` : null,
     p => /brew/.test(p.role) ? `No rain, no harvest. No harvest, no beer. You see the problem.` : null,
     p => /bak/.test(p.role) ? `If the ${crop(p)} harvest fails I'll be baking with pebbles. Rain, please.` : null,
     (p, c) => c.band >= 2 ? `The irrigation pumps are coughing again. A proper rain would give them a rest.` : null,
@@ -68,7 +68,7 @@ const PRAYERS = {
   ],
   bloom: [
     p => `Could the hills around ${town(p)} flower again? My grandmother used to love them.`,
-    p => `I dream of mossbacks grazing in a meadow full of flowers. Just outside ${town(p)} would be perfect.`,
+    p => `I dream of sheep grazing in a meadow full of flowers. Just outside ${town(p)} would be perfect.`,
     (p, c) => c.band >= 2 ? `It's all roads and roofs around ${town(p)} now. A little wild green, please?` : null,
     p => `I've been ${p.q.hobby} all spring and there's nothing left to look at. Something growing, please?`,
     (p, c) => c.pol > .2 ? `The works have turned everything grey round ${town(p)}. Could something green push through the soot?` : null,
@@ -79,7 +79,7 @@ const PRAYERS = {
     (p, c) => c.wed ? `${spouse(p)} and I are marrying again, for the fun of it. We'd love flowers on the hill.` : null,
     (p, c) => c.widowed ? `${spouse(p)} loved the wildflowers. I'd like to see them again, for both of us.` : null,
     (p, c) => c.kids.length ? `${kidName(c)} wants to make a daisy chain. There are no daisies. Help?` : null,
-    p => /herd/.test(p.role) ? `The mossbacks are eating the fence posts. They need a better meadow.` : null,
+    p => /herd/.test(p.role) ? `The sheep are eating the fence posts. They need a better meadow.` : null,
     p => /heal|herbal|doctor|nurse/.test(p.role) ? `My herb baskets are empty. Could the slopes grow wild again?` : null,
     p => /artist|painter|singer|storyteller|poet/.test(p.role) ? `I need something beautiful to paint. The hills used to oblige.` : null,
     (p, c) => c.big ? `${town(p)} is so big now that the children think grass comes in squares. Show them otherwise?` : null,
@@ -103,7 +103,7 @@ const PRAYERS = {
     p => /builder|carpenter|mason/.test(p.role) ? `I've built a room nobody sleeps in yet. It has a window facing the moons.` : null,
     (p, c) => c.band >= 2 ? `The doctor says there's no reason we can't. So we're asking you instead.` : null,
     (p, c) => c.winter ? `It's a long winter for two. We'd love to be three by spring.` : null,
-    p => `${spouse(p)} sings lullabies to the loamhound. It's time, Watcher.`,
+    p => `${spouse(p)} sings lullabies to the dog. It's time, Watcher.`,
     p => `We've been told the vault children came from Earth. Ours would come from ${town(p)}. We'd like that.`,
     () => `Our garden has a swing and nobody to push. Please.`
   ],
@@ -126,7 +126,7 @@ const PRAYERS = {
     p => /cartograph|survey/.test(p.role) ? `My map of the valley doesn't close up. Somewhere there's a mile that isn't there.` : null,
     (p, c) => c.old ? `I'd like to finish this before I go. I'm not in a hurry, but I'm also not young.` : null,
     (p, c) => c.kids.length ? `${kidName(c)} solved half of it with crayons. I need the other half.` : null,
-    () => `The mossback ate my notes. I am not joking. Please send new ones.`,
+    () => `The sheep ate my notes. I am not joking. Please send new ones.`,
     () => `A gift pod, like the old days? Even a small one. Even just a hint in a jar.`
   ],
   starfall: [
@@ -180,7 +180,7 @@ const PRAYERS = {
     (p, c) => c.wed ? `What's the secret to a long marriage? ${spouse(p)} and I would like to know before we find out the hard way.` : null,
     (p, c) => !c.wed && !c.widowed && !c.old ? `There's someone at the market I like. Should I say something?` : null,
     (p, c) => c.widowed ? `It's been a while since ${spouse(p)} passed. Is it all right to be happy again?` : null,
-    (p, c) => c.kids.length ? `${kidName(c)} wants to be a ${pick(['pilot', 'poet', 'mossback', 'Watcher', 'mayor', 'star-watcher'])}. Should I encourage it?` : null,
+    (p, c) => c.kids.length ? `${kidName(c)} wants to be a ${pick(['pilot', 'poet', 'sheep', 'Watcher', 'mayor', 'star-watcher'])}. Should I encourage it?` : null,
     (p, c) => c.grown.length ? `My children never write. Should I write first?` : null,
     (p, c) => c.old ? `What should I do with all the years I've got left? I'd like to spend them well.` : null,
     (p, c) => c.old ? `Should I write down everything I remember, or let the young ones make their own mistakes?` : null,
@@ -199,9 +199,9 @@ const PRAYERS = {
     () => `Are we doing all right, on the whole? Honestly?`,
     (p, c) => `What's on ${c.moon}? Everyone has a theory.`,
     () => `Is it bad luck to whistle in the Pod? Asking for a friend.`,
-    () => `Which is better, ${pick(['sunroot', 'blue barley', 'violet beans', 'pink melon'])} or ${pick(['glowcaps', 'honey-reeds', 'goldreed', 'mint kale'])}? This has split the family.`,
+    () => `Which is better, ${pick(['potatoes', 'barley', 'broad beans', 'strawberries'])} or ${pick(['mushrooms', 'rhubarb', 'oats', 'kale'])}? This has split the family.`,
     () => `If you could change one thing about us, what would it be?`,
-    p => `My loamhound keeps staring at the Pod and howling. Does it know something?`,
+    p => `My dog keeps staring at the Pod and howling. Does it know something?`,
     p => `Would you like ${town(p)} better with a clock tower? We could have one by spring.`,
     p => `I found a Maker shard in the garden. Should I give it to the museum, or keep it on the windowsill?`
   ]
@@ -230,7 +230,7 @@ const OUTCOME = {
   inspire: [
     p => `${p.first} and ${sp3(p)} tell everyone their child was sent by the Watcher. Nobody argues.`,
     p => `The cradle ${sp3(p)} carved is finally in use. ${p.first} hasn't stopped smiling.`,
-    p => `${town(p)} throws a small party for ${p.first} and ${sp3(p)}'s news. The loamhound gets a hat.`,
+    p => `${town(p)} throws a small party for ${p.first} and ${sp3(p)}'s news. The dog gets a hat.`,
     p => `${p.first} lights a candle at the shrine every evening now, just to say thank you.`,
     p => `${p.name} and ${sp3(p)} get the good news on a quiet morning and tell the whole street by noon.`
   ],
@@ -269,8 +269,8 @@ const EXPIRE = {
     p => `No flowers come, so ${p.first} scatters seed along every lane in ${town(p)}. Next spring, a few come up.`, p => `${p.name} makes paper flowers for the whole street. The bees are confused.`],
   drop: [p => `${p.name} solves the problem alone in the end, a bit grumpily.`, p => `${p.name} gives up on help from above and asks the apprentice. The apprentice knew all along.`,
     p => `${p.first} works it out at three in the morning, alone, and wakes the whole house to tell them.`, p => `${p.name} shelves the problem for now. It'll keep. Problems do.`],
-  inspire: [p => `${p.first} and ${sp3(p)} get a loamhound pup instead. It helps.`, p => `${p.first} and ${sp3(p)} become everyone's favourite aunt and uncle. It suits them.`,
-    p => `${p.first} and ${sp3(p)} start teaching the neighbours' children to read. The house isn't quiet any more.`, p => `${p.first} and ${sp3(p)} take in two orphaned mossback calves. They're a handful.`],
+  inspire: [p => `${p.first} and ${sp3(p)} get a puppy instead. It helps.`, p => `${p.first} and ${sp3(p)} become everyone's favourite aunt and uncle. It suits them.`,
+    p => `${p.first} and ${sp3(p)} start teaching the neighbours' children to read. The house isn't quiet any more.`, p => `${p.first} and ${sp3(p)} take in two orphaned sheep calves. They're a handful.`],
   starfall: [p => `${p.name} keeps watching the sky. Maybe next year.`, p => `${p.name} builds a bigger telescope instead. Something will turn up.`,
     p => `No star falls. ${p.first} makes one out of tin and hangs it over the door.`, p => `${p.name} falls asleep on the roof waiting for a star, and wakes up with a cold and no regrets.`],
   ask: [p => `${p.name} never gets an answer, and decides that's an answer too.`, p => `${p.name} stops waiting and asks ${town(p)}'s oldest resident instead. The advice is mostly about soup.`],

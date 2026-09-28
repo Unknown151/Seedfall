@@ -5,7 +5,7 @@ const AI_MODELS = [['claude-haiku-4-5-20251001', 'Haiku 4.5 · fast and cheap'],
 const AI_DAY_CAP = 80;
 const NARR_MIN = { off: 0, rare: 60, often: 20 };
 const AI_BUILDINGS = ['park', 'dome', 'market', 'library', 'school', 'observatory', 'museum', 'stadium', 'dock', 'workshop', 'monument', 'shrine'];
-const AI_EVENTS = ['festival', 'art', 'song', 'invent', 'book', 'harvest', 'herd', 'rivalry', 'skimmers', 'meteors', 'wedding', 'climb'];
+const AI_EVENTS = ['festival', 'art', 'song', 'invent', 'book', 'harvest', 'herd', 'rivalry', 'swallows', 'meteors', 'wedding', 'climb'];
 const AI_MONUMENTS = ['statue', 'lantern', 'spire', 'harp', 'gardens', 'colossus', 'hall', 'clock', 'obelisk', 'orchard'];
 const AI_SHUNNABLE = ['works', 'power', 'mine', 'mast', 'turbine', 'airfield', 'stadium', 'mill', 'market', 'solar', 'antenna', 'clinic', 'school', 'workshop'];
 const LV_KEYS = { nature: ['protect', 'plant', 'clear', 'wild', 'gardens'], growth: ['taller', 'spread_out', 'compact', 'more_towns', 'stay_small'], lights: ['warm', 'cool', 'colourful', 'candlelight', 'dark_sky'], weather: ['sunny', 'rainy', 'snowy', 'foggy', 'stormy', 'mild'], material: ['timber', 'stone', 'brick', 'local'], streets: ['winding', 'planned'] };
@@ -88,7 +88,7 @@ async function aiTest() {
 
 /* ---------- prompts ---------- */
 const AI_SYSTEM = `You write for Seedfall, a cozy, slow, procedural colony simulation that runs on a screen in someone's office.
-The world: every colonist descends from one seed-pod colonist (the Founder) who landed on a pastel alien planet with a vault of frozen embryos and "the Archive" (Earth's knowledge). Mossbacks are gentle grazing beasts, loamhounds are dog-like pets, skimmers are birds, glowcaps and puffwood are the local flora, sunroot is the staple crop, the Pod is the Founder's landing capsule (now a moss-covered monument), and the Makers were a vanished earlier people who planted the forests. The colonists believe in "the Watcher" (the player), who sends omens.
+The world: every colonist descends from one seed-pod colonist (the Founder) who landed on a green, Earth-like planet with a vault of frozen embryos, seeds and livestock and "the Archive" (Earth's knowledge). Everything that grows and grazes here came from Earth in the vault: wheat, barley, potatoes, cabbages, apples, oaks, pines and birches, sheep, cattle, dogs, swallows. Keep it grounded and realistic (a 19th-century-flavoured farming and industrial world, later modern), no invented plants or beasts; the Pod is the Founder's landing capsule (now a moss-covered monument), and the Makers were a vanished earlier people who planted the forests. The colonists believe in "the Watcher" (the player), who sends omens.
 Tone: warm, dry, gently funny, like a good fantasy chronicle. Short sentences. No wars or battles, and no deaths of named people (the simulation handles births and deaths itself). Always use the real names of the towns and people you are given, and keep their established quirks consistent.
 Chronicle lines: present tense, one or two sentences, at most about 200 characters, plain text, no markdown, no quotation marks around the whole line.`;
 // the player's Tone setting (Voice settings, kept per browser like the key, never in the world)

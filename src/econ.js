@@ -8,7 +8,7 @@ const RES_IC = { wood: '🪵', stone: '🪨', clay: '🧱', metal: '⚙️', goo
 const RES_TECH = { wood: null, stone: 'stone', clay: 'kiln', metal: 'smelt', goods: 'smelt', cloth: 'loom', glass: 'masonry' };
 const RES_COL = { wood: '#a0714a', stone: '#9aa0aa', clay: '#c0674c', metal: '#5f6b7a', goods: '#d2a24c', cloth: '#c77fb0', glass: '#6fc0d4' };
 const EXTRACT = { lumber: 'wood', quarry: 'stone', claypit: 'clay', mine: 'metal', pasture: 'cloth', sandpit: 'glass' };
-// two small chains: mossback wool is spun at home, but a weaver makes real cloth of it; sand becomes glass in a glassworks
+// two small chains: sheep's wool is spun at home, but a weaver makes real cloth of it; sand becomes glass in a glassworks
 // [makes, a year, the site that feeds it]. Without that site the crafts buy their wool or sand in, and make less
 const CRAFT = { weaver: ['cloth', 2.6, 'pasture'], glassworks: ['glass', 3, 'sandpit'] };
 const CRAFT_INFO = { weaver: { tech: 'loom', min: 70, per: 900, max: 3, site: 'mid' }, glassworks: { tech: 'masonry', min: 140, per: 1200, max: 4, site: 'edge' } };
@@ -352,7 +352,7 @@ function stepTrade() {
     const sea = seaLinked(A, B) && (!roadLinked(A, B) || chance(.5));
     fx('trade', { from: A.id, to: B.id, r, sea });
     if (S.trade.n === 1) chron('🛒', `The first trade ${sea ? 'ship sails' : 'wagons roll'} from ${A.name} to ${B.name}, loaded with ${RES_N[r]}.`, { T: B, k: 'major', cap: 'The first trade' });
-    else if (chance(.02) && S.year - (S.tradeYr || -99) > 30) S.tradeYr = S.year, chron('🛒', pick([`Wagons of ${RES_N[r]} rumble from ${A.name} to ${B.name}.`, `${B.name} buys ${RES_N[r]} from ${A.name}, and pays in ${pick(['sunroot beer', 'wool', 'promises', 'coin', 'favours'])}.`]), { T: A });
+    else if (chance(.02) && S.year - (S.tradeYr || -99) > 30) S.tradeYr = S.year, chron('🛒', pick([`Wagons of ${RES_N[r]} rumble from ${A.name} to ${B.name}.`, `${B.name} buys ${RES_N[r]} from ${A.name}, and pays in ${pick(['barley beer', 'wool', 'promises', 'coin', 'favours'])}.`]), { T: A });
   }
   if (S.trade.log.length > 60) S.trade.log.splice(0, S.trade.log.length - 60);
 }

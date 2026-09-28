@@ -247,11 +247,11 @@ function springSteam(dt) {
 }
 const FINDS = ['a Maker tool of green glass that still hums faintly', 'a seed-shaped stone carved with the falling glyph', 'a mosaic of a forest, seen from high above',
   'a buried garden terrace, its steps still perfectly level', 'a flute that plays only one very sad note', 'a star chart pieced together from forty shards',
-  'the bones of something far larger than a mossback', 'a sealed jar of seeds. Three of them sprout', 'a stone bench worn smooth by someone sitting on it for centuries',
-  'a tiny carved mossback, the first proof the Makers knew them', 'a map of the valley with a river where there is none today', 'a bell that rings without being touched when it rains'];
-const PLAYS = ['The Long Winter', 'The Founder’s Last Letter', 'Two Moons, One Heart', 'The Mossback Who Would Not Move', 'A Comedy of Wheels', 'The Watcher’s Silence',
-  'Seedfall', 'The Glassblower’s Daughter', 'Much Ado About Sunroot', 'The Weaver of Lurest', 'The Tide Clock', 'Letters from the Far Seed', 'The Last Glyph'];
-const BRED = ['sky melons', 'frost-sweet sunroot', 'glowcap barley', 'purple rice', 'hill grapes', 'salt beans', 'honey kale', 'Maker wheat'];
+  'the bones of something far larger than a cow', 'a sealed jar of seeds. Three of them sprout', 'a stone bench worn smooth by someone sitting on it for centuries',
+  'a tiny carved horse, though no horse ever lived here', 'a map of the valley with a river where there is none today', 'a bell that rings without being touched when it rains'];
+const PLAYS = ['The Long Winter', 'The Founder’s Last Letter', 'Two Moons, One Heart', 'The Cow Who Would Not Move', 'A Comedy of Wheels', 'The Watcher’s Silence',
+  'Seedfall', 'The Glassblower’s Daughter', 'Much Ado About Turnips', 'The Weaver of Lurest', 'The Tide Clock', 'Letters from the Far Seed', 'The Last Glyph'];
+const BRED = ['sky melons', 'frost-sweet potatoes', 'mushroom barley', 'purple rice', 'hill grapes', 'salt beans', 'honey kale', 'Maker wheat'];
 const GUILD = { wood: 'Carpenters', stone: 'Masons', clay: 'Brickmakers', metal: 'Smiths', goods: 'Makers', cloth: 'Weavers', glass: 'Glassblowers' };
 // what a town's guild is for: what it is known for, or else its biggest trade (fixed once the hall is built)
 function guildOf(T) {
