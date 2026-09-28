@@ -67,20 +67,23 @@ function glDomeAt(u, v, r, z0, h, col, e = 0) {
 }
 function glBall(u, v, r, zc, rz, col, e = 0) { glDomeAt(u, v, r, zc, rz, col, e); glDomeAt(u, v, r, zc, -rz, col, e); }
 function glGable(cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
-  const c = gcol(col), cw = gcol(wall), o = .05, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy); GLB.ctr = P(0, 0, z - 1);
+  // the eaves hang out past the walls and drop a little, so the roof meets the top of the wall with no gap
+  const c = gcol(col), cw = gcol(wall), o = .05, g = .02, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy); GLB.ctr = P(0, 0, z - 1);
   if (alongU) {
-    gquad(P(-hw - o, -hd - o, z), P(-hw - o, 0, z + rh), P(hw + o, 0, z + rh), P(hw + o, -hd - o, z), c);
-    gquad(P(hw + o, hd + o, z), P(hw + o, 0, z + rh), P(-hw - o, 0, z + rh), P(-hw - o, hd + o, z), c);
+    const ze = z - rh * o / hd;
+    gquad(P(-hw - g, -hd - o, ze), P(-hw - g, 0, z + rh), P(hw + g, 0, z + rh), P(hw + g, -hd - o, ze), c);
+    gquad(P(hw + g, hd + o, ze), P(hw + g, 0, z + rh), P(-hw - g, 0, z + rh), P(-hw - g, hd + o, ze), c);
     gtri(P(hw, -hd, z), P(hw, 0, z + rh), P(hw, hd, z), cw); gtri(P(-hw, hd, z), P(-hw, 0, z + rh), P(-hw, -hd, z), cw);
   } else {
-    gquad(P(-hw - o, hd + o, z), P(0, hd + o, z + rh), P(0, -hd - o, z + rh), P(-hw - o, -hd - o, z), c);
-    gquad(P(hw + o, -hd - o, z), P(0, -hd - o, z + rh), P(0, hd + o, z + rh), P(hw + o, hd + o, z), c);
+    const ze = z - rh * o / hw;
+    gquad(P(-hw - o, hd + g, ze), P(0, hd + g, z + rh), P(0, -hd - g, z + rh), P(-hw - o, -hd - g, ze), c);
+    gquad(P(hw + o, -hd - g, ze), P(0, -hd - g, z + rh), P(0, hd + g, z + rh), P(hw + o, hd + g, ze), c);
     gtri(P(-hw, hd, z), P(hw, hd, z), P(0, hd, z + rh), cw); gtri(P(hw, -hd, z), P(-hw, -hd, z), P(0, -hd, z + rh), cw);
   }
 }
 function glPyr(cx, cy, u0, v0, hw, hd, z, rh, col) {
   const c = gcol(col), o = .04, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy), T = P(0, 0, z + rh); GLB.ctr = P(0, 0, z - 1);
-  const A = P(-hw - o, -hd - o, z), B = P(hw + o, -hd - o, z), C = P(hw + o, hd + o, z), D = P(-hw - o, hd + o, z);
+  const ze = z - rh * o / Math.max(.05, Math.min(hw, hd)), A = P(-hw - o, -hd - o, ze), B = P(hw + o, -hd - o, ze), C = P(hw + o, hd + o, ze), D = P(-hw - o, hd + o, ze); // eaves drop to meet the walls
   gtri(B, A, T, c); gtri(A, D, T, c); gtri(D, C, T, c); gtri(C, B, T, c);
 }
 // windows on all four walls (the camera can go round now); em in (0, 1) = a window, lit when em < the night's lit fraction
