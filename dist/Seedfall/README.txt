@@ -273,8 +273,7 @@ THE 3D VIEW
   turns, two pinch and move, a tap shows what's there.
   Zoom in and the streets near you fill in: sills and shutters, cornices, door
   steps, gutters, balconies, the glazing on glass towers.
-  The button in the bottom corner switches between 3D and the flat 2D view, and
-  Seedfall remembers which you like. On a slow PC, 2D is the lighter one.
+  On a PC with no 3D support, Seedfall falls back to the flat 2D view.
 
 KEYS
   C        chronicle, towns, people, lore

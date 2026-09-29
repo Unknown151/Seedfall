@@ -1050,19 +1050,14 @@ function glPeople() {
 
 /* ---------- switching between the 2D and 3D views (3D by default) ---------- */
 const GL_DEFAULT = true; // new worlds and new browsers open in 3D (the choice is remembered)
-function glWanted() { if (QS.has('2d')) return false; if (QS.has('gl')) return true; try { const v = localStorage.getItem('sf3d'); if (v) return v === '1'; } catch (e) { } return GL_DEFAULT; }
+function glWanted() { return !QS.has('2d'); } // always 3D (2D stays as the fallback for ?2d and browsers without WebGL2)
 function glToggle() {
   const want = !GL3.on; try { localStorage.setItem('sf3d', want ? '1' : '0'); } catch (e) { }
   if (want) { if (!GL3.gl) glInit(); else { GL3.on = true; GL3.c.style.display = 'block'; $('view').style.display = 'none'; for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); } }
   else { ensure2D(); GL3.on = false; GL3.c.style.display = 'none'; $('view').style.display = 'block'; const h = $('glHint'); if (h) h.remove(); $('tip').style.opacity = 0; renderAll(); relightNow(); }
   glBtn();
 }
-function glBtn() {
-  let b = $('glBtn');
-  if (!b) { b = document.createElement('button'); b.id = 'glBtn'; b.onclick = glToggle; b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:4;padding:8px 14px;border:0;border-radius:12px;background:rgba(255,251,245,.9);box-shadow:0 4px 18px rgba(60,40,60,.18);font:600 13px "Segoe UI",system-ui,sans-serif;color:#2b2833;cursor:pointer'; document.body.appendChild(b); }
-  if (innerWidth < 700) b.style.bottom = '104px'; // clear of the tool bar on a phone
-  b.textContent = GL3.on ? 'Switch to 2D' : 'Try it in 3D';
-}
+function glBtn() { const b = $('glBtn'); if (b) b.remove(); } // (the 2D/3D switch is gone)
 
 /* ---------- textures, painted in code at start-up (no image files): one layer each in a texture array ---------- */
 // Materials: 0 none, 1 grass, 2 brick, 3 roof tiles, 4 bark, 5 leaves, 6 plaster, 7 stone, 8 planks, 9 cobbles, 10 asphalt, 11 earth.
