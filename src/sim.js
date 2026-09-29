@@ -53,7 +53,7 @@ function shortCap(t) { const s = t.split(/[.:;!]/)[0]; return s.length > 58 ? s.
 function newState(seed) {
   const g = genWorld(seed);
   S = {
-    v: 1, roadV: 2, seed, created: Date.now(), savedAt: 0, playSec: 0,
+    v: 1, roadV: 2, size: W, seed, created: Date.now(), savedAt: 0, playSec: 0,
     year: 0, month: 0, map: g.M, B: {}, nextB: 1, T: {}, nextT: 1, P: {}, nextP: 1,
     tech: { done: {}, cur: 0, pts: 0 }, era: 0, age: null, ageN: 0, ageUsed: {},
     styles: [Object.assign({}, STYLES0[0])], styleIdx: 0,
@@ -738,24 +738,25 @@ function growTown(T) {
 
 /* ---------- founding ---------- */
 const MAX_TOWNS = [1, 1, 2, 3, 4, 5, 6, 6, 7, 7];
+const BIGMAP = W > 64; // wide lands: twice the towns, and settlers who go further afield to find open country
 function tryFound() {
-  const ts = towns(), g = lever('growth'), PT = S.pendingTown;
+  const ts = towns(), g = lever('growth'), PT = S.pendingTown, K = BIGMAP ? 2 : 1;
   if (PT && S.year > PT.until) { S.pendingTown = null; chron('🧭', `The settlers who meant to found ${PT.name} never find the right valley, and quietly unpack.`); return; }
-  const forced = PT && S.year >= PT.at && ts.length < 10;
+  const forced = PT && S.year >= PT.at && ts.length < 10 * K;
   if (!forced) {
     if (g === 'stay_small') return;
     const more = g === 'more_towns' ? 2 : 0;
-    if (ts.length >= MAX_TOWNS[S.era] + (S.age ? 1 : 0) + more || ts.length >= 8 + more) return;
-    if (S.year - S.lastFound < (more ? 12 : 25)) return;
+    if (ts.length >= MAX_TOWNS[S.era] * K + (S.age ? 1 : 0) + more || ts.length >= 8 * K + more) return;
+    if (S.year - S.lastFound < (more ? 12 : BIGMAP ? 16 : 25)) return;
   }
   const parent = ts.filter(T => T.pop > (forced ? 20 : 40 + ts.length * 30)).sort((a, b) => b.pop - a.pop)[0];
   if (!parent) return;
   let best = null, bs = -1e9;
-  for (let t = 0; t < (forced ? 1500 : 500); t++) {
+  for (let t = 0; t < (forced ? 1500 : 500) * K; t++) {
     const x = 3 + ri(0, W - 7), y = 3 + ri(0, H - 7), i = idx(x, y);
     if (M.water[i] || M.bld[i] || M.ruin[i] || M.elev[i] > 5 || M.bio[i] === BIO.ROCK || M.bio[i] === BIO.SNOW) continue;
     const dp = dist(x, y, parent.x, parent.y);
-    if (dp < (forced ? 7 : 10) || dp > (forced ? 40 : 26)) continue;
+    if (dp < (forced ? 7 : 10) || dp > (forced ? 40 : 26) * (BIGMAP ? 1.6 : 1)) continue;
     if (ts.some(T => dist(x, y, T.x, T.y) < Math.max(forced ? 8 : 11, townRadius(T) + 2.5))) continue; // open country, not someone else's back streets
     let ok = 0, fert = 0, water = 0;
     for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
@@ -763,7 +764,7 @@ function tryFound() {
       if (M.water[j]) water++; else if (!M.bld[j] && !M.road[j] && !M.plan[j] && Math.abs(M.elev[j] - M.elev[i]) <= 1) { ok++; fert += M.fert[j]; }
     }
     if (ok < (forced ? 16 : 22)) continue;
-    const s = ok * .4 + fert * .25 + (water > 0 && water < 12 ? 6 : 0) - dp * .15 + rnd() * 4 + ((S.springs || []).some(o => dist(o.x, o.y, x, y) < 6) ? 5 : 0); // settlers like a hot spring
+    const s = ok * .4 + fert * .25 + (water > 0 && water < 12 ? 6 : 0) - dp * (BIGMAP ? .04 : .15) + rnd() * 4 + ((S.springs || []).some(o => dist(o.x, o.y, x, y) < 6) ? 5 : 0); // settlers like a hot spring
     if (s > bs) { bs = s; best = { x, y }; }
   }
   if (!best) { if (!forced) S.lastFound = S.year - 15; else PT.at = S.year + 3; return; }
@@ -805,7 +806,7 @@ function researchRate() {
   }
   m = Math.min(m, 6);
   if (S.age) { const th = AGE_THEMES.find(a => a.k === S.age.k); if (th && th.research) m *= th.research; }
-  return (0.9 * Math.pow(pop, 0.62) * m + (S.year < 20 ? 3 : 0)) * (1 + .25 * (CULT.rs || 0));
+  return (0.9 * Math.pow(pop, 0.62) * m + (S.year < 20 ? 3 : 0)) * (1 + .25 * (CULT.rs || 0)) * (BIGMAP ? .78 : 1); // (wide lands hold more people and schools, not a faster march of discovery)
 }
 function stepResearch() {
   if (S.tech.cur >= TECHS.length) return;

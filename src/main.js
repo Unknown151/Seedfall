@@ -24,8 +24,9 @@ function startWorld(isNew) {
   glBtn();
   if (!RUNNING) { RUNNING = true; requestAnimationFrame(frame); }
 }
-async function newWorld(seed, archive) {
+async function newWorld(seed, archive, size) {
   if (archive && S && FOLDER.ok) { S.savedAt = Date.now(); await archiveFolderWorld(serialize()); }
+  if (size && size !== W) { await resizeTo(size, { then: 'new', seed }); return; } // (a map of the other size: the page comes back at that size and starts it)
   newState(seed);
   const pod = Object.values(S.B).find(B => B.type === 'pod'); if (pod) pod.hid = 1;
   startWorld(true);
@@ -167,9 +168,18 @@ async function boot() {
     newState(+QS.get('seed')); if (QS.has('nointro')) { S.flags.intro = 0; introChronicle(); } else { const pod = Object.values(S.B).find(B => B.type === 'pod'); if (pod) pod.hid = 1; } startWorld(true);
     return;
   }
+  const pend = await IDB.get('pending'); if (pend) await IDB.del('pending'); // a world parked to come back at its own size
+  if (pend && pend.save && saveSize(pend.save) !== W) { await resizeTo(saveSize(pend.save), pend); return; } // (opened at the wrong size somehow: go again)
   if (cloud) {
+    if (pend) { // carry on with what was being done: a new world, a switch, a loaded file, a take-over or the startup pick
+      if (pend.then === 'new') { await newWorld(pend.seed); await cloudOwn(false); return; }
+      try { const c = await cloudGet(true); CLOUD.rev = c ? c.meta.rev : null; } catch (e) { }
+      deserialize(pend.save); if (pend.then === 'switch') S.lastLive = Date.now(); startWorld(false);
+      if (pend.then === 'switch' || pend.then === 'load') toast(`Welcome back to ${S.planet || 'your world'}.`);
+      await cloudOwn(pend.then === 'cloud' ? !!pend.upload : true); return;
+    }
     const r = await cloudStart();
-    if (r) { deserialize(r.save); startWorld(false); await cloudOwn(r.upload); return; }
+    if (r) { if (!(await fitSize(r.save, 'cloud', { upload: r.upload }))) return; deserialize(r.save); startWorld(false); await cloudOwn(r.upload); return; }
   } else {
     let st = parseSave(await IDB.get('save'));
     const h = await IDB.get('dir');
@@ -182,17 +192,19 @@ async function boot() {
         if (fs && (!st || (fs.state.savedAt || 0) > (st.state.savedAt || 0))) st = fs;
       } else showBanner();
     }
-    if (st) { deserialize(st); startWorld(false); return; }
+    if (pend && pend.then === 'new') { await newWorld(pend.seed); return; }
+    if (pend && pend.save) { deserialize(pend.save); startWorld(false); saveAll(); return; }
+    if (st) { if (!(await fitSize(st, 'boot'))) return; deserialize(st); startWorld(false); return; }
   }
   // first run
-  const w = $('welcome'); w.classList.add('show');
+  const w = $('welcome'); w.classList.add('show'); sizeRow($('wSize'));
   if (cloud) {
     $('wText').textContent = 'The world grows while it\'s on screen, and keeps going for up to 8 hours while you\'re away. It is saved to the cloud, so you can carry on from any browser you log in from. Already have a world? Load its save.json.';
     $('wFine').innerHTML = `World seed <input id="wSeed" spellcheck="false"> · saving to the cloud${CLOUD.email ? ' as ' + esc(CLOUD.email) : ''}.`;
     $('wSeed').value = randSeed();
     $('wFolder').textContent = 'Load a save.json…'; $('wLocal').textContent = 'Start a new world';
     $('wFolder').onclick = async () => { if (await cloudLoadFile(true)) w.classList.remove('show'); };
-    $('wLocal').onclick = async () => { w.classList.remove('show'); await newWorld(+$('wSeed').value || randSeed()); cloudOwn(false); };
+    $('wLocal').onclick = async () => { w.classList.remove('show'); await newWorld(+$('wSeed').value || randSeed(), false, UI.newSize); cloudOwn(false); };
     return;
   }
   $('wSeed').value = randSeed();
@@ -201,15 +213,15 @@ async function boot() {
     const fs = await connectFolder(true);
     if (fs === false) return;
     w.classList.remove('show');
-    if (fs) { deserialize(fs); startWorld(false); toast(`Welcome back to ${S.planet || 'your world'}.`); }
-    else { await newWorld(+$('wSeed').value || randSeed()); }
+    if (fs) { if (!(await fitSize(fs, 'boot'))) return; deserialize(fs); startWorld(false); toast(`Welcome back to ${S.planet || 'your world'}.`); }
+    else { await newWorld(+$('wSeed').value || randSeed(), false, UI.newSize); }
   };
-  $('wLocal').onclick = () => { w.classList.remove('show'); newWorld(+$('wSeed').value || randSeed()); };
+  $('wLocal').onclick = () => { w.classList.remove('show'); newWorld(+$('wSeed').value || randSeed(), false, UI.newSize); };
 }
-setInterval(() => { if (S && RUNNING) saveAll(); }, 45000);
+setInterval(() => { if (S && RUNNING && !RESIZING) saveAll(); }, 45000);
 setInterval(() => { if (S && RUNNING) aiMaybeGossip(); }, 30000);
 document.addEventListener('visibilitychange', () => { if (document.hidden && S && RUNNING) saveAll('hidden'); else lastT = 0; });
-addEventListener('beforeunload', () => { if (S && RUNNING && !CLOUD.conflict && !SCRATCH) { S.savedAt = Date.now(); try { IDB.set('save', JSON.stringify(serialize())); } catch (e) { } } });
+addEventListener('beforeunload', () => { if (S && RUNNING && !CLOUD.conflict && !SCRATCH && !RESIZING) { S.savedAt = Date.now(); try { IDB.set('save', JSON.stringify(serialize())); } catch (e) { } } });
 boot();
 </script>
 </body>

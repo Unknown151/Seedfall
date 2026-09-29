@@ -72,8 +72,15 @@ function bindUI() {
   $('banner').addEventListener('click', () => reconnectFolder());
 }
 function confirmBox(title, text, yes) {
-  $('cTitle').textContent = title; $('cText').textContent = text; $('confirm').classList.add('show');
+  $('cTitle').textContent = title; $('cText').textContent = text; $('confirm').classList.add('show'); $('cSize').hidden = true;
   $('cYes').onclick = () => { $('confirm').classList.remove('show'); yes(); };
+}
+// how big a new world is: a valley (64 tiles a side, as it always was) or wide lands (128: four times the ground, more towns, and more for the PC to draw)
+const SIZE_OPTS = [[64, 'A valley', '64 × 64 tiles'], [128, 'Wide lands', '128 × 128: four times the ground, heavier on the PC']];
+function sizeRow(el) {
+  if (!UI.newSize) UI.newSize = W;
+  el.innerHTML = SIZE_OPTS.map(([n, a, b]) => `<button class="btn${n === UI.newSize ? ' sel' : ''}" data-size="${n}">${a}<small>${b}</small></button>`).join(''); el.hidden = false;
+  el.querySelectorAll('[data-size]').forEach(b => b.onclick = () => { UI.newSize = +b.dataset.size; el.querySelectorAll('[data-size]').forEach(x => x.classList.toggle('sel', x === b)); });
 }
 function togglePanel() { UI.panel = !UI.panel; document.body.classList.toggle('panel', UI.panel); if (UI.panel) { renderPanel(true); } }
 function selectTool(k) {

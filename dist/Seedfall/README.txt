@@ -16,6 +16,13 @@ FIRST RUN
   After a browser restart, Edge may need one click on the page to re-allow
   folder access (a small banner tells you). It also keeps a copy in the browser.
 
+WORLD SIZE
+  A new world is either a valley (64 x 64 tiles, the classic size) or wide lands
+  (128 x 128: four times the ground, twice the towns, spread further apart). Pick
+  on the welcome card or when you start a new world. Wide lands ask more of the
+  PC and take longer to catch up after time away. The page reloads itself when it
+  opens a world of the other size, and it remembers the size you last used.
+
 TIME
   The world pauses whenever the tab isn't visible. When you come back it catches up on
   the time you were gone, but at most 8 hours of it (and never more than 250 years),

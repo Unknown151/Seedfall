@@ -47,6 +47,14 @@ npm run dev               # local Worker at http://127.0.0.1:8787 with a fake lo
   are hoisted, but top-level `const`s from later files are only usable at runtime.
 - **Duplicate function names fail the build.** A duplicate would silently shadow the earlier one. That
   has bitten twice: `stepPeople` vs `stepAgents` stopped anyone dying, and `workFor` vs `jobPlace`.
+- **Map size.** `W`/`H` are 64 or 128 (`MAP_SIZES`), fixed when the page loads (`MAPN` in util.js: `?size=`,
+  else localStorage `sfSize`), so every buffer is still sized once. Worlds carry `S.size` (older saves are 64).
+  Every load goes through `fitSize(save, then)`: a world of the other size is parked in IndexedDB (`pending`,
+  with what was being done: boot, cloud, load, switch) and `resizeTo` reloads the page at its size; `boot()` picks
+  `pending` up first. `newWorld(seed, archive, size)` does the same with `{then: 'new', seed}`. `RESIZING` stops
+  saves while the page goes. The size is chosen in `sizeRow` (welcome card `#wSize`, new-world question `#cSize`).
+  Wide lands (`BIGMAP`) found twice the towns further out, and research runs at .78 so the pace stays the same.
+  `test/mapsize.mjs` covers it.
 - **URL flags.** Open `seedfall.html` directly. `?seed=N&fresh` makes a scratch world (`SCRATCH`): it never
   saves anywhere (IndexedDB, folder or cloud) and never claims the cloud world, so it's safe on the live
   site. `&nointro` skips the landing, and `&dev` adds an fps readout and opens the debug card.
@@ -101,6 +109,7 @@ itself is covered by `glpick`, `glphone` and `soak`. Add `&2d` to a new test unl
 | `prayers` | Prayer words at three points in history: all well-formed (no `undefined`, lowercase sentence starts or overlong cards), 40+ different out of 60 per kind, early ones free of radios and seedships and late ones mentioning them. |
 | `lots` | Bigger lots: landmarks spreading onto 2×1/2×2 lots, harbours growing to several berths, ships at their own berths, every tile of a lot pointing at it, saves keeping lots, removal freeing them. `SHOTS=1` adds 3D pictures. |
 | `glfilm` | The film camera (shots in a row, varied, a touch hands the camera back, a minute later it carries on) and the season and weather reaching the 3D shader. `SHOTS=1` saves pictures. |
+| `mapsize` | Valley or wide lands: the welcome card and New world offer both, choosing the other size reloads at it, a plain reload remembers it, a world opened at the wrong size reloads at its own, and a 128 world by 1800 has more towns spread further with the same techs. Needs `npm run serve`. |
 | `roads` | Road surfaces by era and material: dirt and gravel early, cobbles or bricks with Masonry, asphalt and concrete with Motorcars, glowlanes with Hovercraft, the market quarter keeping its cobbles, chronicle firsts, the tooltip, and an older save's roads converted. |
 | `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, kept worlds (new, switch, forget), a `?fresh` scratch tab saving nothing, and file:// staying cloud-free. Needs the root `npm install`. |
 
@@ -262,5 +271,5 @@ See `TODO.md`:
    Cloudflare Access for login, saves in Workers KV, a server-side voice proxy, and cloud mode in the game.
    Leftovers (server-side exports, phone support) are in TODO.md. The game still works exactly as before
    when opened from `file://`.
-2. **Bigger worlds** (128×128 or 96×96). Blocked on static canvas memory, which would be ~420 MB at
-   128×128 unless the layer is chunked.
+2. **Bigger worlds**: done as a choice per world (64 or 128). The 2D fallback's static canvas is only made when
+   2D is used, so it no longer blocks it.

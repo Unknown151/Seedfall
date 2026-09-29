@@ -2,7 +2,11 @@
 /* ============================== util ============================== */
 const SF = window.SF = {};
 const TAU = Math.PI * 2;
-const W = 64, H = 64;              // map size in tiles
+// map size in tiles: fixed when the page loads (?size=, else the size of the last world opened here), so every
+// buffer is sized once; a world of the other size reloads the page at its size (fitSize in persist.js)
+const MAP_SIZES = [64, 128];
+const MAPN = (() => { let n = +new URLSearchParams(location.search).get('size'); if (!MAP_SIZES.includes(n)) { try { n = +localStorage.getItem('sfSize'); } catch (e) { } } return MAP_SIZES.includes(n) ? n : 64; })();
+const W = MAPN, H = MAPN;
 const TW2 = 16, TH2 = 8, EH = 6;   // iso half-width, half-height, elevation step (world units)
 const SEAZ = 9;                    // sea surface z
 const RS = 2;                      // static layer resolution multiplier

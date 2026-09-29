@@ -67,10 +67,11 @@ only, or a few invited emails.
 - **Phone support:** touch pan and zoom, and a lower-resolution static layer on small screens.
 - ~~Catch-up for time away~~: done (up to 8 hours, see `catchUp` in main.js).
 
-## 2. Bigger worlds (128×128, or 96×96 as a middle ground)
+## 2. Bigger worlds (done: 64 or 128 per world)
 
-- **Per-world map size.** Old saves stay 64×64.
-- **Graphics memory.** The static layer needs chunking or a lower resolution. At 128×128 it would take
-  ~420 MB of canvas memory as things are now; 96×96 would be about 250 MB.
-- **Worldgen retune.** More rivers, ranges and ruins.
-- **Towns.** More of them, with sensible spacing, then re-check the pacing.
+- Done: per-world size (`S.size`, old saves 64), picked for each new world; the page reloads at a world's size.
+- Done: towns (twice as many on wide lands, further apart) and research trimmed so the pace holds.
+- Done: graphics memory. The 3D view doesn't use the static layer, which is only made for the 2D fallback
+  (at 128 it's ~170 MB there).
+- Left: a worldgen retune for the bigger map (more rivers, ranges and ruins), and simpler far chunks if
+  128 turns out heavy on laptops.
