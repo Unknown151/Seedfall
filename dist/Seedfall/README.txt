@@ -286,6 +286,12 @@ THE 3D VIEW
   and it's yours again. R turns the film camera off or on.
   Zoom in and the streets near you fill in: sills and shutters, cornices, door
   steps, gutters, balconies, the glazing on glass towers.
+  The towns grow up in the style of the old city-builders: thatch and earth
+  yards with barrels, crates and washing lines for the first farmers; brick
+  terraces with dormers and chimney pots for the workers; stone ground floors,
+  quoins and striped shop awnings for the artisans; and tall mansard blocks
+  with iron cresting for the engineers. Chimneys smoke (more in winter), and
+  so do the works.
   On a PC with no 3D support, Seedfall falls back to the flat 2D view.
 
 KEYS

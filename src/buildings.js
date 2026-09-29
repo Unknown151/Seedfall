@@ -559,7 +559,9 @@ function porch(c, cx, cy, u0, v0, hd, st) { // a canopy on two posts by the door
   for (const a of [-.1, .1]) { const p = pt(cx, cy, u0 + a, v0 + hd + .1, 0); line(c, p[0], p[1], p[0], p[1] - 4.5, shade(st.trim, .9), .6); }
   box(c, cx, cy, u0, v0 + hd + .055, .13, .06, 4.5, .8, st.roof);
 }
+const AWN_C = ['#c8433a', '#3f7a4f', '#d9a032', '#3f5f8a', '#8a3f5f'];
 function awning(c, cx, cy, u0, v0, hw, hd, st, U) { // shopfronts: a striped awning over the ground floor
+  if (GLB) { const k = (hash2(GLB.x, GLB.y, 919) * 6) | 0; return glAwning(cx, cy, u0, v0, hw, hd, k < 5 ? AWN_C[k] : st.accent, U); }
   if (U) { box(c, cx, cy, u0, v0 + hd + .04, hw * .86, .045, 4.6, 1, st.accent); box(c, cx, cy, u0, v0 + hd + .002, hw * .9, .002, 0, 4.2, mix(st.wall, st.trim, .45)); }
   else { box(c, cx, cy, u0 + hw + .04, v0, .045, hd * .86, 4.6, 1, st.accent); box(c, cx, cy, u0 + hw + .002, v0, .002, hd * .9, 0, 4.2, mix(st.wall, st.trim, .45)); }
 }
@@ -602,7 +604,8 @@ function drawRow(c, B, cx, cy, st, J, hm, wc) {
   else poly(c, [pt(cx, cy, hw + .003, v0 + L * .3 - .045, 0), pt(cx, cy, hw + .003, v0 + L * .3 + .045, 0), pt(cx, cy, hw + .003, v0 + L * .3 + .045, 4.4), pt(cx, cy, hw + .003, v0 + L * .3 - .045, 4.4)], shade(st.trim, .9));
   if (t === 5 && (r * 13) % 1 < .45) for (let z = 8; z < h - 2; z += 6) box(c, cx, cy, U ? u0 : u0 + hw + .015, U ? v0 + hd + .015 : v0, U ? hw * .9 : .03, U ? .03 : hd * .9, z, 1, st.accent); // balconies down the street
   if (t >= 4) box(c, cx, cy, u0, v0, hw + .015, hd + .015, h, 1.4, shade(st.trim, 1.22)); // cornice
-  if (t === 3 || (t === 4 && r < .55)) roofGable(c, cx, cy, u0, v0, hw, hd, h + (t === 4 ? 1.4 : 0), t === 3 ? 6 : 4.5, st.roof, st.wall, U);
+  const pitched = !dsFlat() && !hasTech('computing'); // (terraces keep pitched roofs, chimneys at the party walls, until the modern blocks come)
+  if (t === 3 || (t === 4 && (r < .55 || pitched)) || t === 5 && pitched) roofGable(c, cx, cy, u0, v0, hw, hd, h + (t >= 4 ? 1.4 : 0), t === 3 ? 6 : t === 5 ? 6 : 4.5, st.roof, st.wall, U);
   else roofBits(c, cx, cy, u0, v0, hw, hd, h, st, B);
   if (t === 3 && dsFlat()) roofBits(c, cx, cy, u0, v0, hw, hd, h, st, B);
 }
@@ -655,7 +658,7 @@ function drawHouse(c, B, cx, cy, st) {
       windows(c, cx, cy, uu, v0, hw, hd, 0, h, h > 8 ? 2 : 1, 2, wc);
       roofGable(c, cx, cy, uu, v0, hw, hd, h, 6, st.roof, st.wall, au);
       if (flatR) roofBits(c, cx, cy, uu, v0, hw, hd, h, st, B);
-      else if (v > .3) box(c, cx, cy, uu + hw * (hk(B, 8) < .5 ? .5 : -.5), v0 - hd * .4, .04, .04, h + 2, 6, '#8f6f62');
+      else if (v > .3 && !GLB) box(c, cx, cy, uu + hw * (hk(B, 8) < .5 ? .5 : -.5), v0 - hd * .4, .04, .04, h + 2, 6, '#8f6f62');
       if (hk(B, 5) < .35) porch(c, cx, cy, uu - hw * .3, v0, hd, st);
       return;
     }
@@ -677,7 +680,8 @@ function drawHouse(c, B, cx, cy, st) {
       box(c, cx, cy, 0, 0, hw, hd, 0, h, st.wall); windows(c, cx, cy, 0, 0, hw, hd, 0, h, h > 20 ? 4 : 3, 3, wc);
       box(c, cx, cy, 0, 0, hw + .02, hd + .02, h, 1.5, shade(st.trim, 1.25));
       if (shopfront(B)) awning(c, cx, cy, 0, 0, hw, hd, st, true); else box(c, cx, cy, 0, hd + .02, hw, .03, 7, .8, st.accent);
-      if (v > .5 || flatR) { box(c, cx, cy, -.15, -.1, .08, .08, h + 1.5, 5, shade(st.wall, .95)); if (flatR) roofBits(c, cx, cy, 0, 0, hw, hd, h + 1.5, st, B); }
+      if (flatR || v > .5 && hasTech('computing')) { box(c, cx, cy, -.15, -.1, .08, .08, h + 1.5, 5, shade(st.wall, .95)); if (flatR) roofBits(c, cx, cy, 0, 0, hw, hd, h + 1.5, st, B); }
+      else if ((hk(B, 13) < .4 || v > .5) && hasTech('steam')) roofMansard(c, cx, cy, 0, 0, hw, hd, h + 1.5, 6, st.roof); // a mansard on the grander townhouses
       else roofGable(c, cx, cy, 0, 0, hw, hd, h + 1.5, 5, st.roof, st.wall, true);
       if (hk(B, 5) < .22) { const [X, Y] = pt(cx, cy, hw - .02, hd - .02, 0); cyl(c, X, Y, .1, 0, h + 3, st.wall); cone(c, X, Y - h - 3, .13, 7, st.roof); } // a corner turret
       return;
@@ -687,13 +691,17 @@ function drawHouse(c, B, cx, cy, st) {
       const h = 30 + ((v * 3) % 1) * 22, hw = .31 + ((v * 7) % 1) * .07, hd = .31 + ((v * 11) % 1) * .07;
       const wall = kind === 3 ? mix(st.wall, st.accent, .22) : kind === 1 ? mix(st.wall, st.roof, .12) : st.wall;
       box(c, cx, cy, 0, 0, hw, hd, 0, h, wall); windows(c, cx, cy, 0, 0, hw, hd, 0, h, Math.round(h / 6), 4, wc);
-      if (kind === 0) { // flat roof, stair box and water tank
+      if (!hasTech('computing') && !dsFlat()) { // the engineers' blocks: a mansard, and iron balconies on some
+        if (kind === 3) for (let z = 8; z < h - 2; z += 6) box(c, cx, cy, 0, hd + .015, hw * .9, .03, z, 1, st.accent);
+        box(c, cx, cy, 0, 0, hw + .015, hd + .015, h, 1.4, shade(st.trim, 1.2)); roofMansard(c, cx, cy, 0, 0, hw + .02, hd + .02, h + 1.4, 8, st.roof);
+        if (hk(B, 14) < .5) awning(c, cx, cy, 0, 0, hw, hd, st, hk(B, 15) < .5);
+      } else if (kind === 0) { // flat roof, stair box and water tank
         box(c, cx, cy, 0, 0, hw + .015, hd + .015, h, 1.4, shade(st.trim, 1.2));
         box(c, cx, cy, -.12, -.12, .1, .08, h + 1.4, 4, shade(wall, .92));
         cyl(c, ...pt(cx, cy, .15, -.1, 0), .05, h + 1.4, 5, '#8a7d73');
       } else if (kind === 1) { // mansard roof
-        roofPyr(c, cx, cy, 0, 0, hw + .02, hd + .02, h, 7, st.roof);
-        box(c, cx, cy, .12, -.08, .05, .05, h + 3, 6, shade(st.trim, 1.1));
+        roofMansard(c, cx, cy, 0, 0, hw + .02, hd + .02, h, 7, st.roof);
+        if (!GLB) box(c, cx, cy, .12, -.08, .05, .05, h + 3, 6, shade(st.trim, 1.1));
       } else if (kind === 2) { // setback penthouse
         box(c, cx, cy, 0, 0, hw + .015, hd + .015, h, 1.2, shade(st.trim, 1.2));
         box(c, cx, cy, -.06, -.06, hw * .6, hd * .6, h + 1.2, 6, shade(wall, 1.05)); windows(c, cx, cy, -.06, -.06, hw * .6, hd * .6, h + 1.2, 6, 1, 2, wc);

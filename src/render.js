@@ -225,6 +225,7 @@ function roofGable(c, cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
     poly(c, [P(hw + o, -hd - o, z), P(hw + o, hd + o, z), P(0, hd + o, z + rh), P(0, -hd - o, z + rh)], topC(shade(col, lf(r, 0, hw))));
   }
 }
+function roofMansard(c, cx, cy, u0, v0, hw, hd, z, rh, col) { if (GLB) return glMansard(cx, cy, u0, v0, hw, hd, z, rh, col); roofPyr(c, cx, cy, u0, v0, hw, hd, z, rh, col); } // (a plain hip roof in 2D)
 function roofPyr(c, cx, cy, u0, v0, hw, hd, z, rh, col) {
   if (DS && dsRoof(c, cx, cy, u0, v0, hw, hd, z, rh, col)) return;
   if (GLB) return glPyr(cx, cy, u0, v0, hw, hd, z, rh, col);
@@ -692,6 +693,7 @@ function drawYard(c, B, x, y, cx, cy) {
 // the 3D garden: each free corner of the plot gets a bush, a flower bed, a tree or a clump of grass, and some plots a hedge
 function glYard(B, x, y) {
   const row = houseJoin(B), big = B.tier > 3;
+  if (!row && B.tier >= 1 && B.tier <= 3 && B.prog >= 1) glYardBits(B, x, y);
   for (const [u, v, k] of [[-.42, -.42, 0], [-.42, .42, 1], [.42, .42, 2], [.42, -.42, 3]]) {
     const h = hash2(x, y, 510 + k), X = pt(0, 0, u, v, 0);
     if (row && h < .7) continue; // terraces keep to window boxes and the odd pot

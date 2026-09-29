@@ -1242,6 +1242,7 @@ function roofGable(c, cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
     poly(c, [P(hw + o, -hd - o, z), P(hw + o, hd + o, z), P(0, hd + o, z + rh), P(0, -hd - o, z + rh)], topC(shade(col, lf(r, 0, hw))));
   }
 }
+function roofMansard(c, cx, cy, u0, v0, hw, hd, z, rh, col) { if (GLB) return glMansard(cx, cy, u0, v0, hw, hd, z, rh, col); roofPyr(c, cx, cy, u0, v0, hw, hd, z, rh, col); } // (a plain hip roof in 2D)
 function roofPyr(c, cx, cy, u0, v0, hw, hd, z, rh, col) {
   if (DS && dsRoof(c, cx, cy, u0, v0, hw, hd, z, rh, col)) return;
   if (GLB) return glPyr(cx, cy, u0, v0, hw, hd, z, rh, col);
@@ -1709,6 +1710,7 @@ function drawYard(c, B, x, y, cx, cy) {
 // the 3D garden: each free corner of the plot gets a bush, a flower bed, a tree or a clump of grass, and some plots a hedge
 function glYard(B, x, y) {
   const row = houseJoin(B), big = B.tier > 3;
+  if (!row && B.tier >= 1 && B.tier <= 3 && B.prog >= 1) glYardBits(B, x, y);
   for (const [u, v, k] of [[-.42, -.42, 0], [-.42, .42, 1], [.42, .42, 2], [.42, -.42, 3]]) {
     const h = hash2(x, y, 510 + k), X = pt(0, 0, u, v, 0);
     if (row && h < .7) continue; // terraces keep to window boxes and the odd pot
@@ -2303,7 +2305,9 @@ function porch(c, cx, cy, u0, v0, hd, st) { // a canopy on two posts by the door
   for (const a of [-.1, .1]) { const p = pt(cx, cy, u0 + a, v0 + hd + .1, 0); line(c, p[0], p[1], p[0], p[1] - 4.5, shade(st.trim, .9), .6); }
   box(c, cx, cy, u0, v0 + hd + .055, .13, .06, 4.5, .8, st.roof);
 }
+const AWN_C = ['#c8433a', '#3f7a4f', '#d9a032', '#3f5f8a', '#8a3f5f'];
 function awning(c, cx, cy, u0, v0, hw, hd, st, U) { // shopfronts: a striped awning over the ground floor
+  if (GLB) { const k = (hash2(GLB.x, GLB.y, 919) * 6) | 0; return glAwning(cx, cy, u0, v0, hw, hd, k < 5 ? AWN_C[k] : st.accent, U); }
   if (U) { box(c, cx, cy, u0, v0 + hd + .04, hw * .86, .045, 4.6, 1, st.accent); box(c, cx, cy, u0, v0 + hd + .002, hw * .9, .002, 0, 4.2, mix(st.wall, st.trim, .45)); }
   else { box(c, cx, cy, u0 + hw + .04, v0, .045, hd * .86, 4.6, 1, st.accent); box(c, cx, cy, u0 + hw + .002, v0, .002, hd * .9, 0, 4.2, mix(st.wall, st.trim, .45)); }
 }
@@ -2346,7 +2350,8 @@ function drawRow(c, B, cx, cy, st, J, hm, wc) {
   else poly(c, [pt(cx, cy, hw + .003, v0 + L * .3 - .045, 0), pt(cx, cy, hw + .003, v0 + L * .3 + .045, 0), pt(cx, cy, hw + .003, v0 + L * .3 + .045, 4.4), pt(cx, cy, hw + .003, v0 + L * .3 - .045, 4.4)], shade(st.trim, .9));
   if (t === 5 && (r * 13) % 1 < .45) for (let z = 8; z < h - 2; z += 6) box(c, cx, cy, U ? u0 : u0 + hw + .015, U ? v0 + hd + .015 : v0, U ? hw * .9 : .03, U ? .03 : hd * .9, z, 1, st.accent); // balconies down the street
   if (t >= 4) box(c, cx, cy, u0, v0, hw + .015, hd + .015, h, 1.4, shade(st.trim, 1.22)); // cornice
-  if (t === 3 || (t === 4 && r < .55)) roofGable(c, cx, cy, u0, v0, hw, hd, h + (t === 4 ? 1.4 : 0), t === 3 ? 6 : 4.5, st.roof, st.wall, U);
+  const pitched = !dsFlat() && !hasTech('computing'); // (terraces keep pitched roofs, chimneys at the party walls, until the modern blocks come)
+  if (t === 3 || (t === 4 && (r < .55 || pitched)) || t === 5 && pitched) roofGable(c, cx, cy, u0, v0, hw, hd, h + (t >= 4 ? 1.4 : 0), t === 3 ? 6 : t === 5 ? 6 : 4.5, st.roof, st.wall, U);
   else roofBits(c, cx, cy, u0, v0, hw, hd, h, st, B);
   if (t === 3 && dsFlat()) roofBits(c, cx, cy, u0, v0, hw, hd, h, st, B);
 }
@@ -2399,7 +2404,7 @@ function drawHouse(c, B, cx, cy, st) {
       windows(c, cx, cy, uu, v0, hw, hd, 0, h, h > 8 ? 2 : 1, 2, wc);
       roofGable(c, cx, cy, uu, v0, hw, hd, h, 6, st.roof, st.wall, au);
       if (flatR) roofBits(c, cx, cy, uu, v0, hw, hd, h, st, B);
-      else if (v > .3) box(c, cx, cy, uu + hw * (hk(B, 8) < .5 ? .5 : -.5), v0 - hd * .4, .04, .04, h + 2, 6, '#8f6f62');
+      else if (v > .3 && !GLB) box(c, cx, cy, uu + hw * (hk(B, 8) < .5 ? .5 : -.5), v0 - hd * .4, .04, .04, h + 2, 6, '#8f6f62');
       if (hk(B, 5) < .35) porch(c, cx, cy, uu - hw * .3, v0, hd, st);
       return;
     }
@@ -2421,7 +2426,8 @@ function drawHouse(c, B, cx, cy, st) {
       box(c, cx, cy, 0, 0, hw, hd, 0, h, st.wall); windows(c, cx, cy, 0, 0, hw, hd, 0, h, h > 20 ? 4 : 3, 3, wc);
       box(c, cx, cy, 0, 0, hw + .02, hd + .02, h, 1.5, shade(st.trim, 1.25));
       if (shopfront(B)) awning(c, cx, cy, 0, 0, hw, hd, st, true); else box(c, cx, cy, 0, hd + .02, hw, .03, 7, .8, st.accent);
-      if (v > .5 || flatR) { box(c, cx, cy, -.15, -.1, .08, .08, h + 1.5, 5, shade(st.wall, .95)); if (flatR) roofBits(c, cx, cy, 0, 0, hw, hd, h + 1.5, st, B); }
+      if (flatR || v > .5 && hasTech('computing')) { box(c, cx, cy, -.15, -.1, .08, .08, h + 1.5, 5, shade(st.wall, .95)); if (flatR) roofBits(c, cx, cy, 0, 0, hw, hd, h + 1.5, st, B); }
+      else if ((hk(B, 13) < .4 || v > .5) && hasTech('steam')) roofMansard(c, cx, cy, 0, 0, hw, hd, h + 1.5, 6, st.roof); // a mansard on the grander townhouses
       else roofGable(c, cx, cy, 0, 0, hw, hd, h + 1.5, 5, st.roof, st.wall, true);
       if (hk(B, 5) < .22) { const [X, Y] = pt(cx, cy, hw - .02, hd - .02, 0); cyl(c, X, Y, .1, 0, h + 3, st.wall); cone(c, X, Y - h - 3, .13, 7, st.roof); } // a corner turret
       return;
@@ -2431,13 +2437,17 @@ function drawHouse(c, B, cx, cy, st) {
       const h = 30 + ((v * 3) % 1) * 22, hw = .31 + ((v * 7) % 1) * .07, hd = .31 + ((v * 11) % 1) * .07;
       const wall = kind === 3 ? mix(st.wall, st.accent, .22) : kind === 1 ? mix(st.wall, st.roof, .12) : st.wall;
       box(c, cx, cy, 0, 0, hw, hd, 0, h, wall); windows(c, cx, cy, 0, 0, hw, hd, 0, h, Math.round(h / 6), 4, wc);
-      if (kind === 0) { // flat roof, stair box and water tank
+      if (!hasTech('computing') && !dsFlat()) { // the engineers' blocks: a mansard, and iron balconies on some
+        if (kind === 3) for (let z = 8; z < h - 2; z += 6) box(c, cx, cy, 0, hd + .015, hw * .9, .03, z, 1, st.accent);
+        box(c, cx, cy, 0, 0, hw + .015, hd + .015, h, 1.4, shade(st.trim, 1.2)); roofMansard(c, cx, cy, 0, 0, hw + .02, hd + .02, h + 1.4, 8, st.roof);
+        if (hk(B, 14) < .5) awning(c, cx, cy, 0, 0, hw, hd, st, hk(B, 15) < .5);
+      } else if (kind === 0) { // flat roof, stair box and water tank
         box(c, cx, cy, 0, 0, hw + .015, hd + .015, h, 1.4, shade(st.trim, 1.2));
         box(c, cx, cy, -.12, -.12, .1, .08, h + 1.4, 4, shade(wall, .92));
         cyl(c, ...pt(cx, cy, .15, -.1, 0), .05, h + 1.4, 5, '#8a7d73');
       } else if (kind === 1) { // mansard roof
-        roofPyr(c, cx, cy, 0, 0, hw + .02, hd + .02, h, 7, st.roof);
-        box(c, cx, cy, .12, -.08, .05, .05, h + 3, 6, shade(st.trim, 1.1));
+        roofMansard(c, cx, cy, 0, 0, hw + .02, hd + .02, h, 7, st.roof);
+        if (!GLB) box(c, cx, cy, .12, -.08, .05, .05, h + 3, 6, shade(st.trim, 1.1));
       } else if (kind === 2) { // setback penthouse
         box(c, cx, cy, 0, 0, hw + .015, hd + .015, h, 1.2, shade(st.trim, 1.2));
         box(c, cx, cy, -.06, -.06, hw * .6, hd * .6, h + 1.2, 6, shade(wall, 1.05)); windows(c, cx, cy, -.06, -.06, hw * .6, hd * .6, h + 1.2, 6, 1, 2, wc);
@@ -8979,6 +8989,7 @@ function glWinDetail(Wc, a, n, ww, wh, wall, seed, floor = 0) { // around one wi
   GLB.mat = 0;
   if (old) { const fc = tintS(wall, .8); glFace(at(0, .007, 0), V3s(a, .0028), [0, wh / 2, 0], n, fc); glFace(at(0, .0072, wh * .1), V3s(a, ww / 2), [0, .0028, 0], n, fc); } // glazing bars
   if (old && hash2(seed | 0, 3, 41) < .45) { const sh = SHUT[(hash2(seed | 0, 5, 43) * SHUT.length) | 0]; GLB.mat = M_PLANK; for (const sg of [-1, 1]) glFace(at(sg * (ww / 2 + ww * .27), .007, 0), V3s(a, ww * .25), [0, wh / 2, 0], n, sh); } // shutters
+  const HB = GLB.B; if (glOld() && floor <= 2 && HB && HB.type === 'house' && HB.tier >= 2 && HB.tier <= 4 && hash2(seed | 0, 11, 53) < .3) glWinBox(at, a, n, ww, wh, seed | 0);
   if (!old && floor >= 1 && hash2(seed | 0, 7, 47) < .3) { // a balcony on a modern block
     GLB.mat = M_STONE; glOBox(at(0, .04, -wh / 2 - .02), V3s(a, ww / 2 + .03), V3s(n, .04), [0, .008, 0], '#c9c6c0');
     GLB.mat = 0; glOBox(at(0, .076, -wh / 2 + .012), V3s(a, ww / 2 + .03), V3s(n, .002), [0, .02, 0], hash2(seed | 0, 9, 3) < .5 ? '#b8bcc2' : 'rgb(185,215,228)'); // its railing, standing on it
@@ -9008,6 +9019,7 @@ function glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top) {
     const m = GLB.mat, C = P(0, 0, 0); GLB.mat = M_STONE;
     glOBox([C[0], C[1] + .6 * ZS, C[2]], [hw + .012, 0, 0], [0, 0, hd + .012], [0, .6 * ZS, 0], tintS(c, .45, [.25, .22, .2]));
     glOBox([C[0], C[1] + (z1 - .45) * ZS, C[2]], [hw + .016, 0, 0], [0, 0, hd + .016], [0, .45 * ZS, 0], tintS(c, .5));
+    if (GLB.B && GLB.wall !== M_STONE && GL_PROPER(GLB.wall) && h >= 9 && glOld() && hash2(GLB.x, GLB.y, 915) < .65) glQuoins(C, hw, hd, z0, z1, c);
     GLB.mat = m;
   }
 }
@@ -9056,17 +9068,21 @@ function glGable(cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
     gq(P(hw + o, -hd - g, ze), P(0, -hd - g, z + rh), P(0, hd + g, z + rh), P(hw + o, hd + g, ze), c);
     gt(P(-hw, hd, z), P(hw, hd, z), P(0, hd, z + rh), cw); gt(P(hw, -hd, z), P(-hw, -hd, z), P(0, -hd, z + rh), cw);
   }
+  if (GLB.B && z >= 6 && GLB.wall !== M_GLASS) glGableDress(P, hw, hd, z, rh, c, cw, alongU, rm);
 }
-function roofMat(c) { return c[0] > c[2] + .1 && c[0] > c[1] ? M_ROOF : M_SLATE; } // red and brown roofs are tiled, grey and blue ones slated
+function roofMat(c) { return c[0] > .6 && c[1] > .5 && c[2] < .5 && c[0] - c[2] > .25 && c[1] - c[2] > .15 ? M_THATCH : c[0] > c[2] + .1 && c[0] > c[1] ? M_ROOF : M_SLATE; } // straw-coloured roofs are thatched, red and brown ones tiled, grey and blue ones slated
 function glPyr(cx, cy, u0, v0, hw, hd, z, rh, col) {
   const c = gcol(col), o = .04, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy), T = P(0, 0, z + rh); GLB.ctr = P(0, 0, z - 1); GLB.mat = roofMat(c);
   const ze = z - rh * o / Math.max(.05, Math.min(hw, hd)), A = P(-hw - o, -hd - o, ze), B = P(hw + o, -hd - o, ze), C = P(hw + o, hd + o, ze), D = P(-hw - o, hd + o, ze); // eaves drop to meet the walls
   gtri(B, A, T, c); gtri(A, D, T, c); gtri(D, C, T, c); gtri(C, B, T, c);
   if (GLB.lod && rh > 4) { GLB.mat = 0; glOBox([T[0], T[1] + .012, T[2]], [.011, 0, 0], [0, 0, .011], [0, .03, 0], '#8c8f94'); } // a finial
+  if (GLB.B && GLB.wall !== M_GLASS && rh >= 5 && hw >= .15 && hd >= .15 && z >= 6 && hash2(GLB.x, GLB.y, 917) < .7) { const [col, mat] = glStackCol(), Q = P(hw * .4, -hd * .35, z - 1); glChimney(Q[0], Q[1], Q[2], .035, .035, gw(0, 0, z + rh * .7 + 3.6)[1], col, mat); }
 }
 // windows on all four walls (the camera can go round now); em in (0, 1) = a window, lit when em < the night's lit fraction
 function glWindows(cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col) {
-  const c = gcol(col), fh = h / floors, e = .006; GLB.ctr = gw(u0, v0, z0 + h / 2, cx, cy);
+  const c = gcol(col), fh = h / floors, e = .006;
+  if (GLB.lod && GLB.B && GL_PROPER(GLB.wall) && floors >= 3 && z0 < 1 && hw >= .15 && hd >= .15 && glOld()) glFacade(gw(u0, v0, 0, cx, cy), hw, hd, z0, h, floors, cols, GLB.wallC || [.8, .75, .68]);
+  GLB.ctr = gw(u0, v0, z0 + h / 2, cx, cy);
   for (let f = 0; f < floors; f++) {
     const zb = z0 + f * fh + fh * .32, wh = fh * .42;
     for (let k = 0; k < cols; k++) {
@@ -9097,6 +9113,116 @@ function glDoor(cx, cy, u0, v0, hd, w, h, col) {
     GLB.mat = 0; for (const sg of [-1, 1]) glOBox([C[0] + sg * (w / 2 + .006), C[1] + h / 2 * ZS, C[2] + .003], [.006, 0, 0], [0, 0, .004], [0, h / 2 * ZS, 0], tintS(wall, .6));
     GLB.mat = m;
   }
+}
+
+/* ---------- the Anno look: chimneys with pots and smoke, dormers, quoins, a stone ground floor, window boxes, awnings, mansards ---------- */
+// (all hung off the shared primitives, so every building in the valley gets them; the small stuff only close up, behind GLB.lod)
+const glOld = () => { const B = GLB.B; return !hasTech('computing') || !!B && B.type === 'house' && B.tier <= 4; }; // the dressed-stone, window-box, chimney-pot age (until the computers come)
+const GL_PROPER = m => m === M_BRICK || m === M_PLASTER || m === M_STONE;
+const FLOWER_C = ['#e05a8a', '#b46adc', '#ff86b0', '#e8503c', '#f2c14e', '#f3f0ea'];
+function glChimney(X, Y, Z, w, d, top, col, mat) { // a stack from Y up to top (world units), a stone cap and clay pots; old ones smoke
+  const m = GLB.mat; GLB.mat = mat; glOBox([X, (Y + top) / 2, Z], [w, 0, 0], [0, 0, d], [0, (top - Y) / 2, 0], col);
+  GLB.mat = M_STONE; glOBox([X, top + .25 * ZS, Z], [w + .008, 0, 0], [0, 0, d + .008], [0, .25 * ZS, 0], '#c9c1b3');
+  const n = Math.max(w, d) > .045 ? 2 : 1, p0 = top + .5 * ZS, along = d > w;
+  if (GLB.lod) { GLB.mat = 0; for (let k = 0; k < n; k++) { const o = n > 1 ? (k ? .45 : -.45) * Math.max(w, d) : 0; glOBox([X + (along ? 0 : o), p0 + .6 * ZS, Z + (along ? o : 0)], [.011, 0, 0], [0, 0, .011], [0, .6 * ZS, 0], '#b5653f'); } }
+  else if (GLB.smk && glOld() && hash2(GLB.x * 3 + ((X * 97) | 0), GLB.y, 911) < .65) GLB.smk.push([X, p0 + 1.2 * ZS, Z]);
+  GLB.mat = m;
+}
+function glStackCol() { const pl = GLB.wall === M_PLASTER; return [pl ? (GLB.wallC || [.86, .82, .74]) : '#a0604a', pl ? M_PLASTER : M_BRICK]; }
+// a gable roof dressed: chimneys at the ridge ends, dormers down both slopes on anything of two floors or more
+function glGableDress(P, hw, hd, z, rh, rc, wc, alongU, rm) {
+  const L = alongU ? hw : hd, D = alongU ? hd : hw, h0 = hash2(GLB.x, GLB.y, 905), ax = alongU ? [1, 0, 0] : [0, 0, 1], ac = alongU ? [0, 0, 1] : [1, 0, 0];
+  const at = (s, t, zz) => alongU ? P(s, t, zz) : P(t, s, zz); // s along the ridge, t across it
+  if (L >= .1 && h0 < (rm === M_THATCH ? .55 : .85)) {
+    const small = z < 11, [col, mat] = glStackCol(), ends = h0 < .35 && !small ? [-1, 1] : [h0 < .6 ? -1 : 1]; // (a cottage has one short stack)
+    for (const e of ends) { const Q = at(e * (L - .06), 0, z - 1); glChimney(Q[0], Q[1], Q[2], alongU ? .034 : small ? .04 : .05, alongU ? (small ? .04 : .05) : .034, Q[1] + (rh + (small ? 2.2 : 4.4)) * ZS, col, mat); }
+  }
+  if (GLB.lod && z >= 11 && rh >= 4.5 && L >= .17 && rm !== M_THATCH && hash2(GLB.x, GLB.y, 907) < .75) {
+    const n = L >= .3 ? 2 : 1;
+    for (const sg of [-1, 1]) for (let k = 0; k < n; k++) glDormer(at(n === 1 ? 0 : (k ? .5 : -.5) * L, sg * D * .7, z + rh * .3 - .3), V3s(ac, sg), ax, Math.min(3.4, rh * .7 - .5) * ZS, D * .7, rc, wc, (GLB.x * 13 + GLB.y * 7 + k * 3 + sg) | 0);
+  }
+}
+function glDormer(F, out, side, h, depth, rc, wc, seed) { // F: the foot of its window wall on the roof; it runs back into the roof
+  const m = GLB.mat, W = .05, c = [F[0] - out[0] * depth / 2, F[1] + h / 2, F[2] - out[2] * depth / 2];
+  GLB.mat = GLB.wall || 0; const U = [0, h / 2, 0]; // its front and two cheeks (the top is under its roof, the back in the big roof)
+  glFace(F.map((q, i) => q + U[i]), V3s(side, W), U, out, wc); for (const sg of [-1, 1]) glFace([c[0] + side[0] * W * sg, c[1], c[2] + side[2] * W * sg], V3s(out, depth / 2), U, V3s(side, sg), wc);
+  GLB.mat = 0; GLB.ctr = c; const Wc = [F[0] + out[0] * .004, F[1] + h * .5, F[2] + out[2] * .004], a = V3s(side, .027), u = [0, h * .3, 0];
+  gquad(V3a(V3a(Wc, V3s(a, -1)), V3s(u, -1)), V3a(V3a(Wc, a), V3s(u, -1)), V3a(V3a(Wc, a), u), V3a(V3a(Wc, V3s(a, -1)), u), [.23, .26, .31], .03 + .94 * hash2(seed, 5, 71));
+  gRoof([c[0], 0, c[2]], V3s(out, depth / 2 + .012), V3s(side, W + .004), F[1] + h, 1.7 * ZS, rc, wc);
+  GLB.mat = m;
+}
+// a mansard: steep lower slopes with dormers, a shallow top, iron cresting and a row of chimney stacks (the engineers' blocks)
+function glMansard(cx, cy, u0, v0, hw, hd, z, rh, col) {
+  const c = gcol(col), rm = roofMat(c), o = .03, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy), zb = z + rh * .72, iw = hw * .8, id = hd * .8; GLB.ctr = P(0, 0, z - 1);
+  const E = [P(-hw - o, -hd - o, z - .4), P(hw + o, -hd - o, z - .4), P(hw + o, hd + o, z - .4), P(-hw - o, hd + o, z - .4)], I = [P(-iw, -id, zb), P(iw, -id, zb), P(iw, id, zb), P(-iw, id, zb)], T = P(0, 0, z + rh);
+  GLB.mat = rm; for (let k = 0; k < 4; k++) { const j = (k + 1) % 4; gquad(E[k], E[j], I[j], I[k], c); gtri(I[k], I[j], T, gcol(tintS(c, .12, [.2, .2, .22]))); }
+  const wc = GLB.wallC || [.86, .82, .74];
+  if (GLB.lod) {
+    for (const [nx, nz, L, D] of [[0, 1, hw, hd], [0, -1, hw, hd], [1, 0, hd, hw], [-1, 0, hd, hw]]) { // dormers on each face
+      const n = Math.max(1, Math.min(4, Math.round(L * 2 / .2))), out = [nx, 0, nz], side = [nz ? 1 : 0, 0, nx ? 1 : 0];
+      for (let k = 0; k < n; k++) { const s = -L + (k + .5) / n * L * 2, F = P(nx ? nx * D * .93 : s, nz ? nz * D * .93 : s, z + rh * .12); glDormer(F, out, side, rh * .42 * ZS, .09, col, wc, (GLB.x * 11 + GLB.y * 5 + k * 7 + nx * 3 + nz) | 0); }
+    }
+    GLB.mat = 0; for (let k = 0; k < 4; k++) gBeam(V3a(I[k], [0, .03, 0]), V3a(I[(k + 1) % 4], [0, .03, 0]), .005, '#3c3f45'); // cresting
+    for (let k = 0; k < 4; k++) { const a = I[k], b = I[(k + 1) % 4], n = Math.round(Math.hypot(b[0] - a[0], b[2] - a[2]) / .07); for (let j = 0; j <= n; j++) { const t = j / Math.max(1, n); glOBox([a[0] + (b[0] - a[0]) * t, a[1] + .015, a[2] + (b[2] - a[2]) * t], [.003, 0, 0], [0, 0, .003], [0, .015, 0], '#3c3f45'); } }
+  }
+  const [sc, sm] = glStackCol(), ns = hw > .25 ? 3 : 2; // chimney stacks along the top
+  for (let k = 0; k < ns; k++) { const Q = P(-iw * .7 + k / (ns - 1) * iw * 1.4, (k % 2 ? .3 : -.3) * id, z); glChimney(Q[0], Q[1], Q[2], .045, .03, gw(0, 0, z + rh + 3.2)[1], sc, sm); }
+}
+// dressed stone at the corners (quoins), on the old walls of brick and plaster
+function glQuoins(C, hw, hd, z0, z1, wallC) {
+  const m = GLB.mat, col = GLB.wall === M_BRICK ? '#d9d1c1' : tintS(wallC, .45, [.62, .6, .55]); GLB.mat = M_STONE;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let z = z0 + .3, k = 0; z + 1.2 < z1 - .4; z += 2.4, k++) {
+    const y = C[1] + (z + .55) * ZS, la = k % 2 ? .06 : .035, lb = k % 2 ? .035 : .06, U = [0, .55 * ZS, 0];
+    glFace([C[0] + sx * (hw + .004), y, C[2] + sz * (hd - la / 2)], [0, 0, la / 2], U, [sx, 0, 0], col);
+    glFace([C[0] + sx * (hw - lb / 2), y, C[2] + sz * (hd + .004)], [lb / 2, 0, 0], U, [0, 0, sz], col);
+  }
+  GLB.mat = m;
+}
+// a stone ground floor, a band at each floor, and pilasters up a tall old front
+function glFacade(C, hw, hd, z0, h, floors, cols, wallC) {
+  const m = GLB.mat, fh = h / floors, B = GLB.B, hs = hash2(GLB.x, GLB.y, 913);
+  GLB.mat = M_STONE; glOBox([C[0], C[1] + (z0 + fh * .5) * ZS, C[2]], [hw + .004, 0, 0], [0, 0, hd + .004], [0, fh * .5 * ZS, 0], tintS(wallC, .55, [.6, .58, .54])); // rusticated base
+  const band = tintS(wallC, .45, [.93, .9, .84]);
+  for (let f = 1; f < floors; f++) if (floors <= 5 || f === 1 || f === floors - 1) glOBox([C[0], C[1] + (z0 + f * fh) * ZS, C[2]], [hw + .009, 0, 0], [0, 0, hd + .009], [0, .28 * ZS, 0], band);
+  if (floors >= 4 && cols >= 3 && hs < .5 && (!B || B.type === 'house' || B.type === 'hall' || B.type === 'library' || B.type === 'museum')) { // pilasters between the windows
+    const y = C[1] + (z0 + fh + (h - fh) / 2) * ZS, U = [0, (h - fh) / 2 * ZS, 0];
+    for (let k = 1; k < cols; k++) { const t = k / cols;
+      for (const sz of [-1, 1]) glOBox([C[0] - hw + t * hw * 2, y, C[2] + sz * (hd + .006)], [.012, 0, 0], [0, 0, .006], U, band);
+      for (const sx of [-1, 1]) glOBox([C[0] + sx * (hw + .006), y, C[2] - hd + t * hd * 2], [.006, 0, 0], [0, 0, .012], U, band); }
+  }
+  GLB.mat = m;
+}
+// a window box of flowers under a window (cottages, workers' and artisans' houses)
+function glWinBox(at, a, n, ww, wh, seed) {
+  const m = GLB.mat; GLB.mat = M_PLANK; glOBox(at(0, .03, -wh / 2 - .026), V3s(a, ww / 2 + .006), V3s(n, .02), [0, .011, 0], '#6b4a32');
+  GLB.mat = 0; glOBox(at(0, .03, -wh / 2 - .01), V3s(a, ww / 2), V3s(n, .017), [0, .007, 0], '#4f8a45');
+  const fc = FLOWER_C[(hash2(seed, 13, 59) * FLOWER_C.length) | 0]; for (const s of [-.3, .05, .35]) glOBox(at(s * ww, .032, -wh / 2 - .001), V3s(a, ww * .14), V3s(n, .014), [0, .006, 0], fc);
+  GLB.mat = m;
+}
+// a striped canvas awning over a shopfront
+function glAwning(cx, cy, u0, v0, hw, hd, accent, U) {
+  const P = (u, v, z) => gw(u0 + u, v0 + v, z, cx, cy); GLB.ctr = P(0, 0, 3); GLB.mat = M_PLANK;
+  const L = (U ? hw : hd) * .9, n = Math.max(3, Math.round(L * 2 / .045)), stripe = gcol(accent), cream = [.95, .92, .86];
+  for (let k = 0; k < n; k++) {
+    const a = -L + k / n * L * 2, b = -L + (k + 1) / n * L * 2, col = k % 2 ? cream : stripe;
+    const Q = (s, o, z) => U ? P(s, hd + o, z) : P(hw + o, s, z);
+    gquad(Q(a, .005, 6), Q(b, .005, 6), Q(b, .1, 4.6), Q(a, .1, 4.6), col); gquad(Q(a, .1, 4.6), Q(b, .1, 4.6), Q(b, .1, 3.8), Q(a, .1, 3.8), col); // its slope and its hanging edge
+  }
+  GLB.mat = 0;
+}
+// the yard of a cottage or a worker's house: a patch of earth or cobbles, and the things people leave about
+function glYardBits(B, x, y) {
+  const P = (u, v, z) => gw(u, v, z), h = hash2(x, y, 520), cob = B.tier >= 3 || hasTech('masonry') && h < .5; GLB.ctr = P(0, 0, -20);
+  GLB.mat = cob ? M_COBBLE : M_EARTH; gquad(P(-.47, -.47, .2), P(-.47, .47, .2), P(.47, .47, .2), P(.47, -.47, .2), cob ? [.62, .6, .56] : [.55, .45, .33]);
+  if (!GLB.lod) return;
+  const spots = [[.36, -.36], [-.36, .36], [.36, .36], [-.36, -.36]].filter((_, k) => hash2(x, y, 530 + k) < .55);
+  for (const [u, v] of spots.slice(0, 2)) { const k = (hash2(x + 3, y, 540 + u * 10) * 4) | 0, W = P(u, v, 0);
+    if (k === 0) { GLB.mat = M_PLANK; glOBox([W[0], W[1] + .035, W[2]], [.035, 0, 0], [0, 0, .035], [0, .035, 0], '#8a6a48'); glOBox([W[0] + .05, W[1] + .025, W[2] + .02], [.025, 0, 0], [0, 0, .025], [0, .025, 0], '#7a5c3e'); } // crates
+    else if (k === 1) { GLB.mat = M_PLANK; for (const d of [-.028, .028]) { GLB.wall = M_PLANK; glCylAt(u + d, v, .024, 0, 2.2, '#7a5536', '#5f4330', 8); } GLB.wall = glWallMat(B); } // barrels
+    else if (k === 2) { GLB.mat = M_PLANK; glOBox([W[0], W[1] + .05, W[2]], [.07, 0, 0], [0, 0, .04], [0, .012, 0], '#8b6b4a'); GLB.mat = 0; for (const s of [-1, 1]) glOBox([W[0] - .02, W[1] + .035, W[2] + s * .046], [.035, 0, 0], [0, 0, .004], [0, .035, 0], '#4a3a2c'); gBeam([W[0] + .07, W[1] + .05, W[2] - .02], [W[0] + .15, W[1] + .01, W[2] - .02], .004, '#6b5038'); } // a handcart
+    else { GLB.mat = M_PLANK; for (const s of [-1, 1]) glOBox([W[0] + s * .09, W[1] + .06, W[2]], [.005, 0, 0], [0, 0, .005], [0, .06, 0], '#6b5038'); GLB.mat = 0; for (let j = 0; j < 4; j++) glOBox([W[0] - .066 + j * .044, W[1] + .095, W[2]], [.016, 0, 0], [0, 0, .002], [0, .022, 0], FLOWER_C[(j + (h * 9 | 0)) % FLOWER_C.length]); } // a washing line
+  }
+  GLB.mat = 0;
 }
 
 /* ---------- a chunk: terrain, water, roads, trees, lamps and everything standing on its tiles ---------- */
@@ -9173,13 +9299,13 @@ function glSees(P, ch, k) {
 }
 function glBuildChunk(k, near = false) { const v = [], lamps = []; glBuildRows(k, near, 0, GCH, v, lamps); return { v: new Float32Array(v), lamps }; }
 // some rows of a chunk (the detailed version is built a row or two a frame, so it never stalls the view)
-function glBuildRows(k, near, r0, r1, v, lamps) {
+function glBuildRows(k, near, r0, r1, v, lamps, c0 = 0, c1 = GCH) {
   const cx0 = (k % GNC) * GCH, cy0 = ((k / GNC) | 0) * GCH;
   const svLT = LT, svEM = EMQ; LT = GLT_FLAT(); EMQ = null;
   try {
-    for (let y = cy0 + r0; y < cy0 + r1; y++) for (let x = cx0; x < cx0 + GCH; x++) {
+    for (let y = cy0 + r0; y < cy0 + r1; y++) for (let x = cx0 + c0; x < cx0 + c1; x++) {
       const i = idx(x, y), h = GT(i);
-      GLB = { v, x, y, base: surfZ(i) * ZS, tops: [], id: i + 1, wall: 0, mat: 0, lod: near };
+      GLB = { v, x, y, base: surfZ(i) * ZS, tops: [], id: i + 1, wall: 0, mat: 0, lod: near, ctr: null, wallC: null, flat: '', ao: 1, B: null, smk: null }; // (every field up front: one shape keeps the primitives fast)
       const bio = M.bio[i], gmat = M.water[i] ? 0 : bio === BIO.MEADOW || bio === BIO.LUSH ? M_GRASS : bio === BIO.ROCK || bio === BIO.SNOW ? M_STONE : bio === BIO.SAND ? M_SAND : M_EARTH;
       // ground
       const top = gcol(topColor(i)), sc = gcol(sideCol(i));
@@ -9199,7 +9325,7 @@ function glBuildRows(k, near, r0, r1, v, lamps) {
       }
       if (M.tree[i] && !M.bld[i]) glTrees(i, x, y);
       // what stands on the tile, drawn by the same art as the 2D view
-      { const Bw = M.bld[i] && S.B[M.bld[i]]; GLB.wall = Bw ? glWallMat(Bw) : M_PLANK; } // walls by what the building is made of; street furniture is wooden
+      { const Bw = M.bld[i] && S.B[M.bld[i]]; GLB.wall = Bw ? glWallMat(Bw) : M_PLANK; GLB.B = Bw || null; GLB.smk = lamps.smk || (lamps.smk = []); } // walls by what the building is made of; street furniture is wooden
       try { drawTileObjects(GSTUB, i, x, y, 0, 0); } catch (e) { }
       const B = M.bld[i] && S.B[M.bld[i]];
       if (B && !B.hid && FLAT_TYPES[B.type]) { GLB.flat = B.type === 'farm' ? 'farm' : B.type === 'park' || B.type === 'pasture' ? 'green' : B.type === 'plaza' || B.type === 'airfield' ? 'paved' : ''; try { drawBuilding(GSTUB, B, 0, 0, i); } catch (e) { } GLB.flat = ''; }
@@ -9521,7 +9647,7 @@ void main(){ vP=aP; vN=aN; vC=aC; vE = uPk>.5 ? (aE<.5 ? -1. : aE<1.5 ? 0. : aE>
 const GL_FS = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vP, vN, vC; in float vE, vO; in vec4 vS; flat in float vI, vM; out vec4 o;
-uniform highp sampler2DArray uTex; uniform vec3 uAvg[19]; uniform float uTS[19], uRaw[19];
+uniform highp sampler2DArray uTex; uniform vec3 uAvg[20]; uniform float uTS[20], uRaw[20];
 uniform float uHi, uFog0, uFogL; uniform vec3 uFogC; uniform vec3 uSun, uSunC, uSky, uGnd, uWin, uLamp, uEye; uniform float uLit, uShK, uT;
 uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64]; uniform vec4 uSea; uniform vec3 uWx; uniform float uLo; // autumn, winter, spring, snow on the ground; rain, cloud cover, lightning` + GL_SKY + `
 float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
@@ -9577,6 +9703,41 @@ void main(){
   float g=dot(lit,vec3(.299,.587,.114)); lit=clamp(mix(vec3(g),lit,1.18),0.,1.);
   o=vec4(lit,glow);
 }`;
+/* ---------- smoke: soft puffs from chimney pots and works, drawn as point sprites that grow, drift and fade ---------- */
+const GL_SMVS = `#version 300 es
+layout(location=0) in vec4 aP; layout(location=1) in float aA; uniform mat4 uVP; uniform float uPx, uMax; out float vA;
+void main(){ gl_Position=uVP*vec4(aP.xyz,1.); gl_PointSize=clamp(aP.w*uPx/gl_Position.w,1.,uMax); vA=aA; }`;
+const GL_SMFS = `#version 300 es
+precision mediump float; in float vA; out vec4 o; uniform vec3 uCol;
+void main(){ vec2 d=gl_PointCoord-.5; float r=length(d)*2.; if(r>1.) discard; float a=vA*(1.-smoothstep(.15,1.,r))*(.8+.2*sin(d.x*9.+d.y*7.)); o=vec4(uCol*(1.-.12*d.y),a); }`;
+const SMOKE_AT = { workshop: [[.16, -.14, 21]], works: [[.28, -.18, 43]], power: [[-.16, -.2, 37], [.16, -.2, 37]], glassworks: [[.2, -.16, 24]] };
+function glSmoke(gl, dt, FR, VP, pxs, day, tgt) {
+  GL3.smF = [FR, day, tgt]; const A = glSmokeStep(Math.min(dt, .25)), n = A.n; if (!n) return;
+  const Q = GL3.smp; for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
+  gl.useProgram(Q.p); gl.uniformMatrix4fv(Q.u.uVP, false, VP); gl.uniform1f(Q.u.uPx, pxs); gl.uniform1f(Q.u.uMax, GL3.ptMax || 64);
+  gl.uniform3fv(Q.u.uCol, [.86, .85, .84].map(v => v * (.35 + .65 * day)));
+  gl.bindBuffer(gl.ARRAY_BUFFER, GL3.smB); gl.bufferData(gl.ARRAY_BUFFER, A.a.subarray(0, n), gl.STREAM_DRAW);
+  gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 20, 0); gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 20, 16);
+  gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE); gl.depthMask(false);
+  gl.drawArrays(gl.POINTS, 0, n / 5);
+  gl.depthMask(true); gl.disable(gl.BLEND); gl.disableVertexAttribArray(0); gl.disableVertexAttribArray(1);
+}
+function glSmokeStep(dt) { // new puffs from what's in view, then everyone rises, drifts and grows
+  const [FR, day, tgt] = GL3.smF, P = GL3.smoke || (GL3.smoke = []), cap = GL3.lo ? 320 : 900, sea = LIGHT.season || seasonNow(), rate = .22 + .55 * sea.winter + .2 * sea.autumn + .15 * (1 - day), wind = [.07, 0, .04];
+  if (!FAST && dt > 0) {
+    const ks = []; for (let k = 0; k < GL3.chunks.length; k++) { const ch = GL3.chunks[k], sm = ch.lamps && ch.lamps.smk, d = Math.hypot((k % GNC) * GCH + 4 - tgt[0], ((k / GNC) | 0) * GCH + 4 - tgt[2]); if (sm && sm.length && d < 16 && glSees(FR, ch, k)) ks.push([d, sm]); }
+    ks.sort((a, b) => a[0] - b[0]); // the nearest chimneys first (far off, a puff is less than a pixel)
+    for (const [, sm] of ks) for (const q of sm) if (P.length < cap && Math.random() < rate * dt) P.push({ x: q[0], y: q[1], z: q[2], a: 0, L: 6 + Math.random() * 3, s0: .09, s1: .6, o: .72 });
+    for (const B of DYN.anim || []) { const at = SMOKE_AT[B.type]; if (!at || P.length >= cap || Math.hypot(B.x - tgt[0], B.y - tgt[2]) > 40) continue; // the works smoke hard
+      const soot = sootK() >= .5 && !hasTech('solar'), b = surfZ(idx(B.x, B.y)) * ZS;
+      for (const [u, v, z] of at) if (Math.random() < 2.2 * dt) P.push({ x: B.x + u, y: b + z * ZS, z: B.y + v, a: 0, L: 7 + Math.random() * 4, s0: .16, s1: 1.1, o: soot ? .8 : .6 }); }
+  }
+  let n = 0; const A = GL3.smA && GL3.smA.length >= P.length * 5 ? GL3.smA : (GL3.smA = new Float32Array(Math.max(1024, P.length * 5 * 2)));
+  for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; p.a += dt; if (p.a >= p.L) { P[i] = P[P.length - 1]; P.pop(); continue; }
+    const t = p.a / p.L; p.x += (wind[0] * (.4 + t) + (Math.random() - .5) * .02) * dt; p.z += (wind[2] * (.4 + t)) * dt; p.y += (.16 - .1 * t) * dt;
+    A[n++] = p.x; A[n++] = p.y; A[n++] = p.z; A[n++] = p.s0 + (p.s1 - p.s0) * Math.sqrt(t); A[n++] = p.o * Math.min(1, t * 5) * Math.pow(1 - t, 1.6); }
+  return { a: A, n };
+}
 /* ---------- rain and snow, a screen-space pass over the view: three layers, the nearest biggest ---------- */
 const GL_PFS2 = `#version 300 es
 precision highp float; in vec2 vU; out vec4 o; uniform float uT, uRain, uSnow, uAsp, uYaw; uniform vec3 uCol;
@@ -9665,6 +9826,7 @@ function glInit() {
   $('view').style.display = 'none'; document.body.insertBefore(c, $('view'));
   GL3.c = c; GL3.gl = gl; GL3.on = true;
   GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sky = glProg(gl, GL_KVS, GL_KFS); GL3.prc = glProg(gl, GL_KVS, GL_PFS2);
+  GL3.smp = glProg(gl, GL_SMVS, GL_SMFS); GL3.smB = gl.createBuffer(); GL3.ptMax = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 64;
   try { GL3.post = { pr: glProg(gl, GL_KVS, GL_BFS), msF: gl.createFramebuffer(), msC: gl.createRenderbuffer(), msD: gl.createRenderbuffer(), ns: (GL3.lo = glSoft(gl) || QS.has('lo')) ? 0 : Math.min(4, gl.getParameter(gl.MAX_SAMPLES)), hdr: !!gl.getExtension('EXT_color_buffer_float'), lv: [], w: 0, h: 0 }; } catch (e) { GL3.post = null; }
   GL3.sh = glProg(gl, GL_SVS, GL_SFS); GL3.pk = glProg(gl, GL_PVS, GL_PFS);
   { const t0 = performance.now(), T = glTextures(); GL3.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex);
@@ -9813,7 +9975,7 @@ function glFrame(dt) {
     if (!J && best >= 0 && !GL3.noNear) J = GL3.nj = { k: best, row: 0, v: [], lamps: [], a: -1, memo: new Map() };
     if (J && !built.length) { const t0 = performance.now(), budget = GL3.nearMs || 6;
       while (performance.now() - t0 < budget) {
-        if (J.row < GCH) { glBuildRows(J.k, true, J.row, J.row + 1, J.v, J.lamps); J.row++; continue; }
+        if (J.row < GCH * GCH) { const r = (J.row / GCH) | 0, c = J.row % GCH; glBuildRows(J.k, true, r, r + 1, J.v, J.lamps, c, c + 1); J.row++; continue; } // a tile at a time (a tall block can take several ms)
         if (J.a < 0) { J.v = new Float32Array(J.v); J.a = 0; }
         const e = Math.min(J.v.length, J.a + 13 * 3000); glAO(J.v, J.a, e, J.memo); J.a = e;
         if (J.a >= J.v.length) { glUpload(GL3.chunks[J.k], J.v, true); GL3.nj = null; break; }
@@ -9897,6 +10059,7 @@ function glFrame(dt) {
   const fog = wxs.fog || 0;
   gl.uniform1f(U.uFog0, (dist + zz * .6) * (1 - .85 * fog)); gl.uniform1f(U.uFogL, cam.persp ? 55 * (1 - .8 * fog) : 0);
   drawAll(true);
+  glSmoke(gl, dt, FR, VP, h / 2 * (cam.persp ? 1 / Math.tan(fov / 2) : 1 / zz), day, tgt);
   if ((wxs.rain || 0) > .05 || (wxs.snow || 0) > .05) { // rain or snow falling across the view
     const Q = GL3.prc; for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
     gl.useProgram(Q.p); gl.uniform1f(Q.u.uT, GL3.t); gl.uniform1f(Q.u.uRain, wxs.rain || 0); gl.uniform1f(Q.u.uSnow, wxs.snow || 0); gl.uniform1f(Q.u.uAsp, aspect); gl.uniform1f(Q.u.uYaw, cam.yaw);
@@ -10081,7 +10244,7 @@ function glVehicle(c, X, Z, y0, h, moving) {
   glOBox(B(0, 0, y0 + .09 + hov), V3(f, .07), V3(r, .04), [0, .02, 0], '#f4f6f8'); glOBox(B(0, 0, y0 + .065 + hov), V3(f, .05), V3(r, .03), [0, .004, 0], '#7fe8e0', 2);
 }
 function glPeople() {
-  const v = GL3.fb || (GL3.fb = new GLFBuf()); v.length = 0; GLB = { v, x: 0, y: 0, base: 0, tops: [], id: 0, mat: 0, wall: 0 }; GL3.carry = [];
+  const v = GL3.fb || (GL3.fb = new GLFBuf()); v.length = 0; GLB = { v, x: 0, y: 0, base: 0, tops: [], id: 0, wall: 0, mat: 0, lod: false, ctr: null, wallC: null, flat: '', ao: 1, B: null, smk: null }; GL3.carry = [];
   const night = LIGHT.emK > .02; GL3.litNow = night;
   try {
     for (let k = 0; k < DYN.walkers.length; k++) {
@@ -10112,8 +10275,8 @@ function glBtn() { const b = $('glBtn'); if (b) b.remove(); } // (the 2D/3D swit
 // Materials: 0 none, 1 grass, 2 brick, 3 roof tiles, 4 bark, 5 leaves, 6 plaster, 7 stone, 8 planks, 9 cobbles, 10 asphalt, 11 earth.
 // The shader lays them on by world position (triplanar), so nothing needs unwrapping. RAW is how much of the texture's own
 // colour replaces the art's colour (grass and bark look real; plaster keeps the building's own colour and only gains grain).
-const TX = { N: 256, L: 19, SCALE: [1, .5, 1.8, 1.6, 3.5, 2.2, 1.2, 1.4, 2, 1.6, .7, .6, 1.8, 1, 2.2, .6, 1.2, 1.4, 2.6], RAW: [0, .85, .55, .4, .9, .7, 0, .35, .45, .55, .7, .7, .3, .75, .35, .7, .5, .25, .7] };
-const M_NEEDLE = 18; // (pine needles: the leaf texture, but they stay green all winter)
+const TX = { N: 256, L: 20, SCALE: [1, .5, 1.8, 1.6, 3.5, 2.2, 1.2, 1.4, 2, 1.6, .7, .6, 1.8, 1, 2.2, .6, 1.2, 1.4, 2.6, 1.6], RAW: [0, .85, .55, .4, .9, .7, 0, .35, .45, .55, .7, .7, .3, .75, .35, .7, .5, .25, .7, .6] };
+const M_NEEDLE = 18, M_THATCH = 19; // (pine needles: the leaf texture, but they stay green all winter)
 const M_SOIL = 13, M_CROP = 14, M_SAND = 15, M_TAR = 16, M_GLASS = 17, M_SLATE = 12, M_GRASS = 1, M_BRICK = 2, M_ROOF = 3, M_BARK = 4, M_LEAF = 5, M_PLASTER = 6, M_STONE = 7, M_PLANK = 8, M_COBBLE = 9, M_ASPHALT = 10, M_EARTH = 11;
 function glTextures() {
   const N = TX.N, L = TX.L, out = new Uint8Array(N * N * 4 * L), avg = new Float32Array(L * 3);
@@ -10171,6 +10334,8 @@ function glTextures() {
   { const sn = fbm(171, 4), sg = nz(172, 128); put(M_SAND, (x, y) => mx([206, 186, 144], [232, 216, 178], sn(x, y)).map(v => v * (.9 + sg(x, y) * .15 + (R() - .5) * .06))); }
   { const tn = nz(181, 128); put(M_TAR, (x, y) => { const v = .8 + tn(x, y) * .3 + (R() - .5) * .18; return [120, 118, 112].map(q => q * v); }); } // gravel and tar on flat roofs
   { const gn = fbm(191, 2); put(M_GLASS, (x, y) => { const px = x % 32, py = y % 42, frame = px < 3 || py < 3; if (frame) return [150, 156, 164]; const sky = gn(x, y), v = .7 + .5 * sky + (py / 42) * .15; return [110 * v, 150 * v, 180 * v]; }); } // curtain wall panes
+  { const tn = nz(201, 8, 64), tb = fbm(203, 2); put(M_THATCH, (x, y) => { const cw = Math.floor(y / 32), sy = (y % 32) / 32, v = tn((x + cw * 37) % N, y) * .7 + tb(x, y) * .3; // straw laid in courses, each a little darker at its lower edge
+      return mx([118, 92, 52], [196, 164, 104], v).map(q => q * (.72 + .3 * sy)); }, () => { for (let k = 0; k < 2400; k++) { const x = R() * N, y = R() * N, l = 5 + R() * 9, v = R(); wrap(() => { g.strokeStyle = `rgba(${150 + v * 80},${118 + v * 70},${60 + v * 40},.5)`; g.lineWidth = .8; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (R() - .5) * 1.5, y + l); g.stroke(); }); } }); }
   { const Z = N * N * 4; out.copyWithin(M_NEEDLE * Z, M_LEAF * Z, (M_LEAF + 1) * Z); for (let q = 0; q < 3; q++) avg[M_NEEDLE * 3 + q] = avg[M_LEAF * 3 + q]; }
   return { data: out, avg };
 }
