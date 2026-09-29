@@ -9115,9 +9115,8 @@ function aoAt(px, py, pz, nx, ny, nz) {
   }
   return sw ? sv / sw : 1;
 }
-function glAO(v) { // corners are shared by several triangles: work each one out once
-  const memo = new Map();
-  for (let t = 0; t < v.length; t += 13) {
+function glAO(v, from = 0, to = v.length, memo = new Map()) { // corners are shared by several triangles: work each one out once
+  for (let t = from; t < to; t += 13) {
     const key = Math.round(v[t] * 256) * 131071 + Math.round(v[t + 2] * 256) * 8191 + Math.round(v[t + 1] * 512) * 7 + Math.round(v[t + 4] * 3) * 3 + Math.round(v[t + 3] * 3) * 5 + Math.round(v[t + 5] * 3) * 11;
     let a = memo.get(key); if (a === undefined) { a = aoAt(v[t], v[t + 1], v[t + 2], v[t + 3], v[t + 4], v[t + 5]); memo.set(key, a); } v[t + 12] = a;
   }
@@ -9149,11 +9148,13 @@ function glSees(P, ch, k) {
   for (const p of P) if (p[0] * (p[0] > 0 ? x1 : x0) + p[1] * (p[1] > 0 ? y1 : y0) + p[2] * (p[2] > 0 ? z1 : z0) + p[3] < 0) return false;
   return true;
 }
-function glBuildChunk(k, near = false) {
-  const cx0 = (k % GNC) * GCH, cy0 = ((k / GNC) | 0) * GCH, v = [], lamps = [];
+function glBuildChunk(k, near = false) { const v = [], lamps = []; glBuildRows(k, near, 0, GCH, v, lamps); return { v: new Float32Array(v), lamps }; }
+// some rows of a chunk (the detailed version is built a row or two a frame, so it never stalls the view)
+function glBuildRows(k, near, r0, r1, v, lamps) {
+  const cx0 = (k % GNC) * GCH, cy0 = ((k / GNC) | 0) * GCH;
   const svLT = LT, svEM = EMQ; LT = GLT_FLAT(); EMQ = null;
   try {
-    for (let y = cy0; y < cy0 + GCH; y++) for (let x = cx0; x < cx0 + GCH; x++) {
+    for (let y = cy0 + r0; y < cy0 + r1; y++) for (let x = cx0; x < cx0 + GCH; x++) {
       const i = idx(x, y), h = GT(i);
       GLB = { v, x, y, base: surfZ(i) * ZS, tops: [], id: i + 1, wall: 0, mat: 0, lod: near };
       const bio = M.bio[i], gmat = M.water[i] ? 0 : bio === BIO.MEADOW || bio === BIO.LUSH ? M_GRASS : bio === BIO.ROCK || bio === BIO.SNOW ? M_STONE : bio === BIO.SAND ? M_SAND : M_EARTH;
@@ -9181,12 +9182,11 @@ function glBuildChunk(k, near = false) {
       if (B && !B.hid && FLAT_TYPES[B.type]) { GLB.flat = B.type === 'farm' ? 'farm' : B.type === 'park' || B.type === 'pasture' ? 'green' : B.type === 'plaza' || B.type === 'airfield' ? 'paved' : ''; try { drawBuilding(GSTUB, B, 0, 0, i); } catch (e) { } GLB.flat = ''; }
     }
   } finally { GLB = null; LT = svLT; EMQ = svEM; }
-  return { v: new Float32Array(v), lamps };
 }
 let GLT_N = null;
 function GLT_FLAT() { // the light the colours are picked under: none at all (the shader does the lighting)
   if (GLT_N && GLT_N.base === LIGHT.cur) return GLT_N;
-  GLT_N = Object.assign({}, LIGHT.cur, { fL: 1, fR: 1, fT: 1, fG: 1, fWL: 1, fWR: 1, lit: 1, amb: 1, sky: 0, dif: 0, hx: .5, hy: .5, shA: 0, base: LIGHT.cur });
+  GLT_N = Object.assign({}, LIGHT.cur, { fL: 1, fR: 1, fT: 1, fG: 1, fWL: 1, fWR: 1, lit: 1, amb: 1, sky: 0, dif: 0, hx: .5, hy: .5, shA: 0, base: LIGHT.cur, leaf: ['#000', 0], grass: ['#000', 0], snow: 0, flowers: .45 }); // (no season baked in: the shader paints it live)
   return GLT_N;
 }
 function glBoxW(x, z, r, y0, h, col, e = 0) { // a box in world units
@@ -9213,7 +9213,7 @@ function glTrees(i, x, y) {
   for (let k = 0; k < n; k++) {
     let u = (hash2(x, y, k * 3 + 1) - .5) * .6, v = (hash2(x, y, k * 3 + 2) - .5) * .6; if (n === 1) { u *= .4; v *= .4; }
     const s = .8 + hash2(x, y, k * 3 + 3) * .45, hv = hash2(x, y, 90 + k), X = x + u, Z = y + v;
-    if (tt === 2) { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 4 * s * ZS, '#6b5a55'); GLB.mat = M_LEAF; const c = gcol(leafC(hv < .5 ? '#3f6f4a' : '#35604a')); const A = [X, b + 18 * s * ZS, Z]; GLB.ctr = [X, b, Z]; for (let j = 0; j < 8; j++) { const a0 = j / 8 * TAU, a1 = (j + 1) / 8 * TAU, r = .2 * s; gtri([X + Math.cos(a0) * r, b + 3 * s * ZS, Z + Math.sin(a0) * r], [X + Math.cos(a1) * r, b + 3 * s * ZS, Z + Math.sin(a1) * r], A, c); } }
+    if (tt === 2) { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 4 * s * ZS, '#6b5a55'); GLB.mat = M_NEEDLE; const c = gcol(leafC(hv < .5 ? '#3f6f4a' : '#35604a')); const A = [X, b + 18 * s * ZS, Z]; GLB.ctr = [X, b, Z]; for (let j = 0; j < 8; j++) { const a0 = j / 8 * TAU, a1 = (j + 1) / 8 * TAU, r = .2 * s; gtri([X + Math.cos(a0) * r, b + 3 * s * ZS, Z + Math.sin(a0) * r], [X + Math.cos(a1) * r, b + 3 * s * ZS, Z + Math.sin(a1) * r], A, c); } }
     else if (tt === 3) { GLB.mat = 0; glBoxW(X, Z, .022 * s, b, 12 * s * ZS, '#ece8df'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .14 * s, 13 * s, 5.5 * s, leafC(hv < .5 ? '#8fb35a' : '#9dbb62'), 0, M_LEAF); } // birch
     else { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 7 * s * ZS, tt === 4 ? '#7b5e4e' : '#6b5040'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .2 * s, 10 * s, 4.6 * s, leafC(tt === 4 ? '#6db873' : G_PUFF[(hv * G_PUFF.length) | 0]), 0, M_LEAF); }
   }
@@ -9472,13 +9472,22 @@ vec3 untone(vec3 c){ return -log(1.-min(c,vec3(.97)))/1.45; }`;
 const GL_KVS = `#version 300 es
 out vec2 vU; void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2)); vU=p*2.-1.; gl_Position=vec4(vU,0.,1.); }`;
 const GL_KFS = `#version 300 es
-precision highp float; in vec2 vU; out vec4 o; uniform vec3 uF, uR, uU;` + GL_SKY + `
+precision highp float; in vec2 vU; out vec4 o; uniform vec3 uF, uR, uU; uniform float uCT, uLo;` + GL_SKY + `
+float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
+float fb(vec2 p){ return vn(p)*.5+vn(p*2.03+3.1)*.27+vn(p*4.1+7.7)*.15+vn(p*8.3+1.3)*.08; }
 void main(){
   vec3 v=normalize(uF+vU.x*uR+vU.y*uU), c=skyCol(v); float mu=dot(v,uSunD), day=smoothstep(-.1,.2,uSunY);
   float disc=smoothstep(.99982,.99992,mu)*smoothstep(-.03,.02,uSunY)*(1.-uCover*.8); c=mix(c,vec3(1.,.97,.9),disc);
   vec3 q=v*420., qc=floor(q); float st=fract(sin(dot(qc,vec3(12.9898,78.233,37.719)))*43758.5453); // stars: small round points, out once the sun is well down
   float night=1.-smoothstep(-.2,-.06,uSunY), pt=smoothstep(.34,.08,length(fract(q)-.5));
   c+=vec3(.9,.92,1.)*step(.9975,st)*pt*night*(1.-uCover)*smoothstep(0.,.2,v.y)*(.45+.55*fract(st*97.));
+  if(v.y>.01 && uLo<.5){ // clouds on a high layer, drifting; lit gold and rose at sunset, grey and heavy when it's overcast
+    vec2 q=v.xz/(v.y+.08)*1.6+vec2(uCT*.004,uCT*.0015); float cl=fb(q), th=mix(.62,.18,uCover), a=smoothstep(th,th+.22,cl)*smoothstep(.01,.12,v.y);
+    float sunny=pow(max(mu,0.)*.5+.5,3.), lit=mix(.55,1.,day);
+    vec3 cc=mix(vec3(.94,.95,.97)*lit, skyCol(normalize(vec3(v.x,.02,v.z)))*1.1, .35+.3*(1.-day)); cc=mix(cc, cc*vec3(.62,.64,.7), uCover*.8*(1.-sunny*.4)); cc+=vec3(1.,.8,.55)*sunny*.25*day*(1.-uCover);
+    c=mix(c, cc, a*.92); disc*=1.-a;
+  }
   o=vec4(c, disc*.5); // (only the disc itself glows: a glow over a wide patch of bright sky blooms into a blinding blob)
 }`;
 const GL_VS = `#version 300 es
@@ -9489,9 +9498,12 @@ void main(){ vP=aP; vN=aN; vC=aC; vE = uPk>.5 ? (aE<.5 ? -1. : aE<1.5 ? 0. : aE>
 const GL_FS = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vP, vN, vC; in float vE, vO; in vec4 vS; flat in float vI, vM; out vec4 o;
-uniform highp sampler2DArray uTex; uniform vec3 uAvg[18]; uniform float uTS[18], uRaw[18];
+uniform highp sampler2DArray uTex; uniform vec3 uAvg[19]; uniform float uTS[19], uRaw[19];
 uniform float uHi, uFog0, uFogL; uniform vec3 uFogC; uniform vec3 uSun, uSunC, uSky, uGnd, uWin, uLamp, uEye; uniform float uLit, uShK, uT;
-uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64];` + GL_SKY + `
+uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64]; uniform vec4 uSea; uniform vec3 uWx; uniform float uLo; // autumn, winter, spring, snow on the ground; rain, cloud cover, lightning` + GL_SKY + `
+float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
+float fb(vec2 p){ return vn(p)*.55+vn(p*2.1+7.3)*.3+vn(p*4.3+1.7)*.15; }
 float shadow(){ vec3 p=vS.xyz/vS.w*.5+.5; if(p.x<0.||p.x>1.||p.y<0.||p.y>1.) return 1.; float s=0.; vec2 d=vec2(1./2048.);
   for(int x=-1;x<=1;x++) for(int y=-1;y<=1;y++) s+=texture(uSh, vec3(p.xy+vec2(x,y)*d*1.2, p.z-.0015)); return s/9.; }
 void main(){
@@ -9502,15 +9514,34 @@ void main(){
     vec3 t=texture(uTex, vec3(uv*uTS[m], float(m))).rgb;
     c=mix(c*t/uAvg[m], t, uRaw[m]);
   }
+  // the season, painted live: autumn leaves turn, winter fades them, spring puts blossom in some trees, grass follows
+  float sn=0.;
+  if(vE>=-.5 && !(vE>0.&&vE<1.) && vE<1.5){
+    float nz=h21(floor(vP.xz*2.3)), lum=dot(c,vec3(.3,.59,.11));
+    if(m==5){
+      vec3 au=mix(mix(vec3(.86,.42,.12),vec3(.93,.72,.18),nz),vec3(.72,.2,.12),step(.8,nz));
+      c=mix(c, au*(.6+lum*.9), uSea.x*.85);
+      c=mix(c, vec3(.44,.38,.3)*(.7+lum), uSea.y*.55);
+      float bl=step(.5,nz)*smoothstep(.3,.5,vn(vP.xz*38.+vP.y*27.)); c=mix(c, mix(vec3(1.,.72,.84),vec3(.99,.97,.95),step(.78,nz)), uSea.z*bl); c=mix(c, c*vec3(.95,1.08,.9)+vec3(.04,.06,0.), uSea.z*(1.-bl)*.6); // blossom on some, fresh green on the rest
+    }
+    if(m==1||m==14){ c=mix(c, vec3(.62,.56,.32)*(.6+lum), uSea.x*.35+uSea.y*.3); }
+    // snow settles on what faces up (less on leaves, none on walls), patchy at the edges
+    if(uSea.w>0.){ sn=smoothstep(.3,.75,n.y)*uSea.w*(m==5||m==18?.7:1.)*(uLo>.5 ? 1. : smoothstep(.2,.55,fb(vP.xz*3.)+uSea.w*.6)); c=mix(c, vec3(.93,.95,.99), sn); }
+  }
   if(vE<-.5 && n.y>.5){ // water: ripples that move, a deeper colour, and the sun's glint
     vec2 q=vP.xz; n=normalize(vec3(sin(q.x*9.+uT*1.3)*.06+sin(q.y*13.7-uT*1.7)*.04+sin((q.x+q.y)*21.-uT*2.3)*.025, 1., cos(q.y*8.3+uT*1.1)*.06+cos((q.x-q.y)*17.+uT*1.9)*.03));
     vec3 v=normalize(uEye-vP), h=normalize(uSun+v); float sp=pow(max(dot(n,h),0.),120.);
     vec3 rf=reflect(-v,n); rf.y=abs(rf.y); c=mix(c*vec3(.72,.86,.92), untone(skyCol(rf))*.8, .35*(1.-max(dot(n,v),0.))); c+=vec3(1.,.95,.85)*sp*2.2*uShK; glow=min(.45,sp*.7)*uShK; }
-  float nd=m==5 ? clamp(dot(n,uSun)*.55+.45,0.,1.) : max(dot(n,uSun),0.), sh=mix(1., shadow(), uShK); // leaves let light through, so it wraps round to their shady side
-  float ao=vE<-.5?1.:clamp(vO,0.,1.); ao=ao*ao*(3.-2.*ao); if(m==5) ao=.35+.65*ao; // how much open sky this spot sees (baked per vertex)
+  float cs=uWx.y>.05 && uLo<.5 ? smoothstep(.62-.4*uWx.y,.82-.4*uWx.y,fb(vP.xz*.05+vec2(uT*.012,uT*.005))) : 0.; // clouds drifting over, their shadows on the land
+  float nd=(m==5||m==18) ? clamp(dot(n,uSun)*.55+.45,0.,1.) : max(dot(n,uSun),0.), sh=mix(1., shadow(), uShK); // leaves let light through, so it wraps round to their shady side
+  float ao=vE<-.5?1.:clamp(vO,0.,1.); ao=ao*ao*(3.-2.*ao); if(m==5||m==18) ao=.35+.65*ao; // how much open sky this spot sees (baked per vertex)
   vec3 amb=mix(uGnd,uSky,n.y*.5+.5)*ao;
   vec3 bounce=uSunC*.22*max(dot(n,normalize(vec3(-uSun.x,.35,-uSun.z))),0.)*(.4+.6*ao); // light thrown back off the sunny side of things
+  sh*=1.-cs*.7*min(1.,uWx.y*1.8);
+  if(uWx.x>0. && vE>=-.5 && n.y>.5) c*=1.-.28*uWx.x*(1.-sn); // wet ground is darker
   vec3 lit=c*(amb+uSunC*nd*sh*mix(.8,1.,ao)+bounce);
+  if(uWx.x>0. && uLo<.5 && vE>=-.5 && n.y>.6 && sn<.5){ vec3 v2=normalize(uEye-vP), rf2=reflect(-v2,n); rf2.y=abs(rf2.y); lit+=untone(skyCol(rf2))*.22*uWx.x*pow(1.-max(dot(n,v2),0.),2.)*step(.45,vn(vP.xz*6.)); } // puddles catch the sky
+  lit+=vec3(.75,.8,1.)*uWx.z*.9; // lightning
   vec3 pl=vec3(0.);
   for(int i=0;i<64;i++){ if(i>=uNL) break; vec3 d=uLP[i]-vP; float l=length(d); float a=max(0.,1.-l/2.4); pl+=uLamp*a*a*(.35+.65*max(dot(n,d/l),0.)); }
   lit+=c*pl*mix(.55,1.,ao);
@@ -9523,6 +9554,15 @@ void main(){
   float g=dot(lit,vec3(.299,.587,.114)); lit=clamp(mix(vec3(g),lit,1.18),0.,1.);
   o=vec4(lit,glow);
 }`;
+/* ---------- rain and snow, a screen-space pass over the view: three layers, the nearest biggest ---------- */
+const GL_PFS2 = `#version 300 es
+precision highp float; in vec2 vU; out vec4 o; uniform float uT, uRain, uSnow, uAsp, uYaw; uniform vec3 uCol;
+float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
+void main(){ vec2 uv=vU*.5+.5; uv.x*=uAsp; uv.x+=uYaw*.35; float a=0.;
+  for(int L=0;L<3;L++){ float fl=float(L), sc=mix(1.,2.6,fl/2.);
+    if(uRain>0.){ vec2 q=vec2(uv.x*60.*sc+uv.y*6., uv.y*3.*sc+uT*(9.+fl*3.)); vec2 id=floor(q), f=fract(q); float r=h(id); float d=smoothstep(.08,0.,abs(f.x-.5-(r-.5)*.4))*smoothstep(0.,.1,f.y)*smoothstep(1.,.55,f.y)*step(1.-uRain*.35,r); a+=d*(.28-fl*.06); }
+    if(uSnow>0.){ vec2 q=vec2(uv.x*14.*sc+sin(uT*.6+uv.y*6.+fl)*.3, uv.y*14.*sc+uT*(.9+fl*.4)); vec2 id=floor(q), f=fract(q); float r=h(id+fl*17.); vec2 c=vec2(.2+.6*h(id+3.1),.2+.6*r); float d=smoothstep(.09/sc*2.,0.,length(f-c))*step(1.-uSnow*.6,h(id+9.7)); a+=d*(.75-fl*.15); } }
+  o=vec4(uCol, clamp(a,0.,1.)); }`;
 /* ---------- bloom: the glowing things (alpha of the lit view) bleed soft light around themselves ---------- */
 const GL_BFS = `#version 300 es
 precision highp float; in vec2 vU; out vec4 o; uniform sampler2D uA, uB; uniform vec2 uPx; uniform int uMode; uniform float uK;
@@ -9601,8 +9641,8 @@ function glInit() {
   if (!gl) { toast('This browser has no WebGL2, so the 3D view can’t run here. Here’s the 2D one.'); return false; }
   $('view').style.display = 'none'; document.body.insertBefore(c, $('view'));
   GL3.c = c; GL3.gl = gl; GL3.on = true;
-  GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sky = glProg(gl, GL_KVS, GL_KFS);
-  try { GL3.post = { pr: glProg(gl, GL_KVS, GL_BFS), msF: gl.createFramebuffer(), msC: gl.createRenderbuffer(), msD: gl.createRenderbuffer(), ns: glSoft(gl) || QS.has('lo') ? 0 : Math.min(4, gl.getParameter(gl.MAX_SAMPLES)), hdr: !!gl.getExtension('EXT_color_buffer_float'), lv: [], w: 0, h: 0 }; } catch (e) { GL3.post = null; }
+  GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sky = glProg(gl, GL_KVS, GL_KFS); GL3.prc = glProg(gl, GL_KVS, GL_PFS2);
+  try { GL3.post = { pr: glProg(gl, GL_KVS, GL_BFS), msF: gl.createFramebuffer(), msC: gl.createRenderbuffer(), msD: gl.createRenderbuffer(), ns: (GL3.lo = glSoft(gl) || QS.has('lo')) ? 0 : Math.min(4, gl.getParameter(gl.MAX_SAMPLES)), hdr: !!gl.getExtension('EXT_color_buffer_float'), lv: [], w: 0, h: 0 }; } catch (e) { GL3.post = null; }
   GL3.sh = glProg(gl, GL_SVS, GL_SFS); GL3.pk = glProg(gl, GL_PVS, GL_PFS);
   { const t0 = performance.now(), T = glTextures(); GL3.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex);
     gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, TX.N, TX.N, TX.L, 0, gl.RGBA, gl.UNSIGNED_BYTE, T.data); gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
@@ -9626,12 +9666,13 @@ function glInit() {
   const P = GL3.ptrs = new Map(); let pinch = null;
   const touchy = e => e.pointerType === 'touch' || e.pointerType === 'pen';
   c.addEventListener('pointerdown', e => {
+    glTouch();
     if (e.button !== 0 && !touchy(e)) return;
     GL3.touched = touchy(e);
     UI.lastMove = performance.now(); UI.mouse.x = e.clientX; UI.mouse.y = e.clientY;
     P.set(e.pointerId, [e.clientX, e.clientY]); try { c.setPointerCapture(e.pointerId); } catch (er) { }
     if (P.size === 1) GL3.drag = [e.clientX, e.clientY, GL3.cam.yaw, GL3.cam.pitch, false, touchy(e)];
-    else { GL3.drag = null; const [a, b] = [...P.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: GL3.cam.zoom, m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], tx: GL3.cam.tx, tz: GL3.cam.tz }; GL3.cam.auto = false; GL3.follow = null; GL3.goto = null; }
+    else { GL3.drag = null; const [a, b] = [...P.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: GL3.cam.zoom, m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], tx: GL3.cam.tx, tz: GL3.cam.tz }; glTouch(); GL3.follow = null; GL3.goto = null; }
   });
   c.addEventListener('pointermove', e => {
     UI.lastMove = performance.now(); if (!touchy(e) || P.size < 2) { UI.mouse.x = e.clientX; UI.mouse.y = e.clientY; }
@@ -9644,7 +9685,7 @@ function glInit() {
       return;
     }
     const d = GL3.drag; if (!d) return;
-    if (!d[4] && Math.abs(e.clientX - d[0]) + Math.abs(e.clientY - d[1]) > (d[5] ? 10 : 4)) { d[4] = true; GL3.cam.auto = false; }
+    if (!d[4] && Math.abs(e.clientX - d[0]) + Math.abs(e.clientY - d[1]) > (d[5] ? 10 : 4)) { d[4] = true; glTouch(); }
     if (d[4]) { GL3.cam.yaw = d[2] - (e.clientX - d[0]) * .006; GL3.cam.pitch = clamp(d[3] + (e.clientY - d[1]) * .004, GL3.cam.persp ? .1 : .2, 1.45); }
   });
   const up = e => {
@@ -9654,18 +9695,19 @@ function glInit() {
   };
   c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
   c.addEventListener('pointerleave', e => { if (!touchy(e)) { GL3.hover = 0; $('tip').style.opacity = 0; } });
-  c.addEventListener('wheel', e => { GL3.cam.zoom = clamp(GL3.cam.zoom * Math.exp(e.deltaY * .001), 1.2, 44); e.preventDefault(); }, { passive: false });
+  c.addEventListener('wheel', e => { glTouch(); GL3.cam.zoom = clamp(GL3.cam.zoom * Math.exp(e.deltaY * .001), 1.2, 44); e.preventDefault(); }, { passive: false });
   addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     const k = e.key.toLowerCase();
-    if (k === 'r') GL3.cam.auto = !GL3.cam.auto;
+    if (k === 'r') { GL3.cam.auto = !GL3.cam.auto; GL3.film = GL3.cam.auto; if (!GL3.cam.auto) glCap(null); toast(GL3.cam.auto ? 'Film camera on: it wanders to wherever something is happening' : 'Film camera off'); }
+    else if ('ntp'.includes(k)) glTouch();
     else if (k === 'n') { GL3.hi = (GL3.hi + 1) % GL3.hr.length; SF.hour(GL3.hr[GL3.hi]); toast(GL3.hr[GL3.hi] == null ? 'Time of day: live' : `Time of day: ${Math.floor(GL3.hr[GL3.hi])}:${String(Math.round(GL3.hr[GL3.hi] % 1 * 60)).padStart(2, '0')}`); }
     else if (k === 'p') { GL3.cam.persp = !GL3.cam.persp; if (!GL3.cam.persp) GL3.cam.pitch = Math.max(.2, GL3.cam.pitch); toast(GL3.cam.persp ? 'Perspective view' : 'Isometric view'); }
     else if (k === 't') { GL3.town++; GL3.follow = null; GL3.goto = null; glFocusTown(); }
   });
   const hint = document.createElement('div'); hint.id = 'glHint';
   hint.style.cssText = 'position:fixed;right:16px;top:14px;max-width:430px;line-height:1.45;z-index:4;padding:8px 12px;border-radius:12px;background:rgba(255,251,245,.82);box-shadow:0 4px 18px rgba(60,40,60,.15);font:12.5px "Segoe UI",system-ui,sans-serif;color:#2b2833';
-  hint.innerHTML = (matchMedia('(pointer: coarse)').matches ? '<b>3D view</b> · drag to turn · pinch to zoom · two fingers to move · tap anything to see what it is' : '<b>3D view</b> · drag to turn · wheel to zoom · <b>R</b> auto-rotate · <b>N</b> time of day · <b>T</b> next town · <b>P</b> perspective or isometric · point at anything to see what it is, click a person to follow them') + ' <span id="glHideHint" style="cursor:pointer;opacity:.6">✕</span>';
+  hint.innerHTML = (matchMedia('(pointer: coarse)').matches ? '<b>3D view</b> · drag to turn · pinch to zoom · two fingers to move · tap anything to see what it is' : '<b>3D view</b> · drag to turn · wheel to zoom · <b>R</b> film camera · <b>N</b> time of day · <b>T</b> next town · <b>P</b> perspective or isometric · point at anything to see what it is, click a person to follow them') + ' <span id="glHideHint" style="cursor:pointer;opacity:.6">✕</span>';
   hint.querySelector('#glHideHint').onclick = () => hint.remove();
   if (innerWidth < 700) { hint.style.cssText += ';top:auto;right:12px;left:12px;bottom:150px;max-width:none;font-size:12px'; setTimeout(() => hint.remove(), 15000); } // phones: above the tool bar, and not for long
   document.body.appendChild(hint);
@@ -9673,8 +9715,62 @@ function glInit() {
   return true;
 }
 function glFocusTown() { const ts = towns().sort((a, b) => b.pop - a.pop); if (!ts.length) return; const T = ts[GL3.town % ts.length]; GL3.cam.tx = T.x; GL3.cam.tz = T.y; GL3.cam.ty = surfZ(idx(T.x, T.y)) * ZS; GL3.cam.zoom = clamp(townRadius(T) * .75 + 2.5, 5, 14); }
+/* ---------- the film camera: when nobody's touching it, it goes wherever something is happening ---------- */
+// Shots last 20-35 s: news from the chronicle first (a new landmark, a ship launched, a wedding), then ships coming in,
+// a townsperson on their way, a train, a landmark close up, a town from above. It eases between them and turns slowly
+// round what it's looking at, with a caption. Any touch hands the camera back; a minute later the film carries on.
+const FILM_IDLE = 60;
+function glTouch() { GL3.lastIn = performance.now(); if (GL3.shot) { GL3.shot = null; glCap(null); } }
+function glCap(t, sub) {
+  let e = $('glCap');
+  if (!t) { if (e) e.style.opacity = 0; return; }
+  if (!e) { e = document.createElement('div'); e.id = 'glCap'; e.style.cssText = 'position:fixed;left:50%;bottom:34px;transform:translateX(-50%);max-width:min(640px,80vw);z-index:4;padding:9px 18px;border-radius:14px;background:rgba(20,22,30,.5);backdrop-filter:blur(6px);color:#fff;font:15px/1.4 Georgia,"Times New Roman",serif;text-align:center;text-shadow:0 1px 3px rgba(0,0,0,.4);transition:opacity 1.2s;opacity:0;pointer-events:none'; document.body.appendChild(e); }
+  e.innerHTML = t + (sub ? `<div style="font:12px/1.4 'Segoe UI',system-ui,sans-serif;opacity:.75;margin-top:2px">${sub}</div>` : ''); requestAnimationFrame(() => { e.style.opacity = 1; });
+}
+function glShot() { // choose what to look at next
+  const T0 = towns(); if (!T0.length) return null;
+  const seen = GL3.seenN || 0, news = (S.chron || []).filter(e => e.n > seen && e.tx != null && e.yr >= yr() - 3).slice(-12); GL3.seenN = S.chronN;
+  const pick1 = a => a[(Math.random() * a.length) | 0];
+  const major = news.filter(e => e.k === 'major' || e.k === 'era'), ev = major.length ? major[major.length - 1] : news.length && chance(.7) ? pick1(news) : null;
+  const z = (x, y) => surfZ(idx(clamp(Math.round(x), 0, W - 1), clamp(Math.round(y), 0, H - 1))) * ZS;
+  if (ev) return { at: () => [ev.tx, z(ev.tx, ev.ty), ev.ty], zoom: rf(2.6, 4), pitch: rf(.34, .5), cap: ev.ic + ' ' + ev.t, sub: 'Year ' + Math.floor(ev.yr) };
+  const opts = [];
+  const sail = DYN.ships.filter(sh => sh.st === 'sail' && sh.to && sh.path && sh.s > sh.path.length - 14 && sh.s < sh.path.length - 3);
+  if (sail.length) opts.push([3, () => { const sh = pick1(sail), B = S.B[sh.to], T = B && S.T[B.sid]; return { at: () => { const q = shipPos(sh); return q ? [q[0], SEAZ * ZS, q[1]] : null; }, zoom: rf(2.2, 3), pitch: rf(.2, .32), cap: '⛵ A ship coming in' + (T ? ' to ' + T.name : ''), dur: 26 }; }]);
+  const ws = DYN.walkers.filter(w => w.pid && S.P[w.pid] && w.st !== 'in' && w.st !== 'idle' && walkerPos(w));
+  if (ws.length) opts.push([3, () => { const w = pick1(ws), P = S.P[w.pid], T = S.T[P.sid]; return { follow: w, at: () => { const q = walkerPos(w); return q ? [q[0], q[2] * ZS, q[1]] : null; }, zoom: rf(1.4, 2), pitch: rf(.3, .42), cap: P.name, sub: [P.role, T && T.name].filter(Boolean).join(' · ') }; }]);
+  if (DYN.trains.length) opts.push([1.5, () => { const tr = pick1(DYN.trains); return { at: () => { const pa = tr.r.path, s2 = clamp(tr.s, 0, pa.length - 1), a = pa[Math.floor(s2)]; return a == null ? null : [a % W, z(a % W, (a / W) | 0), (a / W) | 0]; }, zoom: rf(2.8, 4), pitch: rf(.3, .45), cap: '🚂 The train' }; }]);
+  const big = Object.values(S.B).filter(B => fpBig(B) && B.prog >= 1);
+  if (big.length) opts.push([2, () => { const B = pick1(big), T = S.T[B.sid], [x, y] = glLot(B); return { at: () => [x, z(x, y), y], zoom: rf(2, 3), pitch: rf(.35, .55), cap: (B.name || (BT[B.type] ? BT[B.type].n : B.type)) + (T ? ' · ' + T.name : '') }; }]);
+  opts.push([2, () => { const T = pick1(T0.slice().sort((a, b) => b.pop - a.pop).slice(0, 4)); return { at: () => [T.x, z(T.x, T.y), T.y], zoom: clamp(townRadius(T) * .8 + 3, 5, 14), pitch: rf(.4, .75), cap: T.name, sub: Math.round(T.pop).toLocaleString('en-GB') + ' people' }; }]);
+  const hs = harbours(); const sun = LIGHT.sun;
+  if (hs.length && sun && sun.el > -2 && sun.el < 14) opts.push([4, () => { const B = pick1(hs), [x, y] = glLot(B), T = S.T[B.sid]; return { at: () => [x + B.dir[0] * .6, z(x, y), y + B.dir[1] * .6], zoom: rf(2.5, 3.5), pitch: rf(.18, .3), cap: '🌇 Evening at the harbour' + (T ? ' of ' + T.name : ''), yaw: Math.atan2(-B.dir[0], -B.dir[1]) }; }]); // golden hour by the water
+  let tot = 0; for (const o of opts) tot += o[0]; let r = Math.random() * tot; for (const o of opts) if ((r -= o[0]) <= 0) return o[1]();
+  return opts[0][1]();
+}
+function glDirector(dt) {
+  const cam = GL3.cam, now = performance.now(), idle = (now - (GL3.lastIn || 0)) / 1000;
+  if (!cam.auto || GL3.drag) { if (GL3.shot) { GL3.shot = null; glCap(null); } return; }
+  if (idle < (GL3.userFollow && GL3.follow === GL3.userFollow ? FILM_IDLE * 3 : FILM_IDLE) && GL3.lastIn) return; // (someone you chose to follow gets longer)
+  GL3.userFollow = null;
+  let sh = GL3.shot;
+  if (!sh || (GL3.t - sh.t0) > (sh.dur || 30)) {
+    try { sh = glShot(); } catch (e) { sh = null; }
+    if (!sh) return;
+    sh.t0 = GL3.t; sh.dur = sh.dur || rf(20, 34); sh.spin = (Math.random() < .5 ? -1 : 1) * rf(.025, .05);
+    GL3.shot = sh; GL3.follow = null; GL3.goto = null; if (sh.yaw != null) sh.yaw0 = sh.yaw;
+    glCap(null); setTimeout(() => { if (GL3.shot === sh) glCap(sh.cap, sh.sub); }, 2500);
+    setTimeout(() => { if (GL3.shot === sh) glCap(null); }, 13000);
+  }
+  const p = sh.at(); if (!p) { GL3.shot = null; return; }
+  const k = 1 - Math.exp(-dt * .7), kz = 1 - Math.exp(-dt * .5); // a slow glide from one shot to the next
+  cam.tx += (p[0] - cam.tx) * k; cam.ty += (p[1] - cam.ty) * k; cam.tz += (p[2] - cam.tz) * k;
+  cam.zoom += (sh.zoom - cam.zoom) * kz; cam.pitch += (sh.pitch - cam.pitch) * kz;
+  if (sh.yaw0 != null) { let d = sh.yaw0 - cam.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); cam.yaw += d * kz; sh.yaw0 += sh.spin * dt * .3; }
+  else cam.yaw += sh.spin * dt;
+}
 function glFrame(dt) {
-  const gl = GL3.gl, c = GL3.c, cam = GL3.cam; GL3.t += dt; GL3.dt = dt;
+  const gl = GL3.gl, c = GL3.c, cam = GL3.cam; GL3.t += dt; GL3.dt = dt; GL3.ft = performance.now(); // (when this frame began: a slow frame mustn't make the pointer look idle)
   LIGHT.sun = sunNow(); if (!LIGHT.season || (LIGHT.seasonT -= dt) <= 0) { LIGHT.season = LIGHT.forceSeason || seasonNow(); LIGHT.seasonT = 300; }
   stepWeather(dt); DIRTY.length = 0;
   const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
@@ -9689,10 +9785,19 @@ function glFrame(dt) {
   { const nr = cam.zoom <= 9 ? 11 : cam.zoom <= 15 ? 7 : 0, cx = cam.tx, cz = cam.tz; let best = -1, bd = 1e9;
     for (let k = 0; k < GNC * GNC; k++) { const ch = GL3.chunks[k], d = Math.hypot((k % GNC) * GCH + GCH / 2 - cx, ((k / GNC) | 0) * GCH + GCH / 2 - cz);
       if (ch.near && d > nr + 8) glDropNear(ch); else if (!ch.near && ch.n && d < nr && d < bd && !GL3.dirty.has(k)) { best = k; bd = d; } }
-    if (best >= 0 && built.length < 2 && !GL3.noNear) { const r = glBuildChunk(best, true); glAO(r.v); glUpload(GL3.chunks[best], r.v, true); } }
+    // one detailed chunk at a time, a few milliseconds a frame: rows first, then its shading, then off to the GPU
+    let J = GL3.nj; if (J && (GL3.chunks[J.k].near || GL3.dirty.has(J.k))) J = GL3.nj = null;
+    if (!J && best >= 0 && !GL3.noNear) J = GL3.nj = { k: best, row: 0, v: [], lamps: [], a: -1, memo: new Map() };
+    if (J && !built.length) { const t0 = performance.now(), budget = GL3.nearMs || 6;
+      while (performance.now() - t0 < budget) {
+        if (J.row < GCH) { glBuildRows(J.k, true, J.row, J.row + 1, J.v, J.lamps); J.row++; continue; }
+        if (J.a < 0) { J.v = new Float32Array(J.v); J.a = 0; }
+        const e = Math.min(J.v.length, J.a + 13 * 3000); glAO(J.v, J.a, e, J.memo); J.a = e;
+        if (J.a >= J.v.length) { glUpload(GL3.chunks[J.k], J.v, true); GL3.nj = null; break; }
+      } } }
   for (const j of again) GL3.dirty.add(j); // a new tall building by the edge darkens the next chunk's streets too
   GL3.first = true;
-  if (cam.auto) cam.yaw += dt * .05;
+  glDirector(dt);
   const fw = GL3.follow && walkerPos(GL3.follow); if (fw) GL3.goto = [fw[0], fw[2] * ZS, fw[1]];
   if (GL3.goto) { const k = 1 - Math.exp(-dt * 3); cam.tx += (GL3.goto[0] - cam.tx) * k; cam.ty += (GL3.goto[1] - cam.ty) * k; cam.tz += (GL3.goto[2] - cam.tz) * k; if (!GL3.follow && Math.hypot(GL3.goto[0] - cam.tx, GL3.goto[2] - cam.tz) < .01) GL3.goto = null; }
   // the sun (or the moon), and the colours of the hour
@@ -9751,7 +9856,7 @@ function glFrame(dt) {
   const sd0 = [Math.cos(el * DEG) * Math.cos(t), Math.sin(el * DEG), Math.cos(el * DEG) * Math.sin(t)], skyU = U => { gl.uniform3fv(U.uSunD, sd0); gl.uniform1f(U.uSunY, sd0[1]); gl.uniform1f(U.uCover, cover); };
   { const K = GL3.sky, f = [-dir[0], -dir[1], -dir[2]], tn = Math.tan(fov / 2), r0 = [f[2], 0, -f[0]], rl = Math.hypot(r0[0], r0[2]) || 1, r = [-r0[0] / rl, 0, -r0[2] / rl], u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
     for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
-    gl.useProgram(K.p); skyU(K.u); gl.uniform3fv(K.u.uF, f); gl.uniform3fv(K.u.uR, r.map(q => q * tn * aspect)); gl.uniform3fv(K.u.uU, u.map(q => q * tn));
+    gl.useProgram(K.p); skyU(K.u); gl.uniform1f(K.u.uCT, GL3.t); gl.uniform1f(K.u.uLo, GL3.lo ? 1 : 0); gl.uniform3fv(K.u.uF, f); gl.uniform3fv(K.u.uR, r.map(q => q * tn * aspect)); gl.uniform3fv(K.u.uU, u.map(q => q * tn));
     gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.depthMask(true); gl.enable(gl.DEPTH_TEST); }
   const P = GL3.main, U = P.u; gl.useProgram(P.p); skyU(U);
   gl.uniformMatrix4fv(U.uVP, false, VP); gl.uniformMatrix4fv(U.uSVP, false, SVP);
@@ -9762,8 +9867,20 @@ function glFrame(dt) {
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex); gl.uniform1i(U.uTex, 1); gl.uniform3fv(U.uAvg, GL3.texAvg); gl.uniform1fv(U.uTS, TX.SCALE); gl.uniform1fv(U.uRaw, TX.RAW); gl.activeTexture(gl.TEXTURE0);
   gl.uniform1i(U.uNL, lamps.length); if (lamps.length) gl.uniform3fv(U.uLP, new Float32Array(lamps.flat()));
   gl.uniform1f(U.uHi, GL3.hover || 0);
-  gl.uniform1f(U.uFog0, dist + zz * .6); gl.uniform1f(U.uFogL, cam.persp ? 55 : 0);
+  // the season and the weather: snow lies where it has fallen, rain wets things, fog closes in, lightning flashes
+  const sea = LIGHT.season || seasonNow(), wxOn = S.settings.weather !== false, wxs = wxOn ? wx : { rain: 0, snow: 0, fog: 0, sc: 0 };
+  GL3.flash = Math.max(0, (GL3.flash || 0) - dt * 2.2); if (DYN.flash > GL3.flash) GL3.flash = DYN.flash;
+  gl.uniform1f(U.uLo, GL3.lo ? 1 : 0); gl.uniform4f(U.uSea, sea.autumn, sea.winter, sea.spring, wxs.sc || 0); gl.uniform3f(U.uWx, wxs.rain || 0, cover, GL3.flash * (wxOn ? 1 : 0));
+  const fog = wxs.fog || 0;
+  gl.uniform1f(U.uFog0, (dist + zz * .6) * (1 - .85 * fog)); gl.uniform1f(U.uFogL, cam.persp ? 55 * (1 - .8 * fog) : 0);
   drawAll(true);
+  if ((wxs.rain || 0) > .05 || (wxs.snow || 0) > .05) { // rain or snow falling across the view
+    const Q = GL3.prc; for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
+    gl.useProgram(Q.p); gl.uniform1f(Q.u.uT, GL3.t); gl.uniform1f(Q.u.uRain, wxs.rain || 0); gl.uniform1f(Q.u.uSnow, wxs.snow || 0); gl.uniform1f(Q.u.uAsp, aspect); gl.uniform1f(Q.u.uYaw, cam.yaw);
+    gl.uniform3fv(Q.u.uCol, (wxs.snow || 0) > (wxs.rain || 0) ? [.96, .97, 1] : [.78, .84, .92].map(v => v * (.4 + .6 * day)));
+    gl.disable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE); // (the glow mask in alpha stays as it was)
+    gl.drawArrays(gl.TRIANGLES, 0, 3); gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST);
+  }
   if (GL3.post) glBloom(gl, w, h, .55 + lit * .7);
   // what's under the pointer: the same scene again, each thing painted in its own id colour, read back one pixel
   if (GL3.pickReq && performance.now() - (GL3.pickT || 0) > 70 && UI.mouse.x >= 0) {
@@ -9787,7 +9904,7 @@ function glFrame(dt) {
 }
 // the tooltip for whatever the pointer is on: the same cards as the 2D view
 function glTip() {
-  const tip = $('tip'), id = GL3.hover || 0, now = performance.now();
+  const tip = $('tip'), id = GL3.hover || 0, now = GL3.ft || performance.now();
   if (!id || GL3.drag && GL3.drag[4] || now - UI.lastMove > (GL3.touched ? 6000 : 2500) || document.querySelector('.modal.show') || document.elementFromPoint(UI.mouse.x, UI.mouse.y) !== GL3.c) { tip.style.opacity = 0; DYN.hover = -1; return; }
   if (id >= GPID) {
     const wk = DYN.walkers[id - GPID], p = wk && S.P[wk.pid]; if (!p) { tip.style.opacity = 0; return; }
@@ -9801,14 +9918,14 @@ function glTip() {
 function glClick(sx, sy) {
   UI.mouse.x = sx; UI.mouse.y = sy;
   const id = GL3.hover || 0; if (!id) return;
-  if (id >= GPID) { const wk = DYN.walkers[id - GPID]; if (wk && wk.pid) { openPerson(wk.pid); GL3.follow = wk; GL3.cam.auto = false; } return; }
+  if (id >= GPID) { const wk = DYN.walkers[id - GPID]; if (wk && wk.pid) { openPerson(wk.pid); GL3.follow = wk; glTouch(); GL3.userFollow = wk; } return; }
   const i = id - 1, x = i % W, y = (i / W) | 0;
   if (UI.tool) {
     const k = UI.tool;
     if (useTool(k, x, y)) { UI.tool = null; document.body.classList.remove('targeting'); document.querySelectorAll('.tool[data-tool]').forEach(b => b.classList.remove('sel')); renderTools(); UIDIRTY.chron = true; toast(`${TOOL_INFO[k][0]} sent. The colonists noticed.`); }
     return;
   }
-  GL3.follow = null; GL3.goto = [x, surfZ(i) * ZS, y]; GL3.cam.auto = false;
+  GL3.follow = null; GL3.goto = [x, surfZ(i) * ZS, y]; glTouch();
 }
 // what's on the water, the rails and in the air: ships by era, fishing boats, ferries, trains and planes
 function glTraffic() {
@@ -9959,7 +10076,7 @@ function glPeople() {
 
 /* ---------- switching between the 2D and 3D views (3D by default) ---------- */
 const GL_DEFAULT = true; // new worlds and new browsers open in 3D (the choice is remembered)
-function glWanted() { return !QS.has('2d'); } // always 3D (2D stays as the fallback for ?2d and browsers without WebGL2)
+function glWanted() { if (QS.has('2d')) return false; try { if (localStorage.getItem('sf2d') === '1') return false; } catch (e) { } return true; } // always 3D (2D stays as the fallback for ?2d and browsers without WebGL2)
 function glToggle() {
   const want = !GL3.on; try { localStorage.setItem('sf3d', want ? '1' : '0'); } catch (e) { }
   if (want) { if (!GL3.gl) glInit(); else { GL3.on = true; GL3.c.style.display = 'block'; $('view').style.display = 'none'; for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); } }
@@ -9972,7 +10089,8 @@ function glBtn() { const b = $('glBtn'); if (b) b.remove(); } // (the 2D/3D swit
 // Materials: 0 none, 1 grass, 2 brick, 3 roof tiles, 4 bark, 5 leaves, 6 plaster, 7 stone, 8 planks, 9 cobbles, 10 asphalt, 11 earth.
 // The shader lays them on by world position (triplanar), so nothing needs unwrapping. RAW is how much of the texture's own
 // colour replaces the art's colour (grass and bark look real; plaster keeps the building's own colour and only gains grain).
-const TX = { N: 256, L: 18, SCALE: [1, .5, 1.8, 1.6, 3.5, 2.2, 1.2, 1.4, 2, 1.6, .7, .6, 1.8, 1, 2.2, .6, 1.2, 1.4], RAW: [0, .85, .55, .4, .9, .7, 0, .35, .45, .55, .7, .7, .3, .75, .35, .7, .5, .25] };
+const TX = { N: 256, L: 19, SCALE: [1, .5, 1.8, 1.6, 3.5, 2.2, 1.2, 1.4, 2, 1.6, .7, .6, 1.8, 1, 2.2, .6, 1.2, 1.4, 2.6], RAW: [0, .85, .55, .4, .9, .7, 0, .35, .45, .55, .7, .7, .3, .75, .35, .7, .5, .25, .7] };
+const M_NEEDLE = 18; // (pine needles: the leaf texture, but they stay green all winter)
 const M_SOIL = 13, M_CROP = 14, M_SAND = 15, M_TAR = 16, M_GLASS = 17, M_SLATE = 12, M_GRASS = 1, M_BRICK = 2, M_ROOF = 3, M_BARK = 4, M_LEAF = 5, M_PLASTER = 6, M_STONE = 7, M_PLANK = 8, M_COBBLE = 9, M_ASPHALT = 10, M_EARTH = 11;
 function glTextures() {
   const N = TX.N, L = TX.L, out = new Uint8Array(N * N * 4 * L), avg = new Float32Array(L * 3);
@@ -10030,6 +10148,7 @@ function glTextures() {
   { const sn = fbm(171, 4), sg = nz(172, 128); put(M_SAND, (x, y) => mx([206, 186, 144], [232, 216, 178], sn(x, y)).map(v => v * (.9 + sg(x, y) * .15 + (R() - .5) * .06))); }
   { const tn = nz(181, 128); put(M_TAR, (x, y) => { const v = .8 + tn(x, y) * .3 + (R() - .5) * .18; return [120, 118, 112].map(q => q * v); }); } // gravel and tar on flat roofs
   { const gn = fbm(191, 2); put(M_GLASS, (x, y) => { const px = x % 32, py = y % 42, frame = px < 3 || py < 3; if (frame) return [150, 156, 164]; const sky = gn(x, y), v = .7 + .5 * sky + (py / 42) * .15; return [110 * v, 150 * v, 180 * v]; }); } // curtain wall panes
+  { const Z = N * N * 4; out.copyWithin(M_NEEDLE * Z, M_LEAF * Z, (M_LEAF + 1) * Z); for (let q = 0; q < 3; q++) avg[M_NEEDLE * 3 + q] = avg[M_LEAF * 3 + q]; }
   return { data: out, avg };
 }
 // what a building's walls are made of
