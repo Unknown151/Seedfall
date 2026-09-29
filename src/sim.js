@@ -525,7 +525,7 @@ function tryService(T) {
   const theme = S.age ? AGE_THEMES.find(a => a.k === S.age.k) : null;
   const list = shuffle(SERV.slice());
   for (const sv of list) {
-    if (!hasTech(sv.tech) || T.pop < sv.min) continue;
+    if (!hasTech(sv.tech) || T.pop < sv.min || sv.until && hasTech(sv.until)) continue; // (outgrown buildings aren't built any more: see yearlyRetire)
     if (CULT.shun && (CULT.shun[sv.t] || 0) >= .3) continue;
     const have = bcount(T, sv.t);
     let want = sv.per ? Math.min(sv.max, 1 + Math.floor((T.pop - sv.min) / sv.per)) : 1;
@@ -1004,7 +1004,7 @@ const TOPICS = ['whose turn it is to feed the pigs', 'the correct way to boil po
 function invBand() { return S.era <= 2 ? 0 : S.era <= 3 ? 1 : S.era <= 4 ? 2 : S.era <= 5 ? 3 : S.era <= 6 ? 4 : 5; }
 function sportNow() { return SPORTS[Math.min(5, invBand())]; }
 const EVENTS = [
-  { k: 'harvest', w: 5, when: () => hasTech('sunroot'), run() { const T = randTown(); const c = CROPS[T.crop].n; T.pop *= 1.015; chron('🌾', pick([`A bumper ${c} harvest in ${T.name}.`, `${T.name} brings in a heavy, sweet crop of ${c} this year.`, `The granaries of ${T.name} are full to the rafters.`]), { T }); } },
+  { k: 'harvest', w: 5, when: () => hasTech('sunroot'), run() { const T = randTown(); const c = CROPS[T.crop].n; T.pop *= 1.015; chron('🌾', pick([`A bumper ${c} harvest in ${T.name}.`, `${T.name} brings in a heavy, sweet crop of ${c} this year.`, bcount(T, 'granary') ? `The granaries of ${T.name} are full to the rafters.` : `The silos of ${T.name} are full to the brim.`]), { T }); } },
   { k: 'festival', w: 4, when: () => S.year > 25, run() { const T = festTown(); const ex = (S.extraFestAt || []).filter(f => f.from <= S.year).map(f => f.n); const f = pickFresh(FESTIVALS.concat(ex, ex), 'fest'); chron('🎆', `${T.name} celebrates ${f}.`, { T }); fx('fireworks', { x: T.x, y: T.y }); gainRev(4, 'a festival'); } },
   { k: 'art', w: 3, when: () => hasTech('kiln'), run() { const T = randTown(); const p = cast('artist', T, q => q.st.cft + q.st.wit + (q.role === 'artist' ? 3 : 0), { minAge: 16 }); const a = pickFresh(ARTWORKS, 'art'); p.deeds.push(a); chron('🎨', `${whoOf(p, T)} makes ${a}.`, { T }); } },
   { k: 'song', w: 2, when: () => S.year > 12, run() { const T = randTown(); chron('🎵', `A song called “The ${pick(SONG_A)} ${pick(SONG_B)}” spreads from ${T.name} to every hearth.`, { T }); } },

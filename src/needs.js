@@ -100,6 +100,28 @@ function yearlyIndustry() {
     chron('🌳', `The old power house of ${T.name} is pulled down now the fusion plant does its work. The site becomes a park, and the chimney a climbing wall.`, { x, y });
     break;
   }
+  yearlyRetire();
+}
+// Buildings a later age has no use for come down a few at a time: wells once water is piped, granaries once grain
+// comes by rail, windmills once the gene gardens feed everyone. Each town keeps its oldest well and mill for old
+// times' sake (`B.old`, the tooltip says so). The ground goes back to the town, so houses or shops fill it in.
+const RETIRE = [
+  { t: 'well', tech: 'concrete', keep: 1, txt: T => `Water runs from taps all over ${T.name} now, and its wells are capped one by one. The oldest stays in the square, with geraniums in the bucket.` },
+  { t: 'granary', tech: 'rail', keep: 0, txt: T => `The trains bring grain to ${T.name} every week, and nobody needs to hoard for winter. The old granaries are pulled down.` },
+  { t: 'mill', tech: 'genegarden', keep: 1, txt: T => `The gene gardens feed ${T.name} without any grinding. Its windmills stop, and come down one by one, all but the oldest.` }
+];
+function yearlyRetire() {
+  for (const r of RETIRE) {
+    if (!hasTech(r.tech)) continue;
+    for (const T of towns()) {
+      const bs = T.bl.map(id => S.B[id]).filter(B => B && B.type === r.t && !B.up).sort((a, b) => a.id - b.id);
+      if (r.keep && bs[0] && !bs[0].old) bs[0].old = 1;
+      if (bs.length <= r.keep || !chance(.3)) continue;
+      const B = bs[bs.length - 1], x = B.x, y = B.y; // the newest goes first
+      removeBuilding(B); T._fail = {}; // (the freed plot is worth a fresh look)
+      if (!S.flags['ret_' + r.t + T.id]) { S.flags['ret_' + r.t + T.id] = 1; if (!FAST || chance(.5)) chron('🧱', r.txt(T), { x, y }); }
+    }
+  }
 }
 
 /* ---------- what the needs do ---------- */
@@ -200,6 +222,7 @@ function needTip(B) {
   if (t === 'warehouse') return '📦 the town’s stores hold half as much again';
   if (t === 'shipyard') return '⚓ bigger ships for sea trade, and more of them on the water';
   if (SMOKY[t] && sootK() >= .5) return `🏭 smoky${POWER_OUT[t] ? ` · ⚡ makes ${POWER_OUT[t]} power` : POWER_USE[t] && hasTech('electric') ? ` · ⚡ uses ${POWER_USE[t]} power` : ''}`;
+  if ((t === 'well' || t === 'mill') && B.old) return t === 'well' ? '🪣 the old well, kept for old times’ sake (water comes by pipe now)' : '🌾 the old windmill, kept turning for the look of it';
   if (t === 'well') return `💧 water for about ${WELL_N} people`;
   if (t === 'watertower') return `💧 water for about ${fmtInt(TOWER_N * (hasTech('steam') ? 2 : 1))} people`;
   if (t === 'mill' && hasTech('mills') && !hasTech('genegarden')) return `🌾 grinds the harvest of about ${MILL_FIELDS} fields (a quarter more food from them)`;

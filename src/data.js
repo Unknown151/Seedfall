@@ -135,14 +135,14 @@ const BT = {
 
 // service buildings: when a town should build one
 const SERV = [
-  { t: 'well', tech: 'wells', min: 14, per: 45, max: 4, site: 'center' },
-  { t: 'granary', tech: 'kiln', min: 20, per: 90, max: 3, site: 'center' },
+  { t: 'well', tech: 'wells', until: 'concrete', min: 14, per: 45, max: 4, site: 'center' },
+  { t: 'granary', tech: 'kiln', until: 'rail', min: 20, per: 90, max: 3, site: 'center' },
   { t: 'shrine', tech: 'stone', min: 22, per: 0, max: 1, site: 'center' },
   { t: 'dock', tech: 'boats', min: 30, per: 70, max: 3, site: 'shore' },
   { t: 'market', tech: 'loom', min: 45, per: 400, max: 2, site: 'center' },
   { t: 'school', tech: 'script', min: 60, per: 350, max: 3, site: 'center' },
   { t: 'workshop', tech: 'smelt', min: 60, per: 200, max: 3, site: 'mid' },
-  { t: 'mill', tech: 'mills', min: 70, per: 180, max: 3, site: 'fields' },
+  { t: 'mill', tech: 'mills', until: 'genegarden', min: 70, per: 180, max: 3, site: 'fields' },
   { t: 'shops', tech: 'coin', min: 250, per: 900, max: 6, site: 'center' },
   { t: 'hall', tech: 'masonry', min: 110, per: 0, max: 1, site: 'center' },
   { t: 'harbor', tech: 'masonry', min: 200, per: 0, max: 1, site: 'harbor' },

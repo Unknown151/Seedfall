@@ -174,6 +174,10 @@ WHAT THE TOWNS NEED
   A town that is short of something sees to it before it builds more houses.
   Nothing ever stops: an unmet need only slows a town down a little. Now and
   then the chronicle notices (queues at the wells, brownouts, dull towns).
+  Old buildings retire when a later age outgrows them: granaries come down
+  once the trains bring grain (Railways), wells are capped once water is
+  piped (Concrete), and windmills stop once the gene gardens feed everyone.
+  Each town keeps its oldest well and windmill for old times' sake.
 
 WAREHOUSES, SHIPYARDS, AND THINGS FOR THE SOUL
   Warehouses (from Coinage): a town whose stores are full builds one, and
