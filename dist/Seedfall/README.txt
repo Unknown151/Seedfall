@@ -174,6 +174,10 @@ WHAT THE TOWNS NEED
   A town that is short of something sees to it before it builds more houses.
   Nothing ever stops: an unmet need only slows a town down a little. Now and
   then the chronicle notices (queues at the wells, brownouts, dull towns).
+  Old buildings retire when a later age outgrows them: granaries come down
+  once the trains bring grain (Railways), wells are capped once water is
+  piped (Concrete), and windmills stop once the gene gardens feed everyone.
+  Each town keeps its oldest well and windmill for old times' sake.
 
 WAREHOUSES, SHIPYARDS, AND THINGS FOR THE SOUL
   Warehouses (from Coinage): a town whose stores are full builds one, and
@@ -271,8 +275,23 @@ THE 3D VIEW
   Drag to turn, scroll to zoom (right down to the street), point at anything to
   see what it is, and click a person to follow them. On a phone: one finger
   turns, two pinch and move, a tap shows what's there.
+  The seasons follow the real calendar: blossom in spring, green summers,
+  autumn colours (the pines stay green), and snow that settles on roofs and
+  fields when it snows. Rain darkens the streets and leaves puddles that catch
+  the sky, fog rolls in some mornings, and clouds drift over with their
+  shadows sliding across the valley.
+  Leave the camera alone for a minute and it turns film camera: it drifts to
+  wherever something is happening (news from the chronicle, a ship coming in,
+  a townsperson on their way, the harbour at sunset) with a caption. Touch it
+  and it's yours again. R turns the film camera off or on.
   Zoom in and the streets near you fill in: sills and shutters, cornices, door
   steps, gutters, balconies, the glazing on glass towers.
+  The towns grow up in the style of the old city-builders: thatch and earth
+  yards with barrels, crates and washing lines for the first farmers; brick
+  terraces with dormers and chimney pots for the workers; stone ground floors,
+  quoins and striped shop awnings for the artisans; and tall mansard blocks
+  with iron cresting for the engineers. Chimneys smoke (more in winter), and
+  so do the works.
   On a PC with no 3D support, Seedfall falls back to the flat 2D view.
 
 KEYS
@@ -282,7 +301,7 @@ KEYS
   6        speak to your people
   F        fullscreen
   Z        zone view: the quarters each town has drawn for itself (2D)
-  R        3D: slowly turn round the town
+  R        3D: the film camera on or off (on by default)
   N        3D: step through the times of day (and back to live)
   T        3D: fly to the next town
   P        3D: perspective or the flat isometric lens

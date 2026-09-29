@@ -9,7 +9,7 @@ await p.waitForTimeout(3000);
 const tips = [];
 for (const [x, y] of [[700, 425], [620, 380], [800, 470], [560, 500], [900, 330]]) {
   await p.mouse.move(x, y); await p.waitForTimeout(400);
-  tips.push(await p.evaluate(() => ({ id: GL3.hover, tip: +$('tip').style.opacity ? $('tip').innerText.split('\n')[0] : '' })));
+  tips.push(await p.evaluate(() => { UI.lastMove = performance.now(); GL3.pickReq = true; GL3.pickT = 0; glFrame(.016); /* (a frame now: in software each takes seconds) */ return { id: GL3.hover, tip: +$('tip').style.opacity ? $('tip').innerText.split('\n')[0] : '' }; }));
 }
 console.log('     ' + tips.map(t => `${t.id}: ${t.tip}`).join(' | '));
 ok(tips.filter(t => t.id && t.tip).length >= 4, 'pointing at things shows what they are');

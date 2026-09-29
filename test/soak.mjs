@@ -14,6 +14,6 @@ for (const [ff, secs] of [[0,15],[300,12],[900,12],[1700,12],[2600,12],[3900,12]
   const st = await p.evaluate(()=>({y:SF.state().year|0, pop:Math.round(totalPop()), era:eraName(), fps:document.getElementById('fps').textContent, chron:SF.state().chron.length}));
   console.log(JSON.stringify(st));
 }
-await p.screenshot({path:'soak_end.png'});
+await p.screenshot({path:'soak_end.png', timeout: 180000}); // (software 3D is slow to hand over a frame late in a big world)
 console.log('ERRORS:', errs.length); console.log(errs.slice(0,15).join('\n'));
 await b.close();
