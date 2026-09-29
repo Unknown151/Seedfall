@@ -38,14 +38,19 @@ function gunscreen(X, Y) { const a = X / 16, b = Y / 8; return [(a + b) / 2, (b 
 /* ---------- close-up detail (the near version of a chunk only: GLB.lod) ---------- */
 const rgbS1 = c => 'rgb(' + Math.round(c[0] * 255) + ',' + Math.round(c[1] * 255) + ',' + Math.round(c[2] * 255) + ')', tintS = (c, k, t = [1, 1, 1]) => rgbS1([c[0] + (t[0] - c[0]) * k, c[1] + (t[1] - c[1]) * k, c[2] + (t[2] - c[2]) * k]);
 const SHUT = ['#3f6b4f', '#3f5f8a', '#8a3f37', '#6b5a4a', '#2f4f5f'];
-function glWinDetail(Wc, a, n, ww, wh, wall, seed) { // around one window: a sill, a lintel, glazing bars and (on older houses) shutters
+function glFace(c, a, u, n, col) { const C = gcol(col), P = (i, j) => [c[0] + a[0] * i + u[0] * j, c[1] + a[1] * i + u[1] * j, c[2] + a[2] * i + u[2] * j], V = GLB.v, id = GLB.id || 0, m = GLB.mat || 0; for (const q of [P(-1, -1), P(1, -1), P(1, 1), P(-1, -1), P(1, 1), P(-1, 1)]) V.push(q[0], q[1], q[2], n[0], n[1], n[2], C[0], C[1], C[2], 0, id, m, 1); } // one flat face (cheap)
+function glWinDetail(Wc, a, n, ww, wh, wall, seed, floor = 0) { // around one window: a sill, a lintel, glazing bars and (on older houses) shutters
   const old = !hasTech('concrete'), sc = tintS(wall, .55), m = GLB.mat; GLB.mat = M_STONE;
   const at = (s, t, y) => [Wc[0] + a[0] * s + n[0] * t, Wc[1] + y, Wc[2] + a[2] * s + n[2] * t];
   glOBox(at(0, .012, -wh / 2 - .012), V3s(a, ww / 2 + .014), V3s(n, .013), [0, .01, 0], sc); // sill
   glOBox(at(0, .006, wh / 2 + .01), V3s(a, ww / 2 + .008), V3s(n, .007), [0, .008, 0], sc); // lintel
   GLB.mat = 0;
-  if (old) { const fc = tintS(wall, .8); glOBox(at(0, .005, 0), V3s(a, .0025), V3s(n, .003), [0, wh / 2, 0], fc); glOBox(at(0, .005, wh * .1), V3s(a, ww / 2), V3s(n, .003), [0, .0025, 0], fc); } // glazing bars
-  if (old && hash2(seed | 0, 3, 41) < .45) { const sh = SHUT[(hash2(seed | 0, 5, 43) * SHUT.length) | 0]; GLB.mat = M_PLANK; for (const sg of [-1, 1]) glOBox(at(sg * (ww / 2 + ww * .27), .006, 0), V3s(a, ww * .25), V3s(n, .005), [0, wh / 2, 0], sh); } // shutters
+  if (old) { const fc = tintS(wall, .8); glFace(at(0, .007, 0), V3s(a, .0028), [0, wh / 2, 0], n, fc); glFace(at(0, .0072, wh * .1), V3s(a, ww / 2), [0, .0028, 0], n, fc); } // glazing bars
+  if (old && hash2(seed | 0, 3, 41) < .45) { const sh = SHUT[(hash2(seed | 0, 5, 43) * SHUT.length) | 0]; GLB.mat = M_PLANK; for (const sg of [-1, 1]) glFace(at(sg * (ww / 2 + ww * .27), .007, 0), V3s(a, ww * .25), [0, wh / 2, 0], n, sh); } // shutters
+  if (!old && floor >= 1 && hash2(seed | 0, 7, 47) < .3) { // a balcony on a modern block
+    GLB.mat = M_STONE; glOBox(at(0, .04, -wh / 2 - .02), V3s(a, ww / 2 + .03), V3s(n, .04), [0, .008, 0], '#c9c6c0');
+    GLB.mat = 0; glOBox(at(0, .076, -wh / 2 + .012), V3s(a, ww / 2 + .03), V3s(n, .002), [0, .02, 0], hash2(seed | 0, 9, 3) < .5 ? '#b8bcc2' : 'rgb(185,215,228)'); // its railing, standing on it
+  }
   GLB.mat = m;
 }
 function glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top) {
@@ -58,6 +63,15 @@ function glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top) {
   gquad(P(hw, -hd, z0), P(-hw, -hd, z0), P(-hw, -hd, z1), P(hw, -hd, z1), c);
   gquad(P(-hw, -hd, z0), P(-hw, hd, z0), P(-hw, hd, z1), P(-hw, -hd, z1), c);
   const [sx, sy] = pt(cx, cy, u0, v0, 0); GLB.tops.push([sx, sy, z1]);
+  if (GLB.lod && GLB.wall === M_GLASS && h >= 16 && hw >= .1 && hd >= .1) { // curtain wall: mullions up the glass and a band at every floor
+    const m = GLB.mat, C = P(0, 0, z0), fc = tintS(c, .55, [.85, .87, .9]), Hh = h * ZS / 2, cy = C[1] + Hh; GLB.mat = 0;
+    for (const [n, a, half, off] of [[[0, 0, 1], [1, 0, 0], hw, hd], [[0, 0, -1], [1, 0, 0], hw, hd], [[1, 0, 0], [0, 0, 1], hd, hw], [[-1, 0, 0], [0, 0, 1], hd, hw]]) {
+      const base = [C[0] + n[0] * (off + .004), 0, C[2] + n[2] * (off + .004)], k = Math.max(2, Math.round(half * 2 / .09));
+      for (let i = 0; i <= k; i++) { const t = -half + i / k * half * 2; glFace([base[0] + a[0] * t, cy, base[2] + a[2] * t], V3s(a, .005), [0, Hh, 0], n, fc); }
+      for (let z = z0 + 7; z < z0 + h - 1; z += 7) glFace([base[0], C[1] + (z - z0) * ZS, base[2]], V3s(a, half), [0, .006, 0], n, fc);
+    }
+    GLB.mat = m;
+  }
   if (GLB.lod && GLB.wall && GLB.wall !== M_GLASS && GLB.wall !== M_CROP && h >= 6 && hw >= .09 && hd >= .09 && z0 < 1) { // a stone plinth and a cornice on a proper wall
     const m = GLB.mat, C = P(0, 0, 0); GLB.mat = M_STONE;
     glOBox([C[0], C[1] + .6 * ZS, C[2]], [hw + .012, 0, 0], [0, 0, hd + .012], [0, .6 * ZS, 0], tintS(c, .45, [.25, .22, .2]));
@@ -132,8 +146,8 @@ function glWindows(cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col) {
       gquad(P(hw + e, v + wv / 2, zb), P(hw + e, v - wv / 2, zb), P(hw + e, v - wv / 2, zb + wh), P(hw + e, v + wv / 2, zb + wh), c, em(3));
       gquad(P(-hw - e, v - wv / 2, zb), P(-hw - e, v + wv / 2, zb), P(-hw - e, v + wv / 2, zb + wh), P(-hw - e, v - wv / 2, zb + wh), c, em(4));
       if (GLB.lod && GLB.wall !== M_GLASS && wh >= 2) { const wall = GLB.wallC || [.8, .75, .68], my = (zb + wh / 2) * ZS, WH = wh * ZS, sd = GLB.x * 31 + GLB.y * 17 + f * 7 + k;
-        glWinDetail(V3a(P(u, hd + e, 0), [0, my, 0]), [1, 0, 0], [0, 0, 1], wu, WH, wall, sd); glWinDetail(V3a(P(u, -hd - e, 0), [0, my, 0]), [1, 0, 0], [0, 0, -1], wu, WH, wall, sd + 1);
-        glWinDetail(V3a(P(hw + e, v, 0), [0, my, 0]), [0, 0, 1], [1, 0, 0], wv, WH, wall, sd + 2); glWinDetail(V3a(P(-hw - e, v, 0), [0, my, 0]), [0, 0, 1], [-1, 0, 0], wv, WH, wall, sd + 3); }
+        glWinDetail(V3a(P(u, hd + e, 0), [0, my, 0]), [1, 0, 0], [0, 0, 1], wu, WH, wall, sd, f); glWinDetail(V3a(P(u, -hd - e, 0), [0, my, 0]), [1, 0, 0], [0, 0, -1], wu, WH, wall, sd + 1, f);
+        glWinDetail(V3a(P(hw + e, v, 0), [0, my, 0]), [0, 0, 1], [1, 0, 0], wv, WH, wall, sd + 2, f); glWinDetail(V3a(P(-hw - e, v, 0), [0, my, 0]), [0, 0, 1], [-1, 0, 0], wv, WH, wall, sd + 3, f); }
     }
   }
 }
@@ -728,7 +742,7 @@ function glFrame(dt) {
   const built = batch.map(k => { GL3.dirty.delete(k); const r = glBuildChunk(k), old = glEdge(k); hfRaster(k, r.v); if (GL3.first && glEdge(k) !== old) for (const j of glNbrs(k)) if (!batch.includes(j)) again.add(j); return [k, r]; });
   for (const [k, r] of built) { glAO(r.v); const ch = GL3.chunks[k]; glUpload(ch, r.v, false); ch.lamps = r.lamps; glDropNear(ch); }
   // the chunks round the camera get a detailed version, one a frame, nearest first (and lose it again once well out of range)
-  { const nr = cam.zoom < 20 ? clamp(cam.zoom * 1.3 + 5, 10, 20) : 0, cx = cam.tx, cz = cam.tz; let best = -1, bd = 1e9;
+  { const nr = cam.zoom <= 9 ? 11 : cam.zoom <= 15 ? 7 : 0, cx = cam.tx, cz = cam.tz; let best = -1, bd = 1e9;
     for (let k = 0; k < GNC * GNC; k++) { const ch = GL3.chunks[k], d = Math.hypot((k % GNC) * GCH + GCH / 2 - cx, ((k / GNC) | 0) * GCH + GCH / 2 - cz);
       if (ch.near && d > nr + 8) glDropNear(ch); else if (!ch.near && ch.n && d < nr && d < bd && !GL3.dirty.has(k)) { best = k; bd = d; } }
     if (best >= 0 && built.length < 2 && !GL3.noNear) { const r = glBuildChunk(best, true); glAO(r.v); glUpload(GL3.chunks[best], r.v, true); } }
@@ -751,7 +765,7 @@ function glFrame(dt) {
   if (cam.persp) { const d0 = zz / Math.tan(19 * DEG); pit = Math.max(pit, Math.asin(Math.min(.95, 2.2 / d0))); dir[0] = Math.cos(pit) * Math.sin(cam.yaw); dir[1] = Math.sin(pit); dir[2] = Math.cos(pit) * Math.cos(cam.yaw); } // stay above the rooftops
   const fov = 38 * DEG, dist = cam.persp ? zz / Math.tan(fov / 2) : 90, tgt = [cam.tx, cam.ty, cam.tz]; let eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
   if (cam.persp) for (let k = 0; k < 24; k++) { // tall buildings: tip the camera up until neither it nor the middle of its view line is inside one
-    const g = Math.max(hfAt(eye[0], eye[2]) - eye[1], hfAt((eye[0] + tgt[0]) / 2, (eye[2] + tgt[2]) / 2) - (eye[1] + tgt[1]) / 2); if (g < -.35 || pit >= 1.45) break;
+    let g = -9; for (const f of [1, .75, .5, .3]) g = Math.max(g, hfAt(tgt[0] + (eye[0] - tgt[0]) * f, tgt[2] + (eye[2] - tgt[2]) * f) - (tgt[1] + (eye[1] - tgt[1]) * f) + (f > .9 ? .6 : .25)); if (g < 0 || pit >= 1.45) break; // (a clear line, and the camera well above the roofs)
     pit = Math.min(1.45, pit + .04); dir = [Math.cos(pit) * Math.sin(cam.yaw), Math.sin(pit), Math.cos(pit) * Math.cos(cam.yaw)]; eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
   }
   { // (only for this frame: the angle you chose stays underneath. Up at once, back down gently)
