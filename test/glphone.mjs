@@ -1,4 +1,4 @@
-// The 3D preview on a phone: opens in 3D with no flags, tap shows what's there, pinch zooms, the 2D/3D switch. Run from test/: `node glphone.mjs`
+// The 3D preview on a phone: opens in 3D with no flags, tap shows what's there, pinch zooms, and no 2D/3D switch. Run from test/: `node glphone.mjs`
 import { launch, ROOT } from './env.mjs';
 const b = await launch();
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
@@ -18,10 +18,7 @@ await p.evaluate(() => { const c = GL3.c, ev = (t, id, x, y) => c.dispatchEvent(
 const z1 = await p.evaluate(() => GL3.cam.zoom);
 ok(z1 < z0 * .7, 'pinching out zooms in', `${z0.toFixed(1)} → ${z1.toFixed(1)}`);
 await p.waitForTimeout(800); await p.screenshot({ path: 'gl_phone_zoom.png' });
-await p.click('#glBtn'); await p.waitForTimeout(800);
-ok(await p.evaluate(() => !GL3.on && $('view').style.display !== 'none' && $('glBtn').textContent === 'Try it in 3D'), 'the switch goes to 2D');
-await p.click('#glBtn'); await p.waitForTimeout(1500);
-ok(await p.evaluate(() => GL3.on && $('glBtn').textContent === 'Switch to 2D'), 'and back to 3D');
+ok(await p.evaluate(() => !$('glBtn')), 'there is no 2D/3D switch');
 await p.screenshot({ path: 'gl_phone.png' });
 ok(!errs.length, 'no page errors', errs.join(' | '));
 await b.close(); console.log(fails ? `${fails} FAILED` : 'all ok'); process.exit(fails ? 1 : 0);
