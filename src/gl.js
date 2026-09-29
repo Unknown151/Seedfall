@@ -35,15 +35,35 @@ function gquad(a, b, c, d, col, e = 0) { gtri(a, b, c, col, e); gtri(a, c, d, co
 function gw(u, v, z, cx = 0, cy = 0) { const su = cx / 16, sv = cy / 8; return [GLB.x + u + (su + sv) / 2, GLB.base + z * ZS, GLB.y + v + (sv - su) / 2]; }
 // a screen point (relative to the tile centre) back to u, v, assuming it's on the ground
 function gunscreen(X, Y) { const a = X / 16, b = Y / 8; return [(a + b) / 2, (b - a) / 2]; }
+/* ---------- close-up detail (the near version of a chunk only: GLB.lod) ---------- */
+const rgbS1 = c => 'rgb(' + Math.round(c[0] * 255) + ',' + Math.round(c[1] * 255) + ',' + Math.round(c[2] * 255) + ')', tintS = (c, k, t = [1, 1, 1]) => rgbS1([c[0] + (t[0] - c[0]) * k, c[1] + (t[1] - c[1]) * k, c[2] + (t[2] - c[2]) * k]);
+const SHUT = ['#3f6b4f', '#3f5f8a', '#8a3f37', '#6b5a4a', '#2f4f5f'];
+function glWinDetail(Wc, a, n, ww, wh, wall, seed) { // around one window: a sill, a lintel, glazing bars and (on older houses) shutters
+  const old = !hasTech('concrete'), sc = tintS(wall, .55), m = GLB.mat; GLB.mat = M_STONE;
+  const at = (s, t, y) => [Wc[0] + a[0] * s + n[0] * t, Wc[1] + y, Wc[2] + a[2] * s + n[2] * t];
+  glOBox(at(0, .012, -wh / 2 - .012), V3s(a, ww / 2 + .014), V3s(n, .013), [0, .01, 0], sc); // sill
+  glOBox(at(0, .006, wh / 2 + .01), V3s(a, ww / 2 + .008), V3s(n, .007), [0, .008, 0], sc); // lintel
+  GLB.mat = 0;
+  if (old) { const fc = tintS(wall, .8); glOBox(at(0, .005, 0), V3s(a, .0025), V3s(n, .003), [0, wh / 2, 0], fc); glOBox(at(0, .005, wh * .1), V3s(a, ww / 2), V3s(n, .003), [0, .0025, 0], fc); } // glazing bars
+  if (old && hash2(seed | 0, 3, 41) < .45) { const sh = SHUT[(hash2(seed | 0, 5, 43) * SHUT.length) | 0]; GLB.mat = M_PLANK; for (const sg of [-1, 1]) glOBox(at(sg * (ww / 2 + ww * .27), .006, 0), V3s(a, ww * .25), V3s(n, .005), [0, wh / 2, 0], sh); } // shutters
+  GLB.mat = m;
+}
 function glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top) {
   if (dsRound()) { const [X, Y] = pt(cx, cy, u0, v0, 0); return glCyl(X, Y, Math.max(hw, hd) * 1.08, z0, h, col, top); }
   const c = gcol(col), ct = top ? gcol(top) : c, P = (u, v, z) => gw(u0 + u, v0 + v, z, cx, cy), z1 = z0 + h; GLB.ctr = P(0, 0, z0 + h / 2);
+  if (GLB.wall && h >= 6) GLB.wallC = c; // (the trim of its windows and doors is tinted from it)
   GLB.mat = GLB.wall && z1 > 6 ? M_TAR : 0; gquad(P(-hw, -hd, z1), P(-hw, hd, z1), P(hw, hd, z1), P(hw, -hd, z1), ct); GLB.mat = GLB.wall || 0;
   gquad(P(-hw, hd, z0), P(hw, hd, z0), P(hw, hd, z1), P(-hw, hd, z1), c);
   gquad(P(hw, hd, z0), P(hw, -hd, z0), P(hw, -hd, z1), P(hw, hd, z1), c);
   gquad(P(hw, -hd, z0), P(-hw, -hd, z0), P(-hw, -hd, z1), P(hw, -hd, z1), c);
   gquad(P(-hw, -hd, z0), P(-hw, hd, z0), P(-hw, hd, z1), P(-hw, -hd, z1), c);
   const [sx, sy] = pt(cx, cy, u0, v0, 0); GLB.tops.push([sx, sy, z1]);
+  if (GLB.lod && GLB.wall && GLB.wall !== M_GLASS && GLB.wall !== M_CROP && h >= 6 && hw >= .09 && hd >= .09 && z0 < 1) { // a stone plinth and a cornice on a proper wall
+    const m = GLB.mat, C = P(0, 0, 0); GLB.mat = M_STONE;
+    glOBox([C[0], C[1] + .6 * ZS, C[2]], [hw + .012, 0, 0], [0, 0, hd + .012], [0, .6 * ZS, 0], tintS(c, .45, [.25, .22, .2]));
+    glOBox([C[0], C[1] + (z1 - .45) * ZS, C[2]], [hw + .016, 0, 0], [0, 0, hd + .016], [0, .45 * ZS, 0], tintS(c, .5));
+    GLB.mat = m;
+  }
 }
 function glFlat(cx, cy, u0, v0, hw, hd, z, col) {
   GLB.mat = GLB.flat === 'farm' ? (col === '#bd8f68' ? M_SOIL : M_CROP) : GLB.flat === 'green' ? M_GRASS : GLB.flat === 'paved' ? M_STONE : 0;
@@ -54,6 +74,7 @@ function glFlat(cx, cy, u0, v0, hw, hd, z, col) {
 function glCylAt(u, v, r, z0, h, col, top, n = 12) {
   const c = gcol(col), ct = top ? gcol(top) : c, P = (a, z) => gw(u + Math.cos(a) * r, v + Math.sin(a) * r, z), C = gw(u, v, z0 + h); GLB.ctr = gw(u, v, z0 + h / 2);
   for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; GLB.mat = GLB.wall || 0; gquad(P(a, z0), P(b, z0), P(b, z0 + h), P(a, z0 + h), c); GLB.mat = 0; gtri(C, P(b, z0 + h), P(a, z0 + h), ct); }
+  if (GLB.lod && GLB.wall && h > 8 && r > .07) { GLB.lod = false; const bc = tintS(c, .4); glCylAt(u, v, r * 1.05, z0 + h - 1.1, 1.1, bc, bc, n); GLB.lod = true; } // a band round the top of a tower
 }
 function glCyl(X, Y, r, z0, h, col, top) { const [u, v] = gunscreen(X, Y); glCylAt(u, v, r, z0, h, col, top); GLB.tops.push([X, Y, z0 + h]); }
 function glCone(X, Y, r, h, col) {
@@ -72,6 +93,12 @@ function glGable(cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
   // the eaves hang out past the walls and drop a little, so the roof meets the top of the wall with no gap
   const c = gcol(col), cw = gcol(wall), o = .05, g = .02, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy); GLB.ctr = P(0, 0, z - 1);
   const rm = roofMat(c), wm = GLB.wall || 0, sq = gquad, tr = gtri, gq = (...a) => { GLB.mat = rm; sq(...a); }, gt = (...a) => { GLB.mat = wm; tr(...a); };
+  if (GLB.lod && hw > .06 && hd > .06) { // a ridge cap and gutters along the eaves
+    const cap = tintS(c, .3, [.18, .17, .17]), L = alongU ? [[-hw - g, 0], [hw + g, 0]] : [[0, -hd - g], [0, hd + g]], ze = alongU ? z - rh * o / hd : z - rh * o / hw;
+    gBeam(P(L[0][0], L[0][1], z + rh + .35), P(L[1][0], L[1][1], z + rh + .35), .013, cap, rm);
+    for (const sg of [-1, 1]) { const E = alongU ? [[-hw - g, sg * (hd + o)], [hw + g, sg * (hd + o)]] : [[sg * (hw + o), -hd - g], [sg * (hw + o), hd + g]]; gBeam(P(E[0][0], E[0][1], ze - .35), P(E[1][0], E[1][1], ze - .35), .008, '#4a4d52'); }
+    GLB.ctr = P(0, 0, z - 1);
+  }
   if (alongU) {
     const ze = z - rh * o / hd;
     gq(P(-hw - g, -hd - o, ze), P(-hw - g, 0, z + rh), P(hw + g, 0, z + rh), P(hw + g, -hd - o, ze), c);
@@ -89,6 +116,7 @@ function glPyr(cx, cy, u0, v0, hw, hd, z, rh, col) {
   const c = gcol(col), o = .04, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy), T = P(0, 0, z + rh); GLB.ctr = P(0, 0, z - 1); GLB.mat = roofMat(c);
   const ze = z - rh * o / Math.max(.05, Math.min(hw, hd)), A = P(-hw - o, -hd - o, ze), B = P(hw + o, -hd - o, ze), C = P(hw + o, hd + o, ze), D = P(-hw - o, hd + o, ze); // eaves drop to meet the walls
   gtri(B, A, T, c); gtri(A, D, T, c); gtri(D, C, T, c); gtri(C, B, T, c);
+  if (GLB.lod && rh > 4) { GLB.mat = 0; glOBox([T[0], T[1] + .012, T[2]], [.011, 0, 0], [0, 0, .011], [0, .03, 0], '#8c8f94'); } // a finial
 }
 // windows on all four walls (the camera can go round now); em in (0, 1) = a window, lit when em < the night's lit fraction
 function glWindows(cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col) {
@@ -103,6 +131,9 @@ function glWindows(cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col) {
       gquad(P(u + wu / 2, -hd - e, zb), P(u - wu / 2, -hd - e, zb), P(u - wu / 2, -hd - e, zb + wh), P(u + wu / 2, -hd - e, zb + wh), c, em(2));
       gquad(P(hw + e, v + wv / 2, zb), P(hw + e, v - wv / 2, zb), P(hw + e, v - wv / 2, zb + wh), P(hw + e, v + wv / 2, zb + wh), c, em(3));
       gquad(P(-hw - e, v - wv / 2, zb), P(-hw - e, v + wv / 2, zb), P(-hw - e, v + wv / 2, zb + wh), P(-hw - e, v - wv / 2, zb + wh), c, em(4));
+      if (GLB.lod && GLB.wall !== M_GLASS && wh >= 2) { const wall = GLB.wallC || [.8, .75, .68], my = (zb + wh / 2) * ZS, WH = wh * ZS, sd = GLB.x * 31 + GLB.y * 17 + f * 7 + k;
+        glWinDetail(V3a(P(u, hd + e, 0), [0, my, 0]), [1, 0, 0], [0, 0, 1], wu, WH, wall, sd); glWinDetail(V3a(P(u, -hd - e, 0), [0, my, 0]), [1, 0, 0], [0, 0, -1], wu, WH, wall, sd + 1);
+        glWinDetail(V3a(P(hw + e, v, 0), [0, my, 0]), [0, 0, 1], [1, 0, 0], wv, WH, wall, sd + 2); glWinDetail(V3a(P(-hw - e, v, 0), [0, my, 0]), [0, 0, 1], [-1, 0, 0], wv, WH, wall, sd + 3); }
     }
   }
 }
@@ -113,6 +144,13 @@ function glCylWindows(cx, cy, u0, v0, r, z0, h, floors, n, col) {
 function glDoor(cx, cy, u0, v0, hd, w, h, col) {
   const P = (u, zz) => gw(u0 + u, v0 + hd + .007, zz, cx, cy); GLB.ctr = gw(u0, v0, h / 2, cx, cy);
   gquad(P(-w / 2, 0), P(w / 2, 0), P(w / 2, h), P(-w / 2, h), gcol(col), .5);
+  if (GLB.lod) { // a frame, a step and a little hood over it
+    const m = GLB.mat, C = P(0, 0), wall = GLB.wallC || [.8, .75, .68]; GLB.mat = M_STONE;
+    glOBox([C[0], C[1] + .25 * ZS, C[2] + .03], [w / 2 + .02, 0, 0], [0, 0, .03], [0, .25 * ZS, 0], '#b9b2a6');
+    glOBox([C[0], C[1] + (h + .3) * ZS, C[2] + .02], [w / 2 + .025, 0, 0], [0, 0, .022], [0, .3 * ZS, 0], tintS(wall, .5));
+    GLB.mat = 0; for (const sg of [-1, 1]) glOBox([C[0] + sg * (w / 2 + .006), C[1] + h / 2 * ZS, C[2] + .003], [.006, 0, 0], [0, 0, .004], [0, h / 2 * ZS, 0], tintS(wall, .6));
+    GLB.mat = m;
+  }
 }
 
 /* ---------- a chunk: terrain, water, roads, trees, lamps and everything standing on its tiles ---------- */
@@ -161,13 +199,40 @@ function glAO(v) { // corners are shared by several triangles: work each one out
     let a = memo.get(key); if (a === undefined) { a = aoAt(v[t], v[t + 1], v[t + 2], v[t + 3], v[t + 4], v[t + 5]); memo.set(key, a); } v[t + 12] = a;
   }
 }
-function glBuildChunk(k) {
+// a chunk's vertices packed for the graphics card: 28 bytes each instead of 52 (position as floats, the normal, colour,
+// glow, material and shade as bytes, the id as a float so picking stays exact)
+function glPack(v) {
+  const n = v.length / 13, buf = new ArrayBuffer(n * 28), F = new Float32Array(buf), I8 = new Int8Array(buf), U8 = new Uint8Array(buf); let y0 = 1e9, y1 = -1e9;
+  const c8 = x => x <= 0 ? 0 : x >= 1 ? 255 : Math.round(x * 255), n8 = x => Math.max(-127, Math.min(127, Math.round(x * 127)));
+  for (let k = 0, s = 0; k < n; k++, s += 13) {
+    const o = k * 28, f = o >> 2, e = v[s + 9]; F[f] = v[s]; F[f + 1] = v[s + 1]; F[f + 2] = v[s + 2]; if (v[s + 1] < y0) y0 = v[s + 1]; if (v[s + 1] > y1) y1 = v[s + 1];
+    I8[o + 12] = n8(v[s + 3]); I8[o + 13] = n8(v[s + 4]); I8[o + 14] = n8(v[s + 5]);
+    U8[o + 16] = c8(v[s + 6]); U8[o + 17] = c8(v[s + 7]); U8[o + 18] = c8(v[s + 8]);
+    U8[o + 19] = e < -.5 ? 0 : e === 0 ? 1 : e >= 1.5 ? 255 : Math.min(254, 2 + Math.round(e * 250)); // (-1 water, 0, a window's (0, 1), 2 a lamp)
+    F[f + 5] = v[s + 10]; U8[o + 24] = v[s + 11]; U8[o + 25] = c8(v[s + 12]);
+  }
+  return { buf, n, y0, y1 };
+}
+function glUpload(ch, v, near) { // into the chunk's far (always) or near (close to the camera, more detail) buffer
+  const gl = GL3.gl, P = glPack(v);
+  if (near) { if (!ch.nb) ch.nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ch.nb); gl.bufferData(gl.ARRAY_BUFFER, P.buf, gl.STATIC_DRAW); ch.nn = P.n; ch.near = true; }
+  else { gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); gl.bufferData(gl.ARRAY_BUFFER, P.buf, gl.STATIC_DRAW); ch.n = P.n; ch.y0 = P.y0; ch.y1 = P.y1; }
+}
+function glDropNear(ch) { if (ch.nb) { GL3.gl.deleteBuffer(ch.nb); ch.nb = null; } ch.nn = 0; ch.near = false; }
+// the view's six planes, to skip chunks outside it
+function glFrustum(m) { const r = i => [m[i], m[4 + i], m[8 + i], m[12 + i]], R3 = r(3), o = []; for (let i = 0; i < 3; i++) { const Ri = r(i); o.push(R3.map((v, j) => v + Ri[j]), R3.map((v, j) => v - Ri[j])); } return o; }
+function glSees(P, ch, k) {
+  const x0 = (k % GNC) * GCH - 2.2, z0 = ((k / GNC) | 0) * GCH - 2.2, x1 = x0 + GCH + 3.4, z1 = z0 + GCH + 3.4, y0 = Math.min(ch.y0, 0) - .2, y1 = ch.y1 + .3; // (padded: big lots and piers reach past their chunk)
+  for (const p of P) if (p[0] * (p[0] > 0 ? x1 : x0) + p[1] * (p[1] > 0 ? y1 : y0) + p[2] * (p[2] > 0 ? z1 : z0) + p[3] < 0) return false;
+  return true;
+}
+function glBuildChunk(k, near = false) {
   const cx0 = (k % GNC) * GCH, cy0 = ((k / GNC) | 0) * GCH, v = [], lamps = [];
   const svLT = LT, svEM = EMQ; LT = GLT_FLAT(); EMQ = null;
   try {
     for (let y = cy0; y < cy0 + GCH; y++) for (let x = cx0; x < cx0 + GCH; x++) {
       const i = idx(x, y), h = GT(i);
-      GLB = { v, x, y, base: surfZ(i) * ZS, tops: [], id: i + 1, wall: 0, mat: 0 };
+      GLB = { v, x, y, base: surfZ(i) * ZS, tops: [], id: i + 1, wall: 0, mat: 0, lod: near };
       const bio = M.bio[i], gmat = M.water[i] ? 0 : bio === BIO.MEADOW || bio === BIO.LUSH ? M_GRASS : bio === BIO.ROCK || bio === BIO.SNOW ? M_STONE : bio === BIO.SAND ? M_SAND : M_EARTH;
       // ground
       const top = gcol(topColor(i)), sc = gcol(sideCol(i));
@@ -460,8 +525,9 @@ void main(){
 }`;
 const GL_VS = `#version 300 es
 layout(location=0) in vec3 aP; layout(location=1) in vec3 aN; layout(location=2) in vec3 aC; layout(location=3) in float aE; layout(location=4) in float aI; layout(location=5) in float aM; layout(location=6) in float aO;
-uniform mat4 uVP, uSVP; out vec3 vP, vN, vC; out float vE, vO; out vec4 vS; flat out float vI, vM;
-void main(){ vP=aP; vN=aN; vC=aC; vE=aE; vI=aI; vM=aM; vO=aO; vS=uSVP*vec4(aP+aN*.02,1.); gl_Position=uVP*vec4(aP,1.); }`;
+uniform mat4 uVP, uSVP; uniform float uPk; out vec3 vP, vN, vC; out float vE, vO; out vec4 vS; flat out float vI, vM;
+void main(){ vP=aP; vN=aN; vC=aC; vE = uPk>.5 ? (aE<.5 ? -1. : aE<1.5 ? 0. : aE>254.5 ? 2. : (aE-2.)/250.) : aE; // (chunks are packed into bytes)
+  vI=aI; vM=aM; vO=aO; vS=uSVP*vec4(aP+aN*.02,1.); gl_Position=uVP*vec4(aP,1.); }`;
 const GL_FS = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vP, vN, vC; in float vE, vO; in vec4 vS; flat in float vI, vM; out vec4 o;
@@ -660,7 +726,12 @@ function glFrame(dt) {
   const batch = [], again = new Set(); let n = 0;
   for (const k of GL3.dirty) { if (n++ >= (GL3.first ? 3 : 64)) break; batch.push(k); }
   const built = batch.map(k => { GL3.dirty.delete(k); const r = glBuildChunk(k), old = glEdge(k); hfRaster(k, r.v); if (GL3.first && glEdge(k) !== old) for (const j of glNbrs(k)) if (!batch.includes(j)) again.add(j); return [k, r]; });
-  for (const [k, r] of built) { glAO(r.v); const ch = GL3.chunks[k]; gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); gl.bufferData(gl.ARRAY_BUFFER, r.v, gl.STATIC_DRAW); ch.n = r.v.length / 13; ch.lamps = r.lamps; }
+  for (const [k, r] of built) { glAO(r.v); const ch = GL3.chunks[k]; glUpload(ch, r.v, false); ch.lamps = r.lamps; glDropNear(ch); }
+  // the chunks round the camera get a detailed version, one a frame, nearest first (and lose it again once well out of range)
+  { const nr = cam.zoom < 20 ? clamp(cam.zoom * 1.3 + 5, 10, 20) : 0, cx = cam.tx, cz = cam.tz; let best = -1, bd = 1e9;
+    for (let k = 0; k < GNC * GNC; k++) { const ch = GL3.chunks[k], d = Math.hypot((k % GNC) * GCH + GCH / 2 - cx, ((k / GNC) | 0) * GCH + GCH / 2 - cz);
+      if (ch.near && d > nr + 8) glDropNear(ch); else if (!ch.near && ch.n && d < nr && d < bd && !GL3.dirty.has(k)) { best = k; bd = d; } }
+    if (best >= 0 && built.length < 2 && !GL3.noNear) { const r = glBuildChunk(best, true); glAO(r.v); glUpload(GL3.chunks[best], r.v, true); } }
   for (const j of again) GL3.dirty.add(j); // a new tall building by the edge darkens the next chunk's streets too
   GL3.first = true;
   if (cam.auto) cam.yaw += dt * .05;
@@ -694,13 +765,22 @@ function glFrame(dt) {
   // lamps near the middle of the view light the streets
   const dyn = glPeople(); // (first: the lanterns people carry are lights too)
   const lamps = []; if (lit > 0) { for (const ch of GL3.chunks) for (const L of ch.lamps) lamps.push(L); for (const L of GL3.carry) lamps.push(L); lamps.sort((a, b) => Math.hypot(a[0] - tgt[0], a[2] - tgt[2]) - Math.hypot(b[0] - tgt[0], b[2] - tgt[2])); lamps.length = Math.min(64, lamps.length); }
-  const attrs = full => { // full: everything the lit view needs; 1: position and id (picking); 0: position only (shadows)
-    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 52, 0);
-    if (full === true) { for (const a of [1, 2, 3, 5, 6]) gl.enableVertexAttribArray(a); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 52, 12); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 52, 24); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 52, 36); gl.vertexAttribPointer(5, 1, gl.FLOAT, false, 52, 44); gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 52, 48); } else { gl.disableVertexAttribArray(5); gl.disableVertexAttribArray(6); }
-    if (full) { gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 1, gl.FLOAT, false, 52, 40); } else gl.disableVertexAttribArray(4);
+  const attrs = (full, pk) => { // full: everything the lit view needs; 1: position and id (picking); 0: position only (shadows). pk: a packed chunk
+    const st = pk ? 28 : 52; gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, st, 0);
+    if (full === true) {
+      for (const a of [1, 2, 3, 5, 6]) gl.enableVertexAttribArray(a);
+      if (pk) { gl.vertexAttribPointer(1, 3, gl.BYTE, true, 28, 12); gl.vertexAttribPointer(2, 3, gl.UNSIGNED_BYTE, true, 28, 16); gl.vertexAttribPointer(3, 1, gl.UNSIGNED_BYTE, false, 28, 19); gl.vertexAttribPointer(5, 1, gl.UNSIGNED_BYTE, false, 28, 24); gl.vertexAttribPointer(6, 1, gl.UNSIGNED_BYTE, true, 28, 25); }
+      else { gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 52, 12); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 52, 24); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 52, 36); gl.vertexAttribPointer(5, 1, gl.FLOAT, false, 52, 44); gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 52, 48); }
+      gl.uniform1f(GL3.main.u.uPk, pk ? 1 : 0);
+    } else { gl.disableVertexAttribArray(5); gl.disableVertexAttribArray(6); }
+    if (full) { gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 1, gl.FLOAT, false, st, pk ? 20 : 40); } else gl.disableVertexAttribArray(4);
   };
   gl.bindBuffer(gl.ARRAY_BUFFER, GL3.dyn); gl.bufferData(gl.ARRAY_BUFFER, dyn, gl.STREAM_DRAW);
-  const drawAll = full => { for (const ch of GL3.chunks) if (ch.n) { gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, ch.n); } if (dyn.length) { gl.bindBuffer(gl.ARRAY_BUFFER, GL3.dyn); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, dyn.length / 13); } if (full === true) { gl.bindBuffer(gl.ARRAY_BUFFER, GL3.sea); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, 6); } };
+  const FR = glFrustum(VP); GL3.drawn = 0;
+  const drawAll = full => { // the shadow pass takes every chunk's plain version; the view only what it can see, in detail where it's near
+    for (let k = 0; k < GL3.chunks.length; k++) { const ch = GL3.chunks[k]; if (!ch.n) continue;
+      if (full !== false && !glSees(FR, ch, k)) continue;
+      const nb = full !== false && ch.near && ch.nb; gl.bindBuffer(gl.ARRAY_BUFFER, nb ? ch.nb : ch.buf); attrs(full, true); gl.drawArrays(gl.TRIANGLES, 0, nb ? ch.nn : ch.n); if (full === true) GL3.drawn++; } if (dyn.length) { gl.bindBuffer(gl.ARRAY_BUFFER, GL3.dyn); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, dyn.length / 13); } if (full === true) { gl.bindBuffer(gl.ARRAY_BUFFER, GL3.sea); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, 6); } };
   gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
   // shadow pass
   gl.bindFramebuffer(gl.FRAMEBUFFER, GL3.shF); gl.viewport(0, 0, 2048, 2048); gl.clear(gl.DEPTH_BUFFER_BIT);
