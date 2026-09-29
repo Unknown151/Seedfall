@@ -116,7 +116,7 @@ function fpGrow(B, w, h, ok = fpFree) {
   return true;
 }
 // landmarks that take a bigger lot once there's room: [w, h] (a 2×1 may turn either way)
-const FP_BIG = { stadium: [2, 2], university: [2, 2], fusion: [2, 2], hall: [2, 1], museum: [2, 1], theatre: [2, 1] };
+const FP_BIG = { stadium: [2, 2], university: [2, 2], fusion: [2, 2], hall: [2, 1], museum: [2, 1], theatre: [2, 1], station: [2, 1], market: [2, 1] };
 function fpSettle(B) {
   const f = FP_BIG[B.type]; if (!f || fpBig(B) || B.prog < 1) return false;
   return fpGrow(B, f[0], f[1], fpYield) || (f[0] !== f[1] && fpGrow(B, f[1], f[0], fpYield));

@@ -39,8 +39,8 @@ r = await p.evaluate(() => {
 ok(r.after === r.before && r.before > 0, 'a saved world keeps its big lots', `${r.before} → ${r.after}`);
 ok(r.freed, 'knocking down a big building frees its whole lot', `${r.n} tiles`);
 if (SHOTS) { // pictures of the harbour and a landmark
-  for (const [k, what] of [['harbor', 'lots_harbour'], ['stadium', 'lots_stadium'], ['university', 'lots_university'], ['hall', 'lots_hall']]) {
-    const f = await p.evaluate(k => { const B = Object.values(S.B).filter(B => B.type === k && fpBig(B)).sort((a, b) => fpW(b) * fpH(b) - fpW(a) * fpH(a))[0]; if (!B) return 0; SF.weather('clear', 9999); SF.hour(15); const [x, z] = glLot(B); GL3.cam.auto = false; GL3.follow = null; GL3.cam.tx = x; GL3.cam.tz = z; GL3.cam.ty = surfZ(idx(B.x, B.y)) * ZS; GL3.cam.zoom = 2.2; GL3.cam.pitch = .5; GL3.cam.yaw = B.dir ? Math.atan2(B.dir[0], B.dir[1]) + .6 : .8; return 1; }, k);
+  for (const [k, what] of [['harbor', 'lots_harbour'], ['stadium', 'lots_stadium'], ['station', 'lots_station'], ['market', 'lots_market'], ['hall', 'lots_hall']]) {
+    const f = await p.evaluate(k => { const B = Object.values(S.B).filter(B => B.type === k && fpBig(B)).sort((a, b) => fpW(b) * fpH(b) - fpW(a) * fpH(a))[0]; if (!B) return 0; SF.weather('clear', 9999); SF.hour(15); const [x, z] = glLot(B); GL3.cam.auto = false; GL3.follow = null; GL3.cam.tx = x; GL3.cam.tz = z; GL3.cam.ty = surfZ(idx(B.x, B.y)) * ZS; GL3.cam.zoom = 2.2; GL3.cam.pitch = .85; GL3.cam.yaw = B.dir ? Math.atan2(B.dir[0], B.dir[1]) + .6 : .8; return 1; }, k);
     if (!f) { console.log('     (no big ' + k + ')'); continue; }
     await p.waitForFunction(() => GL3.dirty.size === 0, null, { timeout: 240000 }); await p.waitForTimeout(1500); await p.screenshot({ path: what + '.png' });
   }

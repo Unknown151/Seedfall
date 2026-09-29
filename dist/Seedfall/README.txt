@@ -218,8 +218,8 @@ HOW TOWNS LAY THEMSELVES OUT
   get hedges, bushes and a tree by the gate.
 
 QUARTERS, TERRACES AND REBUILDING
-  Some landmarks take more room once they're built: a town hall, museum or
-  theatre spreads over two plots, a university, stadium or fusion plant over
+  Some landmarks take more room once they're built: a town hall, museum,
+  theatre, rail station or market spreads over two plots, a university, stadium or fusion plant over
   four (a small house or a field may make way). A full town with no plot left
   for one clears an old cottage that has room round it.
   Nobody zones a Seedfall town but the town itself. Each one keeps a market
@@ -271,6 +271,8 @@ THE 3D VIEW
   Drag to turn, scroll to zoom (right down to the street), point at anything to
   see what it is, and click a person to follow them. On a phone: one finger
   turns, two pinch and move, a tap shows what's there.
+  Zoom in and the streets near you fill in: sills and shutters, cornices, door
+  steps, gutters, balconies, the glazing on glass towers.
   The button in the bottom corner switches between 3D and the flat 2D view, and
   Seedfall remembers which you like. On a slow PC, 2D is the lighter one.
 
