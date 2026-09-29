@@ -65,6 +65,7 @@ function roadDoor(B) {
   if (!B) return -1;
   const i = idx(B.x, B.y);
   if (M.road[i]) return i;
+  if (fpBig(B)) { for (const t of fpTiles(B)) { const x = t % W, y = (t / W) | 0; for (const [dx, dy] of N4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (M.road[j] && !M.water[j]) return j; } } } // a big building: any road along its lot
   let best = -1;
   for (const [dx, dy] of N4) { const nx = B.x + dx, ny = B.y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (M.road[j] && !M.water[j]) return j; if (best < 0 && M.road[j]) best = j; }
   return best;

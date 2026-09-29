@@ -85,6 +85,64 @@ function introChronicle() {
 }
 
 /* ---------- buildings ---------- */
+// Most buildings stand on one tile. Landmarks and harbours can cover B.w × B.h tiles from (B.x, B.y): every tile's
+// M.bld points at them, and they're drawn once, from the tile nearest the viewer (fpFront), centred on the lot.
+const fpW = B => B.w || 1, fpH = B => B.h || 1, fpBig = B => fpW(B) > 1 || fpH(B) > 1;
+function fpTiles(B) { const o = []; for (let y = B.y; y < B.y + fpH(B); y++) for (let x = B.x; x < B.x + fpW(B); x++) if (inb(x, y)) o.push(idx(x, y)); return o; }
+const fpFront = B => idx(B.x + fpW(B) - 1, B.y + fpH(B) - 1);
+function fpOff(B) { const dx = -(fpW(B) - 1) / 2, dy = -(fpH(B) - 1) / 2; return [(dx - dy) * 16, (dx + dy) * 8]; } // from the front tile to the middle of the lot, on screen
+// room for it to spread: free, level ground that isn't street, planned street, water or ruin
+function fpFree(j, z) { return !M.bld[j] && !M.road[j] && !M.plan[j] && !M.water[j] && !M.ruin[j] && !M.rail[j] && surfZ(j) === z; }
+// ...or ground a town would happily give up for a landmark: a small house, a field, a pasture (they're rebuilt elsewhere)
+function fpYield(j, z) {
+  if (M.road[j] || M.plan[j] || M.water[j] || M.ruin[j] || M.rail[j] || surfZ(j) !== z) return false;
+  const B = M.bld[j] && S.B[M.bld[j]]; if (!B) return !M.bld[j];
+  return !fpBig(B) && (B.type === 'house' && B.tier <= 3 && B.up == null || B.type === 'farm' || B.type === 'pasture') && B.prog >= 1;
+}
+// grow B to w × h round where it stands (any placement that keeps its tile); false when there's no room (it stays as it is)
+function fpGrow(B, w, h, ok = fpFree) {
+  const z = surfZ(idx(B.x, B.y)), cand = [];
+  for (let ay = B.y + fpH(B) - h; ay <= B.y; ay++) for (let ax = B.x + fpW(B) - w; ax <= B.x; ax++) { // (the new lot always holds the old one)
+    if (ax < 0 || ay < 0 || ax + w > W || ay + h > H) continue;
+    let good = true; for (let y = ay; y < ay + h && good; y++) for (let x = ax; x < ax + w; x++) { const j = idx(x, y); if (M.bld[j] === B.id) continue; if (!ok(j, z)) { good = false; break; } }
+    if (good) cand.push([ax, ay]);
+  }
+  if (!cand.length) return false;
+  const [ax, ay] = cand[(hash2(B.x, B.y, 77) * cand.length) | 0];
+  for (let y = ay; y < ay + h; y++) for (let x = ax; x < ax + w; x++) { const j = idx(x, y), o = M.bld[j] && S.B[M.bld[j]]; if (o && o !== B) removeBuilding(o); } // (what gave way)
+  const old = fpTiles(B); B.x = ax; B.y = ay; B.w = w; B.h = h;
+  for (const j of fpTiles(B)) { M.bld[j] = B.id; M.tree[j] = 0; M.wild[j] = 0; M.plan[j] = 0; markDirty(j); }
+  for (const j of old) markDirty(j);
+  return true;
+}
+// landmarks that take a bigger lot once there's room: [w, h] (a 2×1 may turn either way)
+const FP_BIG = { stadium: [2, 2], university: [2, 2], fusion: [2, 2], hall: [2, 1], museum: [2, 1], theatre: [2, 1], station: [2, 1], market: [2, 1] };
+function fpSettle(B) {
+  const f = FP_BIG[B.type]; if (!f || fpBig(B) || B.prog < 1) return false;
+  return fpGrow(B, f[0], f[1], fpYield) || (f[0] !== f[1] && fpGrow(B, f[1], f[0], fpYield));
+}
+// is there a w×h lot round (x, y) on ground that would give way? (either way round)
+function fpRoom(x, y, w, h) {
+  const z = surfZ(idx(x, y));
+  for (const [ww, hh] of w === h ? [[w, h]] : [[w, h], [h, w]]) for (let ay = y - hh + 1; ay <= y; ay++) for (let ax = x - ww + 1; ax <= x; ax++) {
+    if (ax < 0 || ay < 0 || ax + ww > W || ay + hh > H) continue;
+    let good = true; for (let yy = ay; yy < ay + hh && good; yy++) for (let xx = ax; xx < ax + ww; xx++) if (!fpYield(idx(xx, yy), z)) { good = false; break; }
+    if (good) return true;
+  }
+  return false;
+}
+// a full town with no plot left for a landmark: an old small house with room round it makes way (the lot spreads once it's built)
+function landmarkSite(T, type) {
+  const f = FP_BIG[type]; if (!f) return null;
+  const c = T.bl.map(id => S.B[id]).filter(B => B && B.type === 'house' && B.tier <= 3 && B.up == null && B.prog >= 1 && !fpBig(B) && fpRoom(B.x, B.y, f[0], f[1]));
+  if (!c.length) return null;
+  c.sort((a, b) => a.tier - b.tier || a.built - b.built);
+  const O = c[0], s = { x: O.x, y: O.y }; removeBuilding(O); return s;
+}
+function yearlyFootprints() { // finished landmarks spread onto their lot (and older worlds' landmarks catch up), a few a year
+  let n = 0; for (const id in S.B) { const B = S.B[id]; if (FP_BIG[B.type] && !fpBig(B) && B.prog >= 1 && fpSettle(B) && ++n >= 3) break; }
+  yearlyHarbours();
+}
 function mkBuilding(type, x, y, T, o = {}) {
   const i = idx(x, y);
   const B = {
@@ -103,6 +161,7 @@ function mkBuilding(type, x, y, T, o = {}) {
 }
 function removeBuilding(B) {
   const i = idx(B.x, B.y);
+  for (const j of fpTiles(B)) if (j !== i && M.bld[j] === B.id) { M.bld[j] = 0; markDirty(j); } // a big building frees all its ground
   M.bld[i] = 0; delete S.B[B.id]; CNT_M = -1;
   const T = S.T[B.sid]; if (T) { const k = T.bl.indexOf(B.id); if (k >= 0) T.bl.splice(k, 1); econDirty(T); }
   markDirty(i); if (B.type === 'house') houseNbrDirty(B); // its terrace neighbours close the gap
@@ -476,7 +535,7 @@ function tryService(T) {
     if (sv.t === 'airfield' && wcount('airfield') >= Math.ceil(towns().length / 2)) continue;
     if (sv.t === 'lighthouse' && (!townHarbour(T) || anycount('lighthouse') >= 3)) continue;
     if (have >= want) continue;
-    const s = findSite(T, sv.site === 'shore' ? 'shore' : sv.site === 'ore' ? 'ore' : sv.site, 0, sv.t);
+    const s = findSite(T, sv.site === 'shore' ? 'shore' : sv.site === 'ore' ? 'ore' : sv.site, 0, sv.t) || landmarkSite(T, sv.t);
     if (!s) continue;
     const B = mkBuilding(sv.t, s.x, s.y, T, sv.t === 'dock' ? { dir: nearWaterDir(s.x, s.y) } : sv.t === 'harbor' ? { dir: harbourSite(s.x, s.y) } : sv.t === 'shops' ? { sub: shopKind() } : {});
     if (sv.t !== 'solar' && sv.t !== 'turbine') connectRoad(B);
@@ -1089,6 +1148,7 @@ function simMonth() {
     yearlyEcon();
     yearlyNeeds();
     yearlyZones();
+    yearlyFootprints();
     for (const T of towns()) cultureProject(T);
     if (S.age) for (const T of towns()) if (T.pop > 300 && chance(.12)) ageProject(T);
     if (hasTech('domes')) for (const T of towns()) if (chance(.2)) greenFields(T);

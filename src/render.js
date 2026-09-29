@@ -42,6 +42,7 @@ function computeBB(i) {
 
 function markDirty(i) {
   if (GL3.on) glDirty(i);
+  if (!SC) return; // (no 2D canvas yet: switching to 2D repaints everything)
   const a0 = BB.x0[i], b0 = BB.y0[i], a1 = BB.x1[i], b1 = BB.y1[i];
   const h0 = CH[i];
   computeBB(i); TV[i]++;
@@ -90,10 +91,13 @@ function flushDirty() {
   return rs.length;
 }
 
+// the 2D canvases (the whole valley at 2×, twice over, plus the glow layers: ~100 MB) only exist once the 2D view is shown
+function ensure2D() { if (!SC) { initStatic(); initLight(); } }
 function renderAll() {
   LIGHT.job = null; LIGHT.fade = -1; LIGHT.next = null; LIGHT.q = [];
   LIGHT.sun = sunNow(); LIGHT.season = LIGHT.forceSeason || seasonNow(); LIGHT.seasonT = 300;
   LIGHT.cur = LT = mkLight(envNow());
+  if (!SC) { DIRTY = []; return; } // 3D: the light's colours are all the art needs
   clearCanvas(SX, SC, RS); clearCanvas(EMX, EMC, RSE); SPR.clear();
   for (let i = 0; i < W * H; i++) computeBB(i);
   for (let s = 0; s <= W + H - 2; s++) {
@@ -317,7 +321,8 @@ function drawTileObjects(c, i, x, y, cx, cy) {
   if (!B && !bid && springAt(i)) drawSpring(c, i, cx, cy);
   if (!w && S.ferries && S.ferries.length) { const fl = ferryLandings().get(i); if (fl) drawLanding(c, i, cx, cy, fl); }
   if (M.road[i] && !w && !bid) drawVerge(c, i, x, y, cx, cy);
-  if (B && !FLAT_TYPES[B.type]) { drawBuilding(c, B, cx, cy, i); if (B.type === 'house' && B.prog >= 1) drawYard(c, B, x, y, cx, cy); }
+  if (B && fpBig(B)) { if (i === fpFront(B) && !FLAT_TYPES[B.type]) { const [ox, oy] = fpOff(B); drawBuilding(c, B, cx + ox, cy + oy, i); } } // a big lot is drawn once, from its front tile
+  else if (B && !FLAT_TYPES[B.type]) { drawBuilding(c, B, cx, cy, i); if (B.type === 'house' && B.prog >= 1) drawYard(c, B, x, y, cx, cy); }
   else if (!B && !bid && M.tree[i]) drawTrees(c, i, x, y, cx, cy);
   else if (!B && !w && (M.bio[i] === BIO.ROCK || M.bio[i] === BIO.HIGH) && hash2(x, y, 11) < 0.3 && !M.road[i]) drawRocks(c, x, y, cx, cy);
   else if (!B && !bid && !w && !M.road[i] && !M.rail[i] && !M.ruin[i]) drawGround(c, i, x, y, cx, cy);
