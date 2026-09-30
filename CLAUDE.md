@@ -72,8 +72,12 @@ npm run dev               # local Worker at http://127.0.0.1:8787 with a fake lo
   `glCylAt`...; small things behind `GLB.lod`). Well, granary, shrine and watchstone are native so far; move the rest
   over a type at a time, and the 2D renderer can go once nothing needs it.
 - **Incidents** (incidents.js). Staged scenes at a real place that you can watch: a house fire (flames, dark smoke, a
-  bucket chain from the nearest water or well, a crowd; saved or burnt down) and sheep loose in the market (the flock
-  wanders the square, townsfolk chase it, then drive it home). The sim part is `S.inc` (`INC[k]`: `yr` chance a year,
+  bucket chain from the nearest water or well, a crowd; saved or burnt down), sheep loose in the market (the flock
+  wanders the square, townsfolk chase it, then drive it home), a wedding (a procession along the street with petals;
+  the couple are married at the end), a river flood (water over the low ground, folk carrying things uphill; the town
+  loses 3%), a runaway cabbage cart (it rolls downhill shedding cabbages, the farmer runs after it, children pick them
+  up) and a whale on the beach (a crowd, buckets from the sea, then it slides free and blows). Moving ones set
+  `st.fx/st.fz` so the film camera follows them. The sim part is `S.inc` (`INC[k]`: `yr` chance a year,
   `n` months, `begin()`, `end(I)` rolling the outcome), run monthly by `stepIncidents` on the sim's stream, so it's saved
   and replays; the view part is `INC_VIEW[k](I, st, p, dt)` (called from `glPeople`, state in `INCV`, never saved, `p` =
   `incProg` 0..1). The bus fires `incident {I}` and `{I, end: true}`; the film camera cuts to a new one. During catch-up
@@ -134,7 +138,7 @@ itself is covered by `glpick`, `glphone` and `soak`. Add `&2d` to a new test unl
 | `lots` | Bigger lots: landmarks spreading onto 2×1/2×2 lots, harbours growing to several berths, ships at their own berths, every tile of a lot pointing at it, saves keeping lots, removal freeing them. `SHOTS=1` adds 3D pictures. |
 | `glfilm` | The film camera (shots in a row, varied, a touch hands the camera back, a minute later it carries on) and the season and weather reaching the 3D shader. `SHOTS=1` saves pictures. |
 | `engine` | The same seed grows the same world; a save reloaded mid-way grows on identically; the event bus fires for chronicle lines, buildings, towns, techs and eras, and listeners that draw random numbers or throw change nothing; native 3D models build far and near. |
-| `incidents` | Fires and loose sheep come every few decades on their own and always end; a fire starts at a house and ends saved or burnt down with a chronicle line; an incident under way survives a reload; both draw in 3D with no WebGL errors. |
+| `incidents` | All six kinds come along on their own (together about every 4 years) and always end; a wedding marries its couple; a flood costs a little; a fire starts at a house and ends saved or burnt down with a chronicle line; an incident under way survives a reload; every kind draws in 3D with no WebGL errors. |
 | `mapsize` | Valley or wide lands: the welcome card and New world offer both, choosing the other size reloads at it, a plain reload remembers it, a world opened at the wrong size reloads at its own, and a 128 world by 1800 has more towns spread further with the same techs. Needs `npm run serve`. |
 | `roads` | Road surfaces by era and material: dirt and gravel early, cobbles or bricks with Masonry, asphalt and concrete with Motorcars, glowlanes with Hovercraft, the market quarter keeping its cobbles, chronicle firsts, the tooltip, and an older save's roads converted. |
 | `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, kept worlds (new, switch, forget), a `?fresh` scratch tab saving nothing, and file:// staying cloud-free. Needs the root `npm install`. |

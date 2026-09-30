@@ -1008,7 +1008,7 @@ function glFocusTown() { const ts = towns().sort((a, b) => b.pop - a.pop); if (!
 // Shots last 20-35 s: news from the chronicle first (a new landmark, a ship launched, a wedding), then ships coming in,
 // a townsperson on their way, a train, a landmark close up, a town from above. It eases between them and turns slowly
 // round what it's looking at, with a caption. Any touch hands the camera back; a minute later the film carries on.
-const FILM_IDLE = 60, INC_CAP = { fire: '🔥 Fire', sheep: '🐑 Sheep loose' };
+const FILM_IDLE = 60, INC_CAP = { fire: '🔥 Fire', sheep: '🐑 Sheep loose', wedding: '💒 A wedding', flood: '🌊 Flood', cart: '🥬 A runaway cart', whale: '🐋 A whale on the beach' };
 GL3.incSeen = new Set();
 EV.on('incident', d => { if (!d.end && GL3.shot) GL3.shot.t0 = -1e9; }); // the film camera cuts to it
 function glTouch() { GL3.lastIn = performance.now(); if (GL3.shot) { GL3.shot = null; glCap(null); } }
@@ -1025,7 +1025,7 @@ function glShot() { // choose what to look at next
   const major = news.filter(e => e.k === 'major' || e.k === 'era'), ev = major.length ? major[major.length - 1] : news.length && chance(.7) ? pick1(news) : null;
   const z = (x, y) => surfZ(idx(clamp(Math.round(x), 0, W - 1), clamp(Math.round(y), 0, H - 1))) * ZS;
   const inc = (S.inc || []).find(I => !GL3.incSeen.has(I.id)) || ((S.inc || []).length && chance(.5) ? pick1(S.inc) : null); // an incident beats everything, and gets a second look now and then
-  if (inc) { GL3.incSeen.add(inc.id); const T = S.T[inc.sid]; return { at: () => [inc.x, z(inc.x, inc.y), inc.y], zoom: rf(2.2, 3), pitch: rf(.3, .42), cap: (INC_CAP[inc.k] || '') + (T ? ' in ' + T.name : ''), dur: 30 }; }
+  if (inc) { GL3.incSeen.add(inc.id); const T = S.T[inc.sid]; return { at: () => { const v = INCV.get(inc.id), x = v && v.fx != null ? v.fx : inc.x, y = v && v.fx != null ? v.fz : inc.y; return [x, z(x, y), y]; }, zoom: rf(2.2, 3), pitch: rf(.3, .42), cap: (INC_CAP[inc.k] || '') + (T ? ' in ' + T.name : ''), dur: 30 }; }
   if (ev) return { at: () => [ev.tx, z(ev.tx, ev.ty), ev.ty], zoom: rf(2.6, 4), pitch: rf(.34, .5), cap: ev.ic + ' ' + ev.t, sub: 'Year ' + Math.floor(ev.yr) };
   const opts = [];
   const sail = DYN.ships.filter(sh => sh.st === 'sail' && sh.to && sh.path && sh.s > sh.path.length - 14 && sh.s < sh.path.length - 3);

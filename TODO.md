@@ -83,8 +83,8 @@ only, or a few invited emails.
 - Done: 3D-native models (`GL_MODEL`, `glModel`): well, granary, shrine, watchstone so far.
 - Next: move the other building types to `GL_MODEL` a few at a time (houses last: they're the biggest), then drop
   the 2D renderer, keeping only what the ?2d fallback needs, or dropping that too.
-- Done: the first incidents, a house fire and sheep loose in the market (incidents.js).
-- Next: more incidents: staged scenes at a real place (a house fire with a bucket chain, sheep loose in the market, a
-  wedding procession, a flood) with walkers pulled off their schedules, 3D props and smoke, phases, and an outcome
-  that changes the world. They listen on the bus, draw from the sim's stream so a reload resumes them, and resolve
-  as text during catch-up.
+- Done: incidents (incidents.js): a house fire, sheep loose in the market, a wedding procession, a river flood, a
+  runaway cabbage cart and a whale on the beach.
+- Next: more incidents (a storm tearing tiles off roofs, a hot-air balloon that drifts off with the mayor, a mine
+  collapse and rescue, a shipwreck and the lifeboat, a strike march in the works era, a harvest fair with a pig race),
+  and prayers that react to them (townsfolk praying for rain during a fire, say).
