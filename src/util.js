@@ -19,7 +19,23 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = t => t * t * (3 - 2 * t);
 const sstep = (a, b, v) => smooth(clamp((v - a) / (b - a), 0, 1));
-const rnd = Math.random;
+// randomness: the sim draws from its own seeded stream (S.rs, saved with the world), so a world grows the same way
+// from the same save and seed (tests, replays, incidents that pick up after a reload); the view and the player's
+// clicks use Math.random. simRun switches streams for the length of a sim step.
+let RNG = Math.random;
+const rnd = () => RNG();
+function simRand() { let t = (S.rs = (S.rs + 0x6D2B79F5) >>> 0); t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+function simRun(fn) { const sv = RNG; RNG = simRand; try { return fn(); } finally { RNG = sv; } }
+// the event bus: the sim says what happened (EV.fire('built', { B, T })) and whoever cares listens (EV.on): the film
+// camera, incidents, the voice... so new things plug in without touching the sim. Listeners get the view's randomness
+// (they must never change what the sim does next), and one that throws can't stop the world.
+// Events: chron {e, o} · placed {B} · built {B, T} · removed {B} · town {T, parent} · tech {t} · era {n} · age {age} · event {k}
+const EV = {
+  ls: {},
+  on(k, f) { (this.ls[k] || (this.ls[k] = [])).push(f); return f; },
+  off(k, f) { const a = this.ls[k], i = a ? a.indexOf(f) : -1; if (i >= 0) a.splice(i, 1); },
+  fire(k, d) { const a = this.ls[k]; if (!a || !a.length) return; const sv = RNG; RNG = Math.random; try { for (const f of a.slice()) { try { f(d); } catch (e) { setTimeout(() => { throw e; }); } } } finally { RNG = sv; } }
+};
 const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
 const rf = (a, b) => a + rnd() * (b - a);
 const pick = a => a[Math.floor(rnd() * a.length)];

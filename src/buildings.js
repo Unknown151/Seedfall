@@ -21,7 +21,7 @@ function matStyle(st, B) {
 }
 function drawBuilding0(c, B, cx, cy, i, st) {
   if (B.prog < 1) { drawConstruction(c, B, cx, cy, st, i); return; }
-  if (GLB && fpBig(B) && GL_BIG[B.type]) return GL_BIG[B.type](B, st); // (the 3D models for landmarks on bigger lots)
+  if (GLB) { const m = glModel(B); if (m) return m(B, st); } // (in 3D: a native model when the type has one)
   const v = B.var || 0;
   switch (B.type) {
     case 'pod': return drawPod(c, B, cx, cy);

@@ -44,16 +44,17 @@ function chron(ic, t, o = {}) {
   S.chron.push(e);
   if (S.chron.length > 3000) S.chron.splice(0, S.chron.length - 3000);
   if (e.tx != null && !o.nocap) fx('caption', { x: e.tx, y: e.ty, ic, t: o.cap || shortCap(t), major: e.k === 'major' || e.k === 'era' });
-  UIDIRTY.chron = true;
+  UIDIRTY.chron = true; EV.fire('chron', { e, o });
   return e;
 }
 function shortCap(t) { const s = t.split(/[.:;!]/)[0]; return s.length > 58 ? s.slice(0, 55) + '…' : s; }
 
 /* ---------- new world ---------- */
-function newState(seed) {
-  const g = genWorld(seed);
+function newState(seed) { S = { rs: (seed * 2654435761) >>> 0 }; return simRun(() => newState0(seed)); } // (a new world's first draws come from its seed too)
+function newState0(seed) {
+  const g = genWorld(seed), rs = S.rs;
   S = {
-    v: 1, roadV: 2, size: W, seed, created: Date.now(), savedAt: 0, playSec: 0,
+    v: 1, roadV: 2, size: W, rs, seed, created: Date.now(), savedAt: 0, playSec: 0,
     year: 0, month: 0, map: g.M, B: {}, nextB: 1, T: {}, nextT: 1, P: {}, nextP: 1,
     tech: { done: {}, cur: 0, pts: 0 }, era: 0, age: null, ageN: 0, ageUsed: {},
     styles: [Object.assign({}, STYLES0[0])], styleIdx: 0,
@@ -157,6 +158,7 @@ function mkBuilding(type, x, y, T, o = {}) {
   if (T) { T.bl.push(B.id); econNewBuilding(B, T); }
   markDirty(i);
   if ((type === 'dock' || type === 'harbor') && B.dir) { const j = idx(x + B.dir[0], y + B.dir[1]); markDirty(j); }
+  EV.fire('placed', { B });
   return B;
 }
 function removeBuilding(B) {
@@ -165,6 +167,7 @@ function removeBuilding(B) {
   M.bld[i] = 0; delete S.B[B.id]; CNT_M = -1;
   const T = S.T[B.sid]; if (T) { const k = T.bl.indexOf(B.id); if (k >= 0) T.bl.splice(k, 1); econDirty(T); }
   markDirty(i); if (B.type === 'house') houseNbrDirty(B); // its terrace neighbours close the gap
+  EV.fire('removed', { B });
 }
 function workFor(B) { return B.type === 'house' ? HT[B.up != null ? B.up : B.tier].work : (BT[B.type] ? BT[B.type].work : 10); }
 function bcount(T, type) { let n = 0; for (const id of T.bl) { const B = S.B[id]; if (B && B.type === type) n++; } return n; }
@@ -705,6 +708,7 @@ const FIRST_TXT = {
   watertower: '{T} raises a water tower. Every street gets a tap, and the queues at the wells are gone.'
 };
 function completeBuilding(B, T) {
+  EV.fire('built', { B, T });
   if (B.up != null) { B.tier = B.up; B.up = null; }
   B.style = S.styleIdx; B.built = yr();
   if (B.type === 'house') houseNbrDirty(B); // joins a terrace, maybe
@@ -776,7 +780,7 @@ function tryFound() {
   f.sid = T.id; T.founder = f.id; T.leader = f.id;
   const sp = f.sp && S.P[f.sp]; if (sp && sp.died === null) sp.sid = T.id;
   for (const k of f.kids) { const c = S.P[k]; if (c && c.died === null && S.year - c.born < 16) c.sid = T.id; }
-  S.T[T.id] = T; econFound(T, parent);
+  S.T[T.id] = T; econFound(T, parent); EV.fire('town', { T, parent });
   S.lastFound = S.year;
   const pl = mkBuilding('plaza', best.x, best.y, T, { prog: 1 });
   if (streetMode(T) === 'grid') growDistrict(T); else { growLane(T); growLane(T); }
@@ -830,7 +834,7 @@ function techInventor(t) {
 }
 function completeTech(i) {
   const t = TECHS[i];
-  S.tech.done[t.id] = yr();
+  S.tech.done[t.id] = yr(); EV.fire('tech', { t });
   const p = techInventor(t);
   const T = S.T[p.sid] || biggestTown();
   p.deeds.push(t.name);
@@ -862,7 +866,7 @@ function newEra(e) {
   S.styles.push(inheritForm(Object.assign({}, STYLES0[e]))); S.styleIdx = S.styles.length - 1;
   driftLang(S.lang, 2);
   chron('🌅', ERAS[e].title, { k: 'era', nocap: true });
-  gainRev(25, 'a new era');
+  gainRev(25, 'a new era'); EV.fire('era', { n: e });
   if (e >= 2 && S.wondersUsed.length < WONDERS.length) queueWonder();
 }
 function queueWonder() {
@@ -881,7 +885,7 @@ function startAge() {
   const n = S.ageUsed[nm];
   const name = (n > 1 ? `The ${['', '', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'][n] || ordinal(n)} Age of ` : 'The Age of ') + nm;
   S.ageN++;
-  S.age = { n: S.ageN, name, k: th.k, start: yr(), len: ri(70, 150) };
+  S.age = { n: S.ageN, name, k: th.k, start: yr(), len: ri(70, 150) }; EV.fire('age', { age: S.age });
   const st = inheritForm(newStyle()); S.styles.push(st); S.styleIdx = S.styles.length - 1;
   driftLang(S.lang, 3);
   chron('🌀', name, { k: 'era', nocap: true });
@@ -1038,7 +1042,7 @@ function rollEvent() {
   if (!avail.length) return;
   const e = wpick(avail.map(e => [e, e.w * (theme && theme.ev && theme.ev[e.k] ? theme.ev[e.k] : 1) * (1 + (CULT.ev[e.k] || 0))]));
   if (e.once) S.flags['ev_' + e.k] = 1;
-  e.run();
+  e.run(); EV.fire('event', { k: e.k });
 }
 function elect(T) {
   const old = person(T.leader);
@@ -1110,7 +1114,8 @@ function milestones() {
 }
 
 /* ---------- the monthly tick ---------- */
-function simMonth() {
+function simMonth() { return simRun(simMonth0); }
+function simMonth0() {
   S.month++; S.year = S.month / 12;
   const newYear = S.month % 12 === 0;
   // vault decanting

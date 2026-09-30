@@ -55,6 +55,22 @@ npm run dev               # local Worker at http://127.0.0.1:8787 with a fake lo
   saves while the page goes. The size is chosen in `sizeRow` (welcome card `#wSize`, new-world question `#cSize`).
   Wide lands (`BIGMAP`) found twice the towns further out, and research runs at .78 so the pace stays the same.
   `test/mapsize.mjs` covers it.
+- **Randomness.** All code calls `rnd()` (and `ri`/`rf`/`pick`/`chance`/`shuffle` on top of it), never `Math.random`
+  directly. `simMonth` and `newState` run inside `simRun`, which switches `rnd` to the sim's own seeded stream
+  (`simRand`, state `S.rs`, saved with the world; older saves get one from their seed). Everything else (the view,
+  particles, the player's clicks) stays on `Math.random`. So the same seed grows the same world, and a reloaded save
+  grows on exactly as it would have: keep it that way (no `Math.random` or `Date.now` deciding anything in the sim,
+  and no sim decisions that depend on what the view did). `test/engine.mjs` checks it.
+- **Event bus.** `EV.fire(kind, data)` says what happened; `EV.on(kind, fn)` listens (`EV.off` to stop). The sim fires
+  `chron {e, o}`, `placed {B}`, `built {B, T}`, `removed {B}`, `town {T, parent}`, `tech {t}`, `era {n}`, `age {age}`
+  and `event {k}`. Listeners run on the view's randomness (so they can never change the sim) and a throwing listener
+  is reported without stopping the world. New features (incidents, the camera, the voice) should listen here rather
+  than be called from inside the sim.
+- **3D models.** `glModel(B)` picks how a building is drawn in 3D: `GL_BIG[type]` for a landmark on a bigger lot, else
+  `GL_MODEL[type]`, else its 2D art run through the primitives (the old way, still most types). New or reworked
+  building art should be a `GL_MODEL` entry, made directly in world units (`gBox`, `gBeam`, `gRoof`, `gSpire`, `gCone`,
+  `glCylAt`...; small things behind `GLB.lod`). Well, granary, shrine and watchstone are native so far; move the rest
+  over a type at a time, and the 2D renderer can go once nothing needs it.
 - **URL flags.** Open `seedfall.html` directly. `?seed=N&fresh` makes a scratch world (`SCRATCH`): it never
   saves anywhere (IndexedDB, folder or cloud) and never claims the cloud world, so it's safe on the live
   site. `&nointro` skips the landing, and `&dev` adds an fps readout and opens the debug card.
@@ -82,8 +98,9 @@ cd test && node soak.mjs
 
 Set `PW_CHROMIUM` to use a specific Chromium binary. In Claude Code cloud sessions the test Playwright is
 newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`
-(or whichever `chromium-*` folder is there) instead of downloading one. Runs are **not deterministic** (the sim uses
-`Math.random`), so ±10–15% in population between runs is noise.
+(or whichever `chromium-*` folder is there) instead of downloading one. The sim is **deterministic per seed** (its own
+seeded stream, see Randomness), so a `?seed=N&fresh` world fast-forwarded the same way grows the same every run;
+comparing across seeds, ±10–15% in population is still just how worlds differ.
 
 Pages open in **3D** by default, and headless Chromium draws 3D in software at about 1 fps, which starves clicks and
 slow catch-ups. Tests of the sim, the panels and saves (`hover`, `needs`, `away`, `faith1`, `flow`, `streetmig`, `cloud`, `voicetab`, `aitest`) therefore use 2D; the 3D view
@@ -109,6 +126,7 @@ itself is covered by `glpick`, `glphone` and `soak`. Add `&2d` to a new test unl
 | `prayers` | Prayer words at three points in history: all well-formed (no `undefined`, lowercase sentence starts or overlong cards), 40+ different out of 60 per kind, early ones free of radios and seedships and late ones mentioning them. |
 | `lots` | Bigger lots: landmarks spreading onto 2×1/2×2 lots, harbours growing to several berths, ships at their own berths, every tile of a lot pointing at it, saves keeping lots, removal freeing them. `SHOTS=1` adds 3D pictures. |
 | `glfilm` | The film camera (shots in a row, varied, a touch hands the camera back, a minute later it carries on) and the season and weather reaching the 3D shader. `SHOTS=1` saves pictures. |
+| `engine` | The same seed grows the same world; a save reloaded mid-way grows on identically; the event bus fires for chronicle lines, buildings, towns, techs and eras, and listeners that draw random numbers or throw change nothing; native 3D models build far and near. |
 | `mapsize` | Valley or wide lands: the welcome card and New world offer both, choosing the other size reloads at it, a plain reload remembers it, a world opened at the wrong size reloads at its own, and a 128 world by 1800 has more towns spread further with the same techs. Needs `npm run serve`. |
 | `roads` | Road surfaces by era and material: dirt and gravel early, cobbles or bricks with Masonry, asphalt and concrete with Motorcars, glowlanes with Hovercraft, the market quarter keeping its cobbles, chronicle firsts, the tooltip, and an older save's roads converted. |
 | `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, kept worlds (new, switch, forget), a `?fresh` scratch tab saving nothing, and file:// staying cloud-free. Needs the root `npm install`. |

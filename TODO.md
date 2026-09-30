@@ -75,3 +75,15 @@ only, or a few invited emails.
   (at 128 it's ~170 MB there).
 - Left: a worldgen retune for the bigger map (more rivers, ranges and ruins), and simpler far chunks if
   128 turns out heavy on laptops.
+
+## 3. The engine underneath (groundwork for incidents and whatever comes next)
+
+- Done: the sim's own seeded randomness (`simRun`, `S.rs`): same seed, same world; a reloaded save grows on the same.
+- Done: the event bus (`EV.on` / `EV.fire`): chron, placed, built, removed, town, tech, era, age, event.
+- Done: 3D-native models (`GL_MODEL`, `glModel`): well, granary, shrine, watchstone so far.
+- Next: move the other building types to `GL_MODEL` a few at a time (houses last: they're the biggest), then drop
+  the 2D renderer, keeping only what the ?2d fallback needs, or dropping that too.
+- Next: incidents: staged scenes at a real place (a house fire with a bucket chain, sheep loose in the market, a
+  wedding procession, a flood) with walkers pulled off their schedules, 3D props and smoke, phases, and an outcome
+  that changes the world. They listen on the bus, draw from the sim's stream so a reload resumes them, and resolve
+  as text during catch-up.

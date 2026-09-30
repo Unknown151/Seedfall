@@ -646,6 +646,52 @@ function glBigMarket(B, st) { // a cobbled market street of stalls under striped
   }
 }
 const GL_BIG = { station: glBigStation, market: glBigMarket, hall: glBigHall, museum: glBigMuseum, theatre: glBigTheatre, university: glBigUniversity, stadium: glBigStadium, fusion: glBigFusion };
+
+/* ---------- 3D-native models: buildings made straight in 3D (world units), not by running their 2D art ---------- */
+// glModel(B) picks the model a building is drawn with in 3D: a landmark on a bigger lot (GL_BIG), else one from
+// GL_MODEL, else nothing and its 2D art runs through the primitives as before. New building art belongs here: move a type
+// over by adding GL_MODEL[type] = (B, st) => {...}. Helpers: gBox/gBeam/gRoof/gSpire/gWins (world units: x, y = height,
+// z), glCylAt/glDomeAt/glPyr/glDoor (tile-local u, v and pixel heights), gCone below; GLB.x/GLB.y is the tile, GLB.base
+// its ground, GLB.lod true for the close-up version (put small detail behind it).
+function glModel(B) { return fpBig(B) && GL_BIG[B.type] || GL_MODEL[B.type] || null; }
+function gCone(u, v, r, z0, h, col, n = 12) { // a cone standing on tile-local (u, v), from pixel height z0 up h
+  const c = gcol(col), A = gw(u, v, z0 + h); GLB.ctr = gw(u, v, z0 - 1); GLB.mat = roofMat(c);
+  for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gtri(gw(u + Math.cos(a) * r, v + Math.sin(a) * r, z0), gw(u + Math.cos(b) * r, v + Math.sin(b) * r, z0), A, c); }
+}
+const GL_MODEL = {
+  well(B, st) { // a stone ring of water under a little roof, with a windlass and a bucket (a pump once the style turns modern)
+    const x = GLB.x, z = GLB.y, y = GLB.base;
+    if (B.style >= 4) { gBox([x, y, z], [.1, 0, 0], [0, 0, .1], 5 * ZS, '#8c96a3', M_STONE); gBeam([x + .1, y + 4 * ZS, z], [x + .22, y + 4 * ZS, z], .012, '#6c7683'); return; }
+    GLB.wall = M_STONE; glCylAt(0, 0, .15, 0, 3.5, '#bdb3a6', '#4f9cbc', 14); GLB.wall = 0;
+    for (const s of [-1, 1]) gBeam([x + s * .13, y + 3 * ZS, z], [x + s * .13, y + 9.2 * ZS, z], .012, '#7a5a44', M_PLANK);
+    gBeam([x - .15, y + 7.6 * ZS, z], [x + .15, y + 7.6 * ZS, z], .008, '#5f4636', M_PLANK); // the windlass
+    if (GLB.lod) { gBeam([x, y + 7.6 * ZS, z], [x, y + 5.4 * ZS, z], .002, '#c9b48a'); gBox([x, y + 4.6 * ZS, z], [.022, 0, 0], [0, 0, .022], 1.6 * ZS, '#6b5040', M_PLANK); } // its rope and bucket
+    gRoof([x, 0, z], [.19, 0, 0], [0, 0, .12], y + 9 * ZS, 3.2 * ZS, st.roof, st.wall);
+  },
+  granary(B, st) { // a round store up on staddle stones (so the rats can't climb in), with a steep roof and a ladder to its door
+    const x = GLB.x, z = GLB.y, y = GLB.base, wall = mix(st.wall, '#d9c29a', .4);
+    for (const [a, b] of [[-.12, -.12], [.12, -.12], [-.12, .12], [.12, .12]]) gBox([x + a, y, z + b], [.025, 0, 0], [0, 0, .025], 2.2 * ZS, '#a49c90', M_STONE);
+    GLB.wall = GLB.B ? glWallMat(GLB.B) : M_PLANK; glCylAt(0, 0, .2, 2.2, 10, wall, wall, 14); GLB.wall = 0;
+    gCone(0, 0, .26, 12.2, 8, st.roof);
+    gBox([x, y + 2.3 * ZS, z + .198], [.04, 0, 0], [0, 0, .008], 4.2 * ZS, '#5a4a40', M_PLANK); // its door, up off the ground
+    if (GLB.lod) for (const s of [-1, 1]) gBeam([x + s * .03, y, z + .34], [x + s * .03, y + 2.6 * ZS, z + .21], .004, '#6b5040', M_PLANK); // and the ladder
+  },
+  shrine(B, st) { // a stone plinth, a white pillar under a little pointed roof, and a candle burning before it
+    const x = GLB.x, z = GLB.y, y = GLB.base;
+    gBox([x, y, z], [.28, 0, 0], [0, 0, .28], 1.6 * ZS, '#d6cfc3', M_STONE);
+    GLB.wall = M_STONE; gBox([x, y + 1.6 * ZS, z], [.07, 0, 0], [0, 0, .07], 15 * ZS, '#e8e2d6', M_STONE); GLB.wall = 0;
+    glPyr(0, 0, 0, 0, .075, .075, 16.6, 4, st.accent);
+    gBox([x + .1, y + 1.6 * ZS, z + .22], [.012, 0, 0], [0, 0, .012], .9 * ZS, '#ffd27a', 0, 2); // the candle
+    if (GLB.lod) for (let k = 0; k < 3; k++) glBlob(-.16 + k * .1, .24, .03, 1.9, .9, FLOWER_C[(k + B.id) % FLOWER_C.length], 0); // flowers left on the plinth
+  },
+  watchstone(B, st) { // a tall pale obelisk with a gilded cap and a glowing teal stone set in its face
+    const x = GLB.x, z = GLB.y, y = GLB.base;
+    gBox([x, y, z], [.3, 0, 0], [0, 0, .3], 2 * ZS, '#d2cabd', M_STONE);
+    gBox([x, y + 2 * ZS, z], [.09, 0, 0], [0, 0, .09], 28 * ZS, '#e9e3d8', M_STONE);
+    gSpire([x, y + 30 * ZS, z], .095, 6 * ZS, '#d6b85a');
+    gBox([x, y + 23 * ZS, z + .092], [.03, 0, 0], [0, 0, .006], .03, '#5fd0c9', 0, 2);
+  }
+};
 function glSheep(X, Z, y0, s, ang, ph = -1) { // a woolly body, a black face and four legs, in world units; ph >= 0: walking
   const f = [Math.cos(ang), 0, Math.sin(ang)], r = [-Math.sin(ang), 0, Math.cos(ang)], u = X - GLB.x, v = Z - GLB.y, zz = (y0 - GLB.base) / ZS;
   for (const [a, b, q] of [[.03, .018, 0], [.03, -.018, Math.PI], [-.03, .018, Math.PI], [-.03, -.018, 0]]) glLimb([X + f[0] * a * s + r[0] * b * s, y0 + 1.1 * s * ZS, Z + f[2] * a * s + r[2] * b * s], f, r, ph >= 0 ? Math.sin(ph + q) * .45 : 0, 1.1 * s * ZS, .007 * s, '#3a3430');
