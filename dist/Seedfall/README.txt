@@ -291,6 +291,10 @@ THE 3D VIEW
   wherever something is happening (news from the chronicle, a ship coming in,
   a townsperson on their way, the harbour at sunset) with a caption. Touch it
   and it's yours again. R turns the film camera off or on.
+  Now and then something happens somewhere you can watch: a house catches
+  fire and the street forms a bucket chain from the river or the well, or the
+  sheep get into the market and half the town chases them home. The film camera
+  goes to look, and the chronicle tells how it ended.
   Zoom in and the streets near you fill in: sills and shutters, cornices, door
   steps, gutters, balconies, the glazing on glass towers.
   The towns grow up in the style of the old city-builders: thatch and earth

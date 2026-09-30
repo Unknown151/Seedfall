@@ -809,11 +809,11 @@ void main(){
 }`;
 /* ---------- smoke: soft puffs from chimney pots and works, drawn as point sprites that grow, drift and fade ---------- */
 const GL_SMVS = `#version 300 es
-layout(location=0) in vec4 aP; layout(location=1) in float aA; uniform mat4 uVP; uniform float uPx, uMax; out float vA;
-void main(){ gl_Position=uVP*vec4(aP.xyz,1.); gl_PointSize=clamp(aP.w*uPx/gl_Position.w,1.,uMax); vA=aA; }`;
+layout(location=0) in vec4 aP; layout(location=1) in vec2 aA; uniform mat4 uVP; uniform float uPx, uMax; out float vA, vS;
+void main(){ gl_Position=uVP*vec4(aP.xyz,1.); gl_PointSize=clamp(aP.w*uPx/gl_Position.w,1.,uMax); vA=aA.x; vS=aA.y; }`;
 const GL_SMFS = `#version 300 es
-precision mediump float; in float vA; out vec4 o; uniform vec3 uCol;
-void main(){ vec2 d=gl_PointCoord-.5; float r=length(d)*2.; if(r>1.) discard; float a=vA*(1.-smoothstep(.15,1.,r))*(.8+.2*sin(d.x*9.+d.y*7.)); o=vec4(uCol*(1.-.12*d.y),a); }`;
+precision mediump float; in float vA, vS; out vec4 o; uniform vec3 uCol;
+void main(){ vec2 d=gl_PointCoord-.5; float r=length(d)*2.; if(r>1.) discard; float a=vA*(1.-smoothstep(.15,1.,r))*(.8+.2*sin(d.x*9.+d.y*7.)); o=vec4(uCol*vS*(1.-.12*d.y),a); }`;
 const SMOKE_AT = { workshop: [[.16, -.14, 21]], works: [[.28, -.18, 43]], power: [[-.16, -.2, 37], [.16, -.2, 37]], glassworks: [[.2, -.16, 24]] };
 function glSmoke(gl, dt, FR, VP, pxs, day, tgt) {
   GL3.smF = [FR, day, tgt]; const A = glSmokeStep(Math.min(dt, .25)), n = A.n; if (!n) return;
@@ -821,9 +821,9 @@ function glSmoke(gl, dt, FR, VP, pxs, day, tgt) {
   gl.useProgram(Q.p); gl.uniformMatrix4fv(Q.u.uVP, false, VP); gl.uniform1f(Q.u.uPx, pxs); gl.uniform1f(Q.u.uMax, GL3.ptMax || 64);
   gl.uniform3fv(Q.u.uCol, [.86, .85, .84].map(v => v * (.35 + .65 * day)));
   gl.bindBuffer(gl.ARRAY_BUFFER, GL3.smB); gl.bufferData(gl.ARRAY_BUFFER, A.a.subarray(0, n), gl.STREAM_DRAW);
-  gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 20, 0); gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 20, 16);
+  gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 24, 0); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 24, 16);
   gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE); gl.depthMask(false);
-  gl.drawArrays(gl.POINTS, 0, n / 5);
+  gl.drawArrays(gl.POINTS, 0, n / 6);
   gl.depthMask(true); gl.disable(gl.BLEND); gl.disableVertexAttribArray(0); gl.disableVertexAttribArray(1);
 }
 function glSmokeStep(dt) { // new puffs from what's in view, then everyone rises, drifts and grows
@@ -834,12 +834,12 @@ function glSmokeStep(dt) { // new puffs from what's in view, then everyone rises
     for (const [, sm] of ks) for (const q of sm) if (P.length < cap && Math.random() < rate * dt) P.push({ x: q[0], y: q[1], z: q[2], a: 0, L: 6 + Math.random() * 3, s0: .09, s1: .6, o: .72 });
     for (const B of DYN.anim || []) { const at = SMOKE_AT[B.type]; if (!at || P.length >= cap || Math.hypot(B.x - tgt[0], B.y - tgt[2]) > 40) continue; // the works smoke hard
       const soot = sootK() >= .5 && !hasTech('solar'), b = surfZ(idx(B.x, B.y)) * ZS;
-      for (const [u, v, z] of at) if (Math.random() < 2.2 * dt) P.push({ x: B.x + u, y: b + z * ZS, z: B.y + v, a: 0, L: 7 + Math.random() * 4, s0: .16, s1: 1.1, o: soot ? .8 : .6 }); }
+      for (const [u, v, z] of at) if (Math.random() < 2.2 * dt) P.push({ x: B.x + u, y: b + z * ZS, z: B.y + v, a: 0, L: 7 + Math.random() * 4, s0: .16, s1: 1.1, o: soot ? .8 : .6, sh: soot ? .6 : .92 }); }
   }
-  let n = 0; const A = GL3.smA && GL3.smA.length >= P.length * 5 ? GL3.smA : (GL3.smA = new Float32Array(Math.max(1024, P.length * 5 * 2)));
+  let n = 0; const A = GL3.smA && GL3.smA.length >= P.length * 6 ? GL3.smA : (GL3.smA = new Float32Array(Math.max(1024, P.length * 6 * 2)));
   for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; p.a += dt; if (p.a >= p.L) { P[i] = P[P.length - 1]; P.pop(); continue; }
     const t = p.a / p.L; p.x += (wind[0] * (.4 + t) + (Math.random() - .5) * .02) * dt; p.z += (wind[2] * (.4 + t)) * dt; p.y += (.16 - .1 * t) * dt;
-    A[n++] = p.x; A[n++] = p.y; A[n++] = p.z; A[n++] = p.s0 + (p.s1 - p.s0) * Math.sqrt(t); A[n++] = p.o * Math.min(1, t * 5) * Math.pow(1 - t, 1.6); }
+    A[n++] = p.x; A[n++] = p.y; A[n++] = p.z; A[n++] = p.s0 + (p.s1 - p.s0) * Math.sqrt(t); A[n++] = p.o * Math.min(1, t * 5) * Math.pow(1 - t, 1.6); A[n++] = p.sh || 1; } // (sh: how dark: soot and burning roofs)
   return { a: A, n };
 }
 /* ---------- rain and snow, a screen-space pass over the view: three layers, the nearest biggest ---------- */
@@ -1008,7 +1008,9 @@ function glFocusTown() { const ts = towns().sort((a, b) => b.pop - a.pop); if (!
 // Shots last 20-35 s: news from the chronicle first (a new landmark, a ship launched, a wedding), then ships coming in,
 // a townsperson on their way, a train, a landmark close up, a town from above. It eases between them and turns slowly
 // round what it's looking at, with a caption. Any touch hands the camera back; a minute later the film carries on.
-const FILM_IDLE = 60;
+const FILM_IDLE = 60, INC_CAP = { fire: '🔥 Fire', sheep: '🐑 Sheep loose' };
+GL3.incSeen = new Set();
+EV.on('incident', d => { if (!d.end && GL3.shot) GL3.shot.t0 = -1e9; }); // the film camera cuts to it
 function glTouch() { GL3.lastIn = performance.now(); if (GL3.shot) { GL3.shot = null; glCap(null); } }
 function glCap(t, sub) {
   let e = $('glCap');
@@ -1022,6 +1024,8 @@ function glShot() { // choose what to look at next
   const pick1 = a => a[(Math.random() * a.length) | 0];
   const major = news.filter(e => e.k === 'major' || e.k === 'era'), ev = major.length ? major[major.length - 1] : news.length && chance(.7) ? pick1(news) : null;
   const z = (x, y) => surfZ(idx(clamp(Math.round(x), 0, W - 1), clamp(Math.round(y), 0, H - 1))) * ZS;
+  const inc = (S.inc || []).find(I => !GL3.incSeen.has(I.id)) || ((S.inc || []).length && chance(.5) ? pick1(S.inc) : null); // an incident beats everything, and gets a second look now and then
+  if (inc) { GL3.incSeen.add(inc.id); const T = S.T[inc.sid]; return { at: () => [inc.x, z(inc.x, inc.y), inc.y], zoom: rf(2.2, 3), pitch: rf(.3, .42), cap: (INC_CAP[inc.k] || '') + (T ? ' in ' + T.name : ''), dur: 30 }; }
   if (ev) return { at: () => [ev.tx, z(ev.tx, ev.ty), ev.ty], zoom: rf(2.6, 4), pitch: rf(.34, .5), cap: ev.ic + ' ' + ev.t, sub: 'Year ' + Math.floor(ev.yr) };
   const opts = [];
   const sail = DYN.ships.filter(sh => sh.st === 'sail' && sh.to && sh.path && sh.s > sh.path.length - 14 && sh.s < sh.path.length - 3);
@@ -1358,6 +1362,7 @@ function glPeople() {
     }
     GLB.id = 0; GLB.ao = 1;
     for (const hd of DYN.herds) for (const m of hd.members) { const [fx, fy, z] = agentPos(m), bx = m.b % W - m.a % W, by = ((m.b / W) | 0) - ((m.a / W) | 0); glSheep(fx, fy, z * ZS, (m.size || 1) * (m.baby ? .6 : 1), glHeading(m, bx, by), m.pause > 0 ? -1 : DYN.t * 3 + (m.a % 7)); }
+    GLB.id = 0; GLB.ao = 1; glIncidents(GL3.dt || .016);
     GLB.id = 0; GLB.ao = 1; try { glTraffic(); } catch (e) { if (QS.has('dev')) console.error(e); }
     for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; GLB.ao = .35 + .65 * aoAt(p[0], p[2] * ZS + .15, p[1], 0, 1, 0); glVehicle(c, p[0], p[1], p[2] * ZS, glHeading(c, p[4], p[5]), true); }
   } catch (e) { if (QS.has('dev')) console.error(e); } finally { GLB = null; }

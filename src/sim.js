@@ -708,7 +708,7 @@ const FIRST_TXT = {
   watertower: '{T} raises a water tower. Every street gets a tap, and the queues at the wells are gone.'
 };
 function completeBuilding(B, T) {
-  EV.fire('built', { B, T });
+  EV.fire('built', { B, T }); econDirty(T);
   if (B.up != null) { B.tier = B.up; B.up = null; }
   B.style = S.styleIdx; B.built = yr();
   if (B.type === 'house') houseNbrDirty(B); // joins a terrace, maybe
@@ -1118,6 +1118,7 @@ function simMonth() { return simRun(simMonth0); }
 function simMonth0() {
   S.month++; S.year = S.month / 12;
   const newYear = S.month % 12 === 0;
+  stepIncidents();
   // vault decanting
   if (S.vault > 0 && S.year >= 2 && chance(0.1 + (S.year > 12 ? 0.05 : 0))) { S.vault--; S.T[1] && (S.T[1].pop += 1); }
   for (const T of towns()) { growTown(T); stepEcon(T); buildTown(T); planTown(T); if (newYear) { planBridges(T); planFerries(T); } if (S.month % 3 === T.id % 3) paveTown(T); }

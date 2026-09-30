@@ -155,6 +155,7 @@ SF.hour = h => { LIGHT.forceHr = h; LIGHT.chk = 0; };               // dev: pin 
 SF.weather = (k, secs) => { setWeather(k, secs); const w = S.wx, T = WXK[k]; for (const p of ['cover', 'rain', 'snow', 'fog', 'storm']) w[p] = T[p] || 0; if (k === 'snow') w.sc = 1; LIGHT.chk = 0; };
 SF.relightNow = () => { renderAll(); };
 SF.pray = k => { const c = prayerCandidates().filter(x => !k || x[0] === k); if (!c.length) return false; const save = prayerCandidates; const [kk, , p, ex] = c[0]; const q = Object.assign({ id: (S.prayN = (S.prayN || 0) + 1), k: kk, pid: p.id, tid: p.sid, t0: S.playSec, exp: S.playSec + 1800, st: 'open' }, ex || {}); q.text = prayText(kk, p, q); q.rw = PRAY_TOOL[kk] ? Math.round(COST[kk] * 1.5 + 8) : 20; if (kk === 'town') S.T[q.tid].asked = 1; S.prayers.push(q); UIDIRTY.prayers = true; return q; };
+SF.incident = k => simRun(() => startIncident(k)); // dev: start an incident now ('fire', 'sheep')
 SF.season = s => { LIGHT.forceSeason = s ? Object.assign({ autumn: 0, winter: 0, spring: 0 }, s) : null; LIGHT.seasonT = 0; LIGHT.chk = 0; };
 
 async function boot() {
