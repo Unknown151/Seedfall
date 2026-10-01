@@ -19,7 +19,7 @@ const clinicN = () => 1500 * (hasTech('genegarden') ? 3 : hasTech('computing') ?
 const NEEDC = { S: null, m: -99, t: {}, grid: 1, sup: 0, dem: 0, word: 0 };
 function townCounts(T) { const n = {}; for (const id of T.bl) { const B = S.B[id]; if (B && B.prog >= 1) n[B.type] = (n[B.type] || 0) + 1; } return n; }
 function refreshNeeds(force) {
-  if (!force && NEEDC.S === S && S.month - NEEDC.m < 3 && NEEDC.m <= S.month) return NEEDC;
+  if (!force && NEEDC.S === S && NEEDC.m === S.month) return NEEDC; // (fresh each month: a cache that refreshed some months after it was made would differ after a reload, and the sim must replay the same)
   NEEDC.S = S; NEEDC.m = S.month; NEEDC.t = {};
   let sup = 0, dem = 0, cov = 0, tot = 0;
   const ts = towns(), radios = [];
@@ -43,10 +43,10 @@ const gridK = () => hasTech('electric') ? .5 + .5 * refreshNeeds().grid : 1; // 
 const NATW = { S: null, v: {} };
 function natWater(T) {
   if (NATW.S !== S) { NATW.S = S; NATW.v = {}; }
-  const c = NATW.v[T.id]; if (c && S.year - c.y < 50) return c.w;
+  const q = Math.floor(S.year / 50), c = NATW.v[T.id]; if (c && c.q === q) return c.w; // (on fixed 50-year boundaries, so a reload agrees)
   const R = Math.ceil(townRadius(T) + 2); let f = 0;
   for (let y = Math.max(0, T.y - R); y <= Math.min(H - 1, T.y + R) && !f; y++) for (let x = Math.max(0, T.x - R); x <= Math.min(W - 1, T.x + R); x++) { const i = idx(x, y); if (M.water[i] === 2 || (M.water[i] && M.bio[i] === BIO.FRESH)) { f = 1; break; } }
-  const w = f ? .35 : .15; NATW.v[T.id] = { w, y: S.year }; return w;
+  const w = f ? .35 : .15; NATW.v[T.id] = { w, q }; return w;
 }
 // each windmill grinds for about sixteen fields, wherever they are in town
 function millShare(T, n) { n = n || townCounts(T); return n.farm ? clamp((n.mill || 0) * MILL_FIELDS / n.farm, 0, 1) : 1; }

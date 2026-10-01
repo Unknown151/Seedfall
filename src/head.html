@@ -174,6 +174,11 @@ select{font:inherit;font-size:12px;padding:4px 6px;border-radius:7px;border:1px 
 .wl-row .btn{padding:5px 10px;font-size:12.5px}
 .wl-row .btn:disabled,#wlNew:disabled{opacity:.45;cursor:default}
 .wl-empty{font-size:13px;color:var(--ink3);padding:6px 2px}
+.sizes{display:flex;gap:8px;margin:10px 0 4px}
+.sizes[hidden]{display:none}
+.sizes .btn{flex:1;text-align:left;padding:7px 10px;line-height:1.25}
+.sizes .btn small{display:block;font-size:11.5px;color:var(--ink3);font-weight:400}
+.sizes .btn.sel{background:rgba(255,255,255,.92);box-shadow:inset 0 0 0 2px #e5874f}
 .away-letter{font-family:Georgia,serif;font-size:14.5px;line-height:1.6;color:var(--ink);background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:12px 0;white-space:pre-wrap}
 .away-letter:empty{display:none}
 .away-letter b{display:block;font-size:15.5px;margin-bottom:6px}
@@ -339,6 +344,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
   <h1>Seedfall</h1>
   <p>A single seed pod is about to fall onto an unnamed world. One colonist, a vault of sleeping embryos, and a lot of time.</p>
   <p id="wText">The world grows while it's on screen, and keeps going for up to 8 hours while you're away. Pick a folder and Seedfall will keep <b>save.json</b>, a readable <b>chronicle.md</b> and <b>stats.csv</b> in it.</p>
+  <div class="sizes" id="wSize"></div>
   <div class="acts">
     <button class="btn primary" id="wFolder">Choose a save folder…</button>
     <button class="btn" id="wLocal">Start without a folder</button>
@@ -416,6 +422,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
 <div class="modal" id="confirm"><div class="card">
   <h2 id="cTitle">Start a new world?</h2>
   <p id="cText"></p>
+  <div class="sizes" id="cSize" hidden></div>
   <div class="acts"><button class="btn primary" id="cYes">Yes</button><button class="btn" id="cNo">Cancel</button></div>
 </div></div>
 

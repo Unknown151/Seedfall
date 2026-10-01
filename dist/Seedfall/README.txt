@@ -16,6 +16,13 @@ FIRST RUN
   After a browser restart, Edge may need one click on the page to re-allow
   folder access (a small banner tells you). It also keeps a copy in the browser.
 
+WORLD SIZE
+  A new world is either a valley (64 x 64 tiles, the classic size) or wide lands
+  (128 x 128: four times the ground, twice the towns, spread further apart). Pick
+  on the welcome card or when you start a new world. Wide lands ask more of the
+  PC and take longer to catch up after time away. The page reloads itself when it
+  opens a world of the other size, and it remembers the size you last used.
+
 TIME
   The world pauses whenever the tab isn't visible. When you come back it catches up on
   the time you were gone, but at most 8 hours of it (and never more than 250 years),
@@ -284,6 +291,13 @@ THE 3D VIEW
   wherever something is happening (news from the chronicle, a ship coming in,
   a townsperson on their way, the harbour at sunset) with a caption. Touch it
   and it's yours again. R turns the film camera off or on.
+  Now and then something happens somewhere you can watch: a house catches
+  fire and the street forms a bucket chain from the river or the well, the
+  sheep get into the market and half the town chases them home, a wedding
+  procession goes down the street in a shower of petals, the river floods the
+  low streets, a cart of cabbages gets away down a hill, or a whale comes
+  ashore and the whole town turns out to keep it wet. The film camera goes to
+  look, and the chronicle tells how it ended.
   Zoom in and the streets near you fill in: sills and shutters, cornices, door
   steps, gutters, balconies, the glazing on glass towers.
   The towns grow up in the style of the old city-builders: thatch and earth

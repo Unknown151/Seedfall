@@ -47,6 +47,41 @@ npm run dev               # local Worker at http://127.0.0.1:8787 with a fake lo
   are hoisted, but top-level `const`s from later files are only usable at runtime.
 - **Duplicate function names fail the build.** A duplicate would silently shadow the earlier one. That
   has bitten twice: `stepPeople` vs `stepAgents` stopped anyone dying, and `workFor` vs `jobPlace`.
+- **Map size.** `W`/`H` are 64 or 128 (`MAP_SIZES`), fixed when the page loads (`MAPN` in util.js: `?size=`,
+  else localStorage `sfSize`), so every buffer is still sized once. Worlds carry `S.size` (older saves are 64).
+  Every load goes through `fitSize(save, then)`: a world of the other size is parked in IndexedDB (`pending`,
+  with what was being done: boot, cloud, load, switch) and `resizeTo` reloads the page at its size; `boot()` picks
+  `pending` up first. `newWorld(seed, archive, size)` does the same with `{then: 'new', seed}`. `RESIZING` stops
+  saves while the page goes. The size is chosen in `sizeRow` (welcome card `#wSize`, new-world question `#cSize`).
+  Wide lands (`BIGMAP`) found twice the towns further out, and research runs at .78 so the pace stays the same.
+  `test/mapsize.mjs` covers it.
+- **Randomness.** All code calls `rnd()` (and `ri`/`rf`/`pick`/`chance`/`shuffle` on top of it), never `Math.random`
+  directly. `simMonth` and `newState` run inside `simRun`, which switches `rnd` to the sim's own seeded stream
+  (`simRand`, state `S.rs`, saved with the world; older saves get one from their seed). Everything else (the view,
+  particles, the player's clicks) stays on `Math.random`. So the same seed grows the same world, and a reloaded save
+  grows on exactly as it would have: keep it that way (no `Math.random` or `Date.now` deciding anything in the sim,
+  and no sim decisions that depend on what the view did). `test/engine.mjs` checks it.
+- **Event bus.** `EV.fire(kind, data)` says what happened; `EV.on(kind, fn)` listens (`EV.off` to stop). The sim fires
+  `chron {e, o}`, `placed {B}`, `built {B, T}`, `removed {B}`, `town {T, parent}`, `tech {t}`, `era {n}`, `age {age}`
+  and `event {k}`. Listeners run on the view's randomness (so they can never change the sim) and a throwing listener
+  is reported without stopping the world. New features (incidents, the camera, the voice) should listen here rather
+  than be called from inside the sim.
+- **3D models.** `glModel(B)` picks how a building is drawn in 3D: `GL_BIG[type]` for a landmark on a bigger lot, else
+  `GL_MODEL[type]`, else its 2D art run through the primitives (the old way, still most types). New or reworked
+  building art should be a `GL_MODEL` entry, made directly in world units (`gBox`, `gBeam`, `gRoof`, `gSpire`, `gCone`,
+  `glCylAt`...; small things behind `GLB.lod`). Well, granary, shrine and watchstone are native so far; move the rest
+  over a type at a time, and the 2D renderer can go once nothing needs it.
+- **Incidents** (incidents.js). Staged scenes at a real place that you can watch: a house fire (flames, dark smoke, a
+  bucket chain from the nearest water or well, a crowd; saved or burnt down), sheep loose in the market (the flock
+  wanders the square, townsfolk chase it, then drive it home), a wedding (a procession along the street with petals;
+  the couple are married at the end), a river flood (water over the low ground, folk carrying things uphill; the town
+  loses 3%), a runaway cabbage cart (it rolls downhill shedding cabbages, the farmer runs after it, children pick them
+  up) and a whale on the beach (a crowd, buckets from the sea, then it slides free and blows). Moving ones set
+  `st.fx/st.fz` so the film camera follows them. The sim part is `S.inc` (`INC[k]`: `yr` chance a year,
+  `n` months, `begin()`, `end(I)` rolling the outcome), run monthly by `stepIncidents` on the sim's stream, so it's saved
+  and replays; the view part is `INC_VIEW[k](I, st, p, dt)` (called from `glPeople`, state in `INCV`, never saved, `p` =
+  `incProg` 0..1). The bus fires `incident {I}` and `{I, end: true}`; the film camera cuts to a new one. During catch-up
+  an incident is just its two chronicle lines. `SF.incident(k)` starts one now. `test/incidents.mjs` covers them.
 - **URL flags.** Open `seedfall.html` directly. `?seed=N&fresh` makes a scratch world (`SCRATCH`): it never
   saves anywhere (IndexedDB, folder or cloud) and never claims the cloud world, so it's safe on the live
   site. `&nointro` skips the landing, and `&dev` adds an fps readout and opens the debug card.
@@ -57,7 +92,7 @@ npm run dev               # local Worker at http://127.0.0.1:8787 with a fake lo
   - Time: `SF.ff(years)` fast-forwards, `SF.hour(h)` pins the clock (null means live).
   - Environment: `SF.weather(kind, secs)`, `SF.season({...})`.
   - State: `SF.state()`, `SF.save()`, `SF.relightNow()`.
-  - Events: `SF.fx(kind, data)`, `SF.pray(kind)`.
+  - Events: `SF.fx(kind, data)`, `SF.pray(kind)`, `SF.incident(kind)`.
 - **Globals.** Top-level `let`s are reachable by name from `page.evaluate` (`S`, `M`, `CAM`, `DYN`,
   `towns()`...). Use `CAM` directly: `SF.cam` can be stale.
 - **Shipped folder.** `dist/Seedfall/` holds `seedfall.html`, `README.txt` (CRLF line endings, player
@@ -74,8 +109,9 @@ cd test && node soak.mjs
 
 Set `PW_CHROMIUM` to use a specific Chromium binary. In Claude Code cloud sessions the test Playwright is
 newer than the pre-installed browser, so use `PW_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`
-(or whichever `chromium-*` folder is there) instead of downloading one. Runs are **not deterministic** (the sim uses
-`Math.random`), so ±10–15% in population between runs is noise.
+(or whichever `chromium-*` folder is there) instead of downloading one. The sim is **deterministic per seed** (its own
+seeded stream, see Randomness), so a `?seed=N&fresh` world fast-forwarded the same way grows the same every run;
+comparing across seeds, ±10–15% in population is still just how worlds differ.
 
 Pages open in **3D** by default, and headless Chromium draws 3D in software at about 1 fps, which starves clicks and
 slow catch-ups. Tests of the sim, the panels and saves (`hover`, `needs`, `away`, `faith1`, `flow`, `streetmig`, `cloud`, `voicetab`, `aitest`) therefore use 2D; the 3D view
@@ -101,6 +137,9 @@ itself is covered by `glpick`, `glphone` and `soak`. Add `&2d` to a new test unl
 | `prayers` | Prayer words at three points in history: all well-formed (no `undefined`, lowercase sentence starts or overlong cards), 40+ different out of 60 per kind, early ones free of radios and seedships and late ones mentioning them. |
 | `lots` | Bigger lots: landmarks spreading onto 2×1/2×2 lots, harbours growing to several berths, ships at their own berths, every tile of a lot pointing at it, saves keeping lots, removal freeing them. `SHOTS=1` adds 3D pictures. |
 | `glfilm` | The film camera (shots in a row, varied, a touch hands the camera back, a minute later it carries on) and the season and weather reaching the 3D shader. `SHOTS=1` saves pictures. |
+| `engine` | The same seed grows the same world; a save reloaded mid-way grows on identically; the event bus fires for chronicle lines, buildings, towns, techs and eras, and listeners that draw random numbers or throw change nothing; native 3D models build far and near. |
+| `incidents` | All six kinds come along on their own (together about every 4 years) and always end; a wedding marries its couple; a flood costs a little; a fire starts at a house and ends saved or burnt down with a chronicle line; an incident under way survives a reload; every kind draws in 3D with no WebGL errors. |
+| `mapsize` | Valley or wide lands: the welcome card and New world offer both, choosing the other size reloads at it, a plain reload remembers it, a world opened at the wrong size reloads at its own, and a 128 world by 1800 has more towns spread further with the same techs. Needs `npm run serve`. |
 | `roads` | Road surfaces by era and material: dirt and gravel early, cobbles or bricks with Masonry, asphalt and concrete with Motorcars, glowlanes with Hovercraft, the market quarter keeping its cobbles, chronicle firsts, the tooltip, and an older save's roads converted. |
 | `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, kept worlds (new, switch, forget), a `?fresh` scratch tab saving nothing, and file:// staying cloud-free. Needs the root `npm install`. |
 
@@ -182,6 +221,7 @@ itself is covered by `glpick`, `glphone` and `soak`. Add `&2d` to a new test unl
 | econ.js | Timber, stone, clay, metal, goods, cloth and glass; extraction sites (incl. pastures and sand pits), crafts (`CRAFT`: weaver, glassworks), material choice, building costs, shortages, road and sea trade, "known for", Towns-tab readouts |
 | needs.js | Town needs (`NEEDS`: water, milling, health, power grid, culture, news), worked out every 3 months from the buildings (`refreshNeeds`, never saved), their effects (`needGrowthK`, `lifeBonus`, `gridK`, `migrate`) and `tryNeeds`, which builds for whatever is missing. Also smoke (`SMOKY`, `sootK`, `pollution`, the `SOOT` ground tint that `topColor` reads), hot springs (`S.springs`, `springAt`), and the culture sites: `tryCulture` (bathhouse, theatre, Maker dig, botanical garden, guild hall) and `yearlyCulture` |
 | zones.js | Zones each town draws for itself (`M.zone`: market core, homes, works quarter, greens) in `drawZones`, redrawn every 20 years or when outgrown (`yearlyZones`); `ZONE_OF`/`ZSC`/`zoneScore` feed `findSite`'s `zt` argument. Redevelopment (`redevelop`, `clearFields`, `tendGreens`), the `shops` building (`shopKind`, `drawShops`) and the Z overlay (`drawZoneView`) |
+| incidents.js | Incidents you can watch: `INC` (the sim part: begin, end, outcome), `stepIncidents`/`startIncident`, `INC_VIEW` (the 3D part: flames, smoke, bucket chains, a flock and the people chasing it), `glIncidents` |
 | people.js | Person model: traits, quirks, families, relationships |
 | ai.js | Claude API (`aiFetch`, daily cap 80), world brief, tool schemas, `CULT` doctrines, `lever(k)`, `LV_KEYS`/`LV_TXT` |
 | levers.js | `applyLevers` (style, nature, growth, streets, materials, lights, weather, names...), customs lists, map labels, sky lanterns |
@@ -262,5 +302,5 @@ See `TODO.md`:
    Cloudflare Access for login, saves in Workers KV, a server-side voice proxy, and cloud mode in the game.
    Leftovers (server-side exports, phone support) are in TODO.md. The game still works exactly as before
    when opened from `file://`.
-2. **Bigger worlds** (128×128 or 96×96). Blocked on static canvas memory, which would be ~420 MB at
-   128×128 unless the layer is chunked.
+2. **Bigger worlds**: done as a choice per world (64 or 128). The 2D fallback's static canvas is only made when
+   2D is used, so it no longer blocks it.

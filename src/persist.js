@@ -6,6 +6,16 @@ const IDB = {
   set(k, v) { return new Promise(res => { try { const t = this.db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(true); t.onerror = () => res(false); } catch (e) { res(false); } }); },
   del(k) { return new Promise(res => { try { const t = this.db.transaction('kv', 'readwrite'); t.objectStore('kv').delete(k); t.oncomplete = () => res(true); t.onerror = () => res(false); } catch (e) { res(false); } }); }
 };
+// a world is 64 or 128 tiles a side (S.size; older saves are 64). One of the other size is parked in IndexedDB
+// ('pending', with what was being done with it) and the page reloads at its size; boot() then carries on with it
+let RESIZING = false;
+const saveSize = o => { const s = o && (o.state || o); return s && MAP_SIZES.includes(s.size) ? s.size : 64; };
+async function fitSize(o, then, extra) { if (saveSize(o) === W) return true; await resizeTo(saveSize(o), Object.assign({ save: o, then }, extra)); return false; }
+async function resizeTo(n, pend) {
+  RESIZING = true; if (pend) await IDB.set('pending', pend);
+  try { localStorage.setItem('sfSize', String(n)); } catch (e) { }
+  const u = new URL(location.href); u.searchParams.set('size', n); u.searchParams.delete('fresh'); location.replace(u.href);
+}
 const FOLDER = { h: null, ok: false, name: '', last: 0, busy: false, err: null, lastSaveStr: '' };
 const HAS_FSA = typeof window.showDirectoryPicker === 'function';
 
@@ -36,6 +46,7 @@ function deserialize(obj) {
   for (const e of S.aiLog || []) { const d = e.kind === 'words' && e.input && e.doc && S.doctrines.find(x => x.id === e.doc); if (d && e.input.interpretation) e.summary = d.summary = clean(e.input.interpretation, 700); }
   recomputeCulture();
   if (!o0.map.plan) legacyStreets(); // saved before towns planned their own streets
+  if (typeof S.rs !== 'number') S.rs = (((S.seed | 0) * 2654435761) ^ (S.month | 0) * 40503) >>> 0; // saved before the sim had its own stream
   if ((S.roadV || 1) < 2) { for (let i = 0; i < W * H; i++) { const r = M.road[i]; if (r === 5) M.road[i] = R_GLOW; else if (r === 4) M.road[i] = R_ASPHALT; } S.roadV = 2; } // old road tiers become surfaces
   for (const k in S.P) ensurePerson(S.P[k]);
   if (S.P[S.founder]) S.P[S.founder].fl = 0;
@@ -106,7 +117,7 @@ async function folderFlush(txtFn) {
 // ?seed=N&fresh opens a scratch world: for testing, so nothing is ever saved (not to the cloud, the browser or a folder)
 let SCRATCH = false;
 async function saveAll(force) {
-  if (!S || S.flags.intro || SCRATCH) return;
+  if (!S || S.flags.intro || SCRATCH || RESIZING) return; // (a resize is reloading the page: the world it leaves is already kept)
   if (CLOUD.conflict) return; // another device owns the world now: writing anything here would only clobber it
   S.savedAt = Date.now();
   if (FOLDER.ok) await folderFlush(() => JSON.stringify(serialize()));
@@ -130,6 +141,7 @@ async function connectFolder(fromWelcome) {
     // folder holds another world: keep it safe before we write ours
     await archiveFolderWorld(fs);
   } else if (fs && S && fs.state.seed === S.seed && (fs.state.savedAt || 0) > (S.savedAt || 0) + 60000) {
+    if (!(await fitSize(fs, 'boot'))) return;
     deserialize(fs); startWorld(false); toast('Loaded the newer save from the folder.');
   }
   toast(`Saving to “${h.name}”.`);
@@ -296,6 +308,7 @@ async function cloudTakeOver() {
     CLOUD.conflict = false; CLOUD.err = null; hideBanner();
     if (c) {
       CLOUD.rev = c.meta.rev; CLOUD.last = c.meta.savedAt || 0;
+      if (saveSize(c.save) !== W) { await IDB.set('save', c.txt); await IDB.set('cloud', { email: CLOUD.email, rev: c.meta.rev }); await fitSize(c.save, 'cloud', { upload: false }); return; } // (the other device is on a world of the other size)
       deserialize(c.save); startWorld(false);
       await IDB.set('save', c.txt); await IDB.set('cloud', { email: CLOUD.email, rev: c.meta.rev });
       toast(`Carrying on with ${S.planet || 'your world'} here.`);
@@ -308,6 +321,7 @@ async function cloudTakeOver() {
 function choose(title, text, yes, no) {
   return new Promise(res => {
     const cY = $('cYes'), cN = $('cNo'), l = [cY.textContent, cN.textContent];
+    $('cSize').hidden = true;
     const done = v => { $('confirm').classList.remove('show'); cY.textContent = l[0]; cN.textContent = l[1]; cY.onclick = cN.onclick = null; res(v); };
     $('cTitle').textContent = title; $('cText').textContent = text; cY.textContent = yes; cN.textContent = no;
     cY.onclick = () => done(true); cN.onclick = () => done(false);
@@ -337,7 +351,7 @@ async function cloudStart() {
 }
 // after a world is on screen: this tab owns it now, so another device's next save gets a 409
 async function cloudOwn(upload) {
-  if (CLOUD.out) return;
+  if (CLOUD.out || RESIZING) return;
   try { await cloudClaim(); } catch (e) { if (!CLOUD.out) CLOUD.err = e.message; }
   CLOUD.lastTry = Date.now(); if (!upload) CLOUD.lastPlay = S.playSec;
   if (upload) await saveAll(true);
@@ -359,6 +373,7 @@ async function cloudLoadFile(welcome) {
   if (!welcome && S && !(await keepWorld())) return false; // never lose the world it replaces
   if (CLOUD.conflict) { CLOUD.conflict = false; hideBanner(); } // loading a file on purpose is a take-over too
   try { const c = await cloudGet(true); CLOUD.rev = c ? c.meta.rev : null; } catch (e) { } // and it replaces whatever is there
+  if (!(await fitSize(fs, 'load'))) return true;
   deserialize(fs); startWorld(false);
   toast(`Welcome back to ${S.planet || 'your world'}.`);
   await cloudOwn(true);
@@ -370,7 +385,7 @@ const worldId = () => `${S.seed}-${S.created || 0}`;
 async function cloudArchive() {
   S.savedAt = Date.now();
   const txt = JSON.stringify(serialize()), gz = typeof CompressionStream === 'function';
-  const h = { 'content-type': gz ? 'application/octet-stream' : 'application/json', 'x-seedfall-gzip': gz ? '1' : '0', 'x-seedfall-info': asciiJson({ year: yr(), planet: S.planet || '', pop: Math.round(totalPop()) }) };
+  const h = { 'content-type': gz ? 'application/octet-stream' : 'application/json', 'x-seedfall-gzip': gz ? '1' : '0', 'x-seedfall-info': asciiJson({ year: yr(), planet: S.planet || '', pop: Math.round(totalPop()), size: S.size || 64 }) };
   const r = await cloudApi('worlds/' + worldId(), { method: 'PUT', headers: h, body: gz ? await gzip(txt) : txt }, 60000);
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
@@ -390,7 +405,7 @@ async function cloudFetchWorld(wid) {
 }
 function openWorlds() {
   if (!CLOUD.on) { // file://: the old way, archived to the save folder if there is one
-    confirmBox('Start a new world?', `${S.planet || 'This world'} will be archived${FOLDER.ok ? ' to the worlds folder' : ''} and a new pod will fall somewhere else.`, () => newWorld(randSeed(), true));
+    confirmBox('Start a new world?', `${S.planet || 'This world'} will be archived${FOLDER.ok ? ' to the worlds folder' : ''} and a new pod will fall somewhere else.`, () => newWorld(randSeed(), true, UI.newSize)); sizeRow($('cSize'));
     return;
   }
   $('worlds').classList.add('show'); renderWorlds();
@@ -403,15 +418,16 @@ async function renderWorlds() {
   box.innerHTML = '<div class="wl-empty">Looking for your other worlds…</div>';
   let j; try { j = await cloudWorlds(); } catch (e) { box.innerHTML = `<div class="wl-empty">Couldn’t list your worlds (${esc(e.message)}).</div>`; return; }
   const ws = (j.worlds || []).filter(w => SCRATCH || w.wid !== worldId()).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
-  box.innerHTML = ws.length ? ws.map(w => `<div class="wl-row"><span><b>${esc(w.planet || 'An unnamed world')}</b><small>Year ${w.year || 0} · ${fmtInt(w.pop || 0)} people · kept ${w.savedAt ? agoStr(w.savedAt) : ''}</small></span><button class="btn" data-sw="${esc(w.wid)}"${SCRATCH || busy ? ' disabled' : ''}>Switch</button><button class="btn" data-fg="${esc(w.wid)}" title="Forget this world"${busy ? ' disabled' : ''}>×</button></div>`).join('') : '<div class="wl-empty">No other worlds kept yet.</div>';
+  box.innerHTML = ws.length ? ws.map(w => `<div class="wl-row"><span><b>${esc(w.planet || 'An unnamed world')}</b><small>${w.size === 128 ? 'Wide lands · ' : ''}Year ${w.year || 0} · ${fmtInt(w.pop || 0)} people · kept ${w.savedAt ? agoStr(w.savedAt) : ''}</small></span><button class="btn" data-sw="${esc(w.wid)}"${SCRATCH || busy ? ' disabled' : ''}>Switch</button><button class="btn" data-fg="${esc(w.wid)}" title="Forget this world"${busy ? ' disabled' : ''}>×</button></div>`).join('') : '<div class="wl-empty">No other worlds kept yet.</div>';
   box.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => switchWorld(ws.find(w => w.wid === b.dataset.sw)));
   box.querySelectorAll('[data-fg]').forEach(b => b.onclick = () => forgetWorld(ws.find(w => w.wid === b.dataset.fg)));
 }
 async function worldsNew() {
   $('worlds').classList.remove('show');
-  if (!(await choose('Start a new world?', `${S.planet || 'This world'} is kept in your list of worlds, and a new pod will fall somewhere else.`, 'Start a new world', 'Cancel'))) return;
+  const q = choose('Start a new world?', `${S.planet || 'This world'} is kept in your list of worlds, and a new pod will fall somewhere else.`, 'Start a new world', 'Cancel'); sizeRow($('cSize'));
+  if (!(await q)) return;
   if (!(await keepWorld())) return;
-  await newWorld(randSeed());
+  await newWorld(randSeed(), false, UI.newSize); if (RESIZING) return;
   toast('A new pod is falling. The old world is safe in your list.');
 }
 async function switchWorld(w) {
@@ -421,6 +437,7 @@ async function switchWorld(w) {
   let fs; try { fs = await cloudFetchWorld(w.wid); } catch (e) { toast(`Couldn’t open that world (${e.message}).`); return; }
   if (!fs) { toast('That kept world won’t open.'); return; }
   if (!(await keepWorld())) return;
+  if (!(await fitSize(fs, 'switch'))) return;
   deserialize(fs); S.lastLive = Date.now(); // it was on the shelf, not away: no catch-up
   startWorld(false);
   toast(`Welcome back to ${S.planet || 'your world'}.`);

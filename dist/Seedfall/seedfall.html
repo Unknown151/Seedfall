@@ -174,6 +174,11 @@ select{font:inherit;font-size:12px;padding:4px 6px;border-radius:7px;border:1px 
 .wl-row .btn{padding:5px 10px;font-size:12.5px}
 .wl-row .btn:disabled,#wlNew:disabled{opacity:.45;cursor:default}
 .wl-empty{font-size:13px;color:var(--ink3);padding:6px 2px}
+.sizes{display:flex;gap:8px;margin:10px 0 4px}
+.sizes[hidden]{display:none}
+.sizes .btn{flex:1;text-align:left;padding:7px 10px;line-height:1.25}
+.sizes .btn small{display:block;font-size:11.5px;color:var(--ink3);font-weight:400}
+.sizes .btn.sel{background:rgba(255,255,255,.92);box-shadow:inset 0 0 0 2px #e5874f}
 .away-letter{font-family:Georgia,serif;font-size:14.5px;line-height:1.6;color:var(--ink);background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:12px 0;white-space:pre-wrap}
 .away-letter:empty{display:none}
 .away-letter b{display:block;font-size:15.5px;margin-bottom:6px}
@@ -339,6 +344,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
   <h1>Seedfall</h1>
   <p>A single seed pod is about to fall onto an unnamed world. One colonist, a vault of sleeping embryos, and a lot of time.</p>
   <p id="wText">The world grows while it's on screen, and keeps going for up to 8 hours while you're away. Pick a folder and Seedfall will keep <b>save.json</b>, a readable <b>chronicle.md</b> and <b>stats.csv</b> in it.</p>
+  <div class="sizes" id="wSize"></div>
   <div class="acts">
     <button class="btn primary" id="wFolder">Choose a save folder…</button>
     <button class="btn" id="wLocal">Start without a folder</button>
@@ -416,6 +422,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
 <div class="modal" id="confirm"><div class="card">
   <h2 id="cTitle">Start a new world?</h2>
   <p id="cText"></p>
+  <div class="sizes" id="cSize" hidden></div>
   <div class="acts"><button class="btn primary" id="cYes">Yes</button><button class="btn" id="cNo">Cancel</button></div>
 </div></div>
 
@@ -424,7 +431,11 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
 /* ============================== util ============================== */
 const SF = window.SF = {};
 const TAU = Math.PI * 2;
-const W = 64, H = 64;              // map size in tiles
+// map size in tiles: fixed when the page loads (?size=, else the size of the last world opened here), so every
+// buffer is sized once; a world of the other size reloads the page at its size (fitSize in persist.js)
+const MAP_SIZES = [64, 128];
+const MAPN = (() => { let n = +new URLSearchParams(location.search).get('size'); if (!MAP_SIZES.includes(n)) { try { n = +localStorage.getItem('sfSize'); } catch (e) { } } return MAP_SIZES.includes(n) ? n : 64; })();
+const W = MAPN, H = MAPN;
 const TW2 = 16, TH2 = 8, EH = 6;   // iso half-width, half-height, elevation step (world units)
 const SEAZ = 9;                    // sea surface z
 const RS = 2;                      // static layer resolution multiplier
@@ -437,7 +448,23 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = t => t * t * (3 - 2 * t);
 const sstep = (a, b, v) => smooth(clamp((v - a) / (b - a), 0, 1));
-const rnd = Math.random;
+// randomness: the sim draws from its own seeded stream (S.rs, saved with the world), so a world grows the same way
+// from the same save and seed (tests, replays, incidents that pick up after a reload); the view and the player's
+// clicks use Math.random. simRun switches streams for the length of a sim step.
+let RNG = Math.random;
+const rnd = () => RNG();
+function simRand() { let t = (S.rs = (S.rs + 0x6D2B79F5) >>> 0); t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+function simRun(fn) { const sv = RNG; RNG = simRand; try { return fn(); } finally { RNG = sv; } }
+// the event bus: the sim says what happened (EV.fire('built', { B, T })) and whoever cares listens (EV.on): the film
+// camera, incidents, the voice... so new things plug in without touching the sim. Listeners get the view's randomness
+// (they must never change what the sim does next), and one that throws can't stop the world.
+// Events: chron {e, o} · placed {B} · built {B, T} · removed {B} · town {T, parent} · tech {t} · era {n} · age {age} · event {k}
+const EV = {
+  ls: {},
+  on(k, f) { (this.ls[k] || (this.ls[k] = [])).push(f); return f; },
+  off(k, f) { const a = this.ls[k], i = a ? a.indexOf(f) : -1; if (i >= 0) a.splice(i, 1); },
+  fire(k, d) { const a = this.ls[k]; if (!a || !a.length) return; const sv = RNG; RNG = Math.random; try { for (const f of a.slice()) { try { f(d); } catch (e) { setTimeout(() => { throw e; }); } } } finally { RNG = sv; } }
+};
 const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
 const rf = (a, b) => a + rnd() * (b - a);
 const pick = a => a[Math.floor(rnd() * a.length)];
@@ -1767,7 +1794,7 @@ function matStyle(st, B) {
 }
 function drawBuilding0(c, B, cx, cy, i, st) {
   if (B.prog < 1) { drawConstruction(c, B, cx, cy, st, i); return; }
-  if (GLB && fpBig(B) && GL_BIG[B.type]) return GL_BIG[B.type](B, st); // (the 3D models for landmarks on bigger lots)
+  if (GLB) { const m = glModel(B); if (m) return m(B, st); } // (in 3D: a native model when the type has one)
   const v = B.var || 0;
   switch (B.type) {
     case 'pod': return drawPod(c, B, cx, cy);
@@ -3149,16 +3176,17 @@ function chron(ic, t, o = {}) {
   S.chron.push(e);
   if (S.chron.length > 3000) S.chron.splice(0, S.chron.length - 3000);
   if (e.tx != null && !o.nocap) fx('caption', { x: e.tx, y: e.ty, ic, t: o.cap || shortCap(t), major: e.k === 'major' || e.k === 'era' });
-  UIDIRTY.chron = true;
+  UIDIRTY.chron = true; EV.fire('chron', { e, o });
   return e;
 }
 function shortCap(t) { const s = t.split(/[.:;!]/)[0]; return s.length > 58 ? s.slice(0, 55) + '…' : s; }
 
 /* ---------- new world ---------- */
-function newState(seed) {
-  const g = genWorld(seed);
+function newState(seed) { S = { rs: (seed * 2654435761) >>> 0 }; return simRun(() => newState0(seed)); } // (a new world's first draws come from its seed too)
+function newState0(seed) {
+  const g = genWorld(seed), rs = S.rs;
   S = {
-    v: 1, roadV: 2, seed, created: Date.now(), savedAt: 0, playSec: 0,
+    v: 1, roadV: 2, size: W, rs, seed, created: Date.now(), savedAt: 0, playSec: 0,
     year: 0, month: 0, map: g.M, B: {}, nextB: 1, T: {}, nextT: 1, P: {}, nextP: 1,
     tech: { done: {}, cur: 0, pts: 0 }, era: 0, age: null, ageN: 0, ageUsed: {},
     styles: [Object.assign({}, STYLES0[0])], styleIdx: 0,
@@ -3262,6 +3290,7 @@ function mkBuilding(type, x, y, T, o = {}) {
   if (T) { T.bl.push(B.id); econNewBuilding(B, T); }
   markDirty(i);
   if ((type === 'dock' || type === 'harbor') && B.dir) { const j = idx(x + B.dir[0], y + B.dir[1]); markDirty(j); }
+  EV.fire('placed', { B });
   return B;
 }
 function removeBuilding(B) {
@@ -3270,6 +3299,7 @@ function removeBuilding(B) {
   M.bld[i] = 0; delete S.B[B.id]; CNT_M = -1;
   const T = S.T[B.sid]; if (T) { const k = T.bl.indexOf(B.id); if (k >= 0) T.bl.splice(k, 1); econDirty(T); }
   markDirty(i); if (B.type === 'house') houseNbrDirty(B); // its terrace neighbours close the gap
+  EV.fire('removed', { B });
 }
 function workFor(B) { return B.type === 'house' ? HT[B.up != null ? B.up : B.tier].work : (BT[B.type] ? BT[B.type].work : 10); }
 function bcount(T, type) { let n = 0; for (const id of T.bl) { const B = S.B[id]; if (B && B.type === type) n++; } return n; }
@@ -3810,6 +3840,7 @@ const FIRST_TXT = {
   watertower: '{T} raises a water tower. Every street gets a tap, and the queues at the wells are gone.'
 };
 function completeBuilding(B, T) {
+  EV.fire('built', { B, T }); econDirty(T);
   if (B.up != null) { B.tier = B.up; B.up = null; }
   B.style = S.styleIdx; B.built = yr();
   if (B.type === 'house') houseNbrDirty(B); // joins a terrace, maybe
@@ -3843,24 +3874,25 @@ function growTown(T) {
 
 /* ---------- founding ---------- */
 const MAX_TOWNS = [1, 1, 2, 3, 4, 5, 6, 6, 7, 7];
+const BIGMAP = W > 64; // wide lands: twice the towns, and settlers who go further afield to find open country
 function tryFound() {
-  const ts = towns(), g = lever('growth'), PT = S.pendingTown;
+  const ts = towns(), g = lever('growth'), PT = S.pendingTown, K = BIGMAP ? 2 : 1;
   if (PT && S.year > PT.until) { S.pendingTown = null; chron('🧭', `The settlers who meant to found ${PT.name} never find the right valley, and quietly unpack.`); return; }
-  const forced = PT && S.year >= PT.at && ts.length < 10;
+  const forced = PT && S.year >= PT.at && ts.length < 10 * K;
   if (!forced) {
     if (g === 'stay_small') return;
     const more = g === 'more_towns' ? 2 : 0;
-    if (ts.length >= MAX_TOWNS[S.era] + (S.age ? 1 : 0) + more || ts.length >= 8 + more) return;
-    if (S.year - S.lastFound < (more ? 12 : 25)) return;
+    if (ts.length >= MAX_TOWNS[S.era] * K + (S.age ? 1 : 0) + more || ts.length >= 8 * K + more) return;
+    if (S.year - S.lastFound < (more ? 12 : BIGMAP ? 16 : 25)) return;
   }
   const parent = ts.filter(T => T.pop > (forced ? 20 : 40 + ts.length * 30)).sort((a, b) => b.pop - a.pop)[0];
   if (!parent) return;
   let best = null, bs = -1e9;
-  for (let t = 0; t < (forced ? 1500 : 500); t++) {
+  for (let t = 0; t < (forced ? 1500 : 500) * K; t++) {
     const x = 3 + ri(0, W - 7), y = 3 + ri(0, H - 7), i = idx(x, y);
     if (M.water[i] || M.bld[i] || M.ruin[i] || M.elev[i] > 5 || M.bio[i] === BIO.ROCK || M.bio[i] === BIO.SNOW) continue;
     const dp = dist(x, y, parent.x, parent.y);
-    if (dp < (forced ? 7 : 10) || dp > (forced ? 40 : 26)) continue;
+    if (dp < (forced ? 7 : 10) || dp > (forced ? 40 : 26) * (BIGMAP ? 1.6 : 1)) continue;
     if (ts.some(T => dist(x, y, T.x, T.y) < Math.max(forced ? 8 : 11, townRadius(T) + 2.5))) continue; // open country, not someone else's back streets
     let ok = 0, fert = 0, water = 0;
     for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
@@ -3868,7 +3900,7 @@ function tryFound() {
       if (M.water[j]) water++; else if (!M.bld[j] && !M.road[j] && !M.plan[j] && Math.abs(M.elev[j] - M.elev[i]) <= 1) { ok++; fert += M.fert[j]; }
     }
     if (ok < (forced ? 16 : 22)) continue;
-    const s = ok * .4 + fert * .25 + (water > 0 && water < 12 ? 6 : 0) - dp * .15 + rnd() * 4 + ((S.springs || []).some(o => dist(o.x, o.y, x, y) < 6) ? 5 : 0); // settlers like a hot spring
+    const s = ok * .4 + fert * .25 + (water > 0 && water < 12 ? 6 : 0) - dp * (BIGMAP ? .04 : .15) + rnd() * 4 + ((S.springs || []).some(o => dist(o.x, o.y, x, y) < 6) ? 5 : 0); // settlers like a hot spring
     if (s > bs) { bs = s; best = { x, y }; }
   }
   if (!best) { if (!forced) S.lastFound = S.year - 15; else PT.at = S.year + 3; return; }
@@ -3880,7 +3912,7 @@ function tryFound() {
   f.sid = T.id; T.founder = f.id; T.leader = f.id;
   const sp = f.sp && S.P[f.sp]; if (sp && sp.died === null) sp.sid = T.id;
   for (const k of f.kids) { const c = S.P[k]; if (c && c.died === null && S.year - c.born < 16) c.sid = T.id; }
-  S.T[T.id] = T; econFound(T, parent);
+  S.T[T.id] = T; econFound(T, parent); EV.fire('town', { T, parent });
   S.lastFound = S.year;
   const pl = mkBuilding('plaza', best.x, best.y, T, { prog: 1 });
   if (streetMode(T) === 'grid') growDistrict(T); else { growLane(T); growLane(T); }
@@ -3910,7 +3942,7 @@ function researchRate() {
   }
   m = Math.min(m, 6);
   if (S.age) { const th = AGE_THEMES.find(a => a.k === S.age.k); if (th && th.research) m *= th.research; }
-  return (0.9 * Math.pow(pop, 0.62) * m + (S.year < 20 ? 3 : 0)) * (1 + .25 * (CULT.rs || 0));
+  return (0.9 * Math.pow(pop, 0.62) * m + (S.year < 20 ? 3 : 0)) * (1 + .25 * (CULT.rs || 0)) * (BIGMAP ? .78 : 1); // (wide lands hold more people and schools, not a faster march of discovery)
 }
 function stepResearch() {
   if (S.tech.cur >= TECHS.length) return;
@@ -3934,7 +3966,7 @@ function techInventor(t) {
 }
 function completeTech(i) {
   const t = TECHS[i];
-  S.tech.done[t.id] = yr();
+  S.tech.done[t.id] = yr(); EV.fire('tech', { t });
   const p = techInventor(t);
   const T = S.T[p.sid] || biggestTown();
   p.deeds.push(t.name);
@@ -3966,7 +3998,7 @@ function newEra(e) {
   S.styles.push(inheritForm(Object.assign({}, STYLES0[e]))); S.styleIdx = S.styles.length - 1;
   driftLang(S.lang, 2);
   chron('🌅', ERAS[e].title, { k: 'era', nocap: true });
-  gainRev(25, 'a new era');
+  gainRev(25, 'a new era'); EV.fire('era', { n: e });
   if (e >= 2 && S.wondersUsed.length < WONDERS.length) queueWonder();
 }
 function queueWonder() {
@@ -3985,7 +4017,7 @@ function startAge() {
   const n = S.ageUsed[nm];
   const name = (n > 1 ? `The ${['', '', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'][n] || ordinal(n)} Age of ` : 'The Age of ') + nm;
   S.ageN++;
-  S.age = { n: S.ageN, name, k: th.k, start: yr(), len: ri(70, 150) };
+  S.age = { n: S.ageN, name, k: th.k, start: yr(), len: ri(70, 150) }; EV.fire('age', { age: S.age });
   const st = inheritForm(newStyle()); S.styles.push(st); S.styleIdx = S.styles.length - 1;
   driftLang(S.lang, 3);
   chron('🌀', name, { k: 'era', nocap: true });
@@ -4142,7 +4174,7 @@ function rollEvent() {
   if (!avail.length) return;
   const e = wpick(avail.map(e => [e, e.w * (theme && theme.ev && theme.ev[e.k] ? theme.ev[e.k] : 1) * (1 + (CULT.ev[e.k] || 0))]));
   if (e.once) S.flags['ev_' + e.k] = 1;
-  e.run();
+  e.run(); EV.fire('event', { k: e.k });
 }
 function elect(T) {
   const old = person(T.leader);
@@ -4214,9 +4246,11 @@ function milestones() {
 }
 
 /* ---------- the monthly tick ---------- */
-function simMonth() {
+function simMonth() { return simRun(simMonth0); }
+function simMonth0() {
   S.month++; S.year = S.month / 12;
   const newYear = S.month % 12 === 0;
+  stepIncidents();
   // vault decanting
   if (S.vault > 0 && S.year >= 2 && chance(0.1 + (S.year > 12 ? 0.05 : 0))) { S.vault--; S.T[1] && (S.T[1].pop += 1); }
   for (const T of towns()) { growTown(T); stepEcon(T); buildTown(T); planTown(T); if (newYear) { planBridges(T); planFerries(T); } if (S.month % 3 === T.id % 3) paveTown(T); }
@@ -4713,7 +4747,7 @@ const ECX = {};
 function econDirty(T) { if (T && ECX[T.id]) ECX[T.id].m = -1e9; }
 function econCache(T) {
   let e = ECX[T.id];
-  if (e && e.S === S && e.m <= S.month && S.month - e.m < 12) return e;
+  if (e && e.S === S && e.m > -1e9) return e; // (it only changes when buildings do, and every change marks it dirty, so it always matches a fresh one: a reloaded world makes the same choices)
   e = ECX[T.id] = { S, m: S.month, ex: [], n: {}, done: {} };
   for (const id of T.bl) {
     const B = S.B[id]; if (!B) continue;
@@ -5045,7 +5079,7 @@ const clinicN = () => 1500 * (hasTech('genegarden') ? 3 : hasTech('computing') ?
 const NEEDC = { S: null, m: -99, t: {}, grid: 1, sup: 0, dem: 0, word: 0 };
 function townCounts(T) { const n = {}; for (const id of T.bl) { const B = S.B[id]; if (B && B.prog >= 1) n[B.type] = (n[B.type] || 0) + 1; } return n; }
 function refreshNeeds(force) {
-  if (!force && NEEDC.S === S && S.month - NEEDC.m < 3 && NEEDC.m <= S.month) return NEEDC;
+  if (!force && NEEDC.S === S && NEEDC.m === S.month) return NEEDC; // (fresh each month: a cache that refreshed some months after it was made would differ after a reload, and the sim must replay the same)
   NEEDC.S = S; NEEDC.m = S.month; NEEDC.t = {};
   let sup = 0, dem = 0, cov = 0, tot = 0;
   const ts = towns(), radios = [];
@@ -5069,10 +5103,10 @@ const gridK = () => hasTech('electric') ? .5 + .5 * refreshNeeds().grid : 1; // 
 const NATW = { S: null, v: {} };
 function natWater(T) {
   if (NATW.S !== S) { NATW.S = S; NATW.v = {}; }
-  const c = NATW.v[T.id]; if (c && S.year - c.y < 50) return c.w;
+  const q = Math.floor(S.year / 50), c = NATW.v[T.id]; if (c && c.q === q) return c.w; // (on fixed 50-year boundaries, so a reload agrees)
   const R = Math.ceil(townRadius(T) + 2); let f = 0;
   for (let y = Math.max(0, T.y - R); y <= Math.min(H - 1, T.y + R) && !f; y++) for (let x = Math.max(0, T.x - R); x <= Math.min(W - 1, T.x + R); x++) { const i = idx(x, y); if (M.water[i] === 2 || (M.water[i] && M.bio[i] === BIO.FRESH)) { f = 1; break; } }
-  const w = f ? .35 : .15; NATW.v[T.id] = { w, y: S.year }; return w;
+  const w = f ? .35 : .15; NATW.v[T.id] = { w, q }; return w;
 }
 // each windmill grinds for about sixteen fields, wherever they are in town
 function millShare(T, n) { n = n || townCounts(T); return n.farm ? clamp((n.mill || 0) * MILL_FIELDS / n.farm, 0, 1) : 1; }
@@ -5552,6 +5586,262 @@ function drawZoneView(c) {
     c.stroke();
   }
 }
+
+/* ============================== incidents: things that happen somewhere, and that you can watch ============================== */
+// An incident is staged at a real place for a few sim months: a house fire, the sheep loose in the market... Its sim part
+// (S.inc: what, where, when; the outcome is rolled when it ends) runs in stepIncidents on the sim's own stream, so it is
+// saved, survives a reload and replays the same. Its view part (INCV: the people, props, flames and smoke) is made up
+// from that each time it's on screen and is never saved. During catch-up months fly by, so an incident is just its two
+// chronicle lines. The bus hears 'incident' {I} when one starts and {I, end: true} when it's over; the film camera
+// goes to look. To add one: an INC entry (yr: chance a year, n: months, begin() -> the incident or null, end(I)) and an
+// INC_VIEW entry (called every frame in 3D with the incident, its view state and how far along it is, 0..1).
+const INC = {
+  fire: {
+    yr: .07, n: 3,
+    begin() {
+      const hs = Object.values(S.B).filter(B => B.type === 'house' && B.prog >= 1 && B.tier >= 1 && B.tier <= 5 && !B.hid && S.T[B.sid]);
+      if (!hs.length) return null;
+      const B = pick(hs), T = S.T[B.sid], st = rcls(nearestRoad(B.x, B.y)) >= 3 ? 'street' : 'lane';
+      chron('🔥', pick([`Fire! A house on a ${st} of ${T.name} is burning. The neighbours are out with buckets.`, `Smoke over ${T.name}: a house has caught fire, and the whole ${st} turns out to fight it.`, `A chimney fire in ${T.name} gets into the roof beams. Bells ring, and the buckets come running.`]), { x: B.x, y: B.y, cap: 'Fire!' });
+      return { k: 'fire', x: B.x, y: B.y, sid: T.id, bid: B.id };
+    },
+    end(I) {
+      const B = S.B[I.bid], T = S.T[I.sid]; if (!B || !T) return;
+      const saved = chance(.55 + (hasTech('electric') ? .3 : hasTech('steam') ? .15 : 0)); // (fire brigades, then hydrants)
+      if (saved) { chron('🪣', pick([`The fire in ${T.name} is out. The house is scorched but standing, and the family are back in by nightfall.`, `${T.name} saves the burning house. Everyone on the ${hasTech('steam') ? 'street' : 'lane'} is soaked, and very proud.`]), { x: I.x, y: I.y, nocap: true }); return; }
+      removeBuilding(B); T._fail = {};
+      chron('🏚️', pick([`The house in ${T.name} burns to the ground. Nobody is hurt; the neighbours take the family in until a new one goes up.`, `Nothing could save the house in ${T.name}. By spring a new one is rising on the same plot.`]), { x: I.x, y: I.y, nocap: true });
+    }
+  },
+  sheep: {
+    yr: .06, n: 2,
+    begin() {
+      if (!hasTech('herding')) return null;
+      const ts = towns().filter(T => T.bl.some(id => S.B[id] && S.B[id].type === 'pasture' && S.B[id].prog >= 1) && T.bl.some(id => S.B[id] && (S.B[id].type === 'market' || S.B[id].type === 'plaza') && S.B[id].prog >= 1));
+      if (!ts.length) return null;
+      const T = pick(ts), bl = T.bl.map(id => S.B[id]).filter(Boolean), P = pick(bl.filter(B => B.type === 'pasture')), mk = bl.find(B => B.type === 'market' && B.prog >= 1) || bl.find(B => B.type === 'plaza');
+      chron('🐑', pick([`Someone left the gate open in ${T.name}. The sheep are in the market.`, `The sheep of ${T.name} have found the market, and the cabbages.`, `A flock gets loose in ${T.name} and makes straight for the market square.`]), { x: mk.x, y: mk.y, cap: 'Sheep loose!' });
+      return { k: 'sheep', x: mk.x, y: mk.y, px: P.x, py: P.y, sid: T.id };
+    },
+    end(I) {
+      const T = S.T[I.sid]; if (!T) return;
+      chron('🧶', pick([`Every sheep of ${T.name} is back in its field. Nobody will say who left the gate open.`, `The flock is home in ${T.name}, minus three cabbages and a hat.`, `The sheep are rounded up in ${T.name}. The market sweeps up and carries on.`, `${T.name}'s runaway sheep are back behind the gate, looking pleased with themselves.`]), { x: I.x, y: I.y, nocap: true });
+    }
+  },
+  wedding: {
+    yr: .08, n: 2,
+    begin() {
+      const ts = towns().filter(T => T.pop > 60); if (!ts.length) return null;
+      const T = pick(ts), ad = Object.values(S.P).filter(q => q.sid === T.id && q.died === null && !q.sp && age(q) >= 20 && age(q) <= 50);
+      if (ad.length < 2) return null;
+      const a = pick(ad), cand = ad.filter(q => q !== a && Math.abs(age(q) - age(a)) <= 12 && !related(a, q)); if (!cand.length) return null;
+      const b = pick(cand), V = T.bl.map(id => S.B[id]).find(B => B && B.prog >= 1 && (B.type === 'shrine' || B.type === 'hall' || B.type === 'plaza')) || S.B[T.bl[0]]; if (!V) return null;
+      chron('💒', pick([`${a.first} and ${b.first} are getting married in ${T.name}! The whole street follows them with flowers.`, `Wedding bells in ${T.name}: ${a.first} and ${b.first}. The procession sets off, and so does half the town.`, `${T.name} turns out for ${a.first} and ${b.first}'s wedding: a procession, petals, and a fiddler who knows three tunes.`]), { x: V.x, y: V.y, cap: 'A wedding!' });
+      return { k: 'wedding', x: V.x, y: V.y, sid: T.id, a: a.id, b: b.id };
+    },
+    end(I) {
+      const a = S.P[I.a], b = S.P[I.b], T = S.T[I.sid]; if (!a || !b || !T || a.died !== null || b.died !== null || a.sp || b.sp) return;
+      marry(a, b);
+      chron('💍', pick([`${a.first} and ${b.first} are married. The party in ${T.name} goes on until the lamps run dry.`, `${T.name} dances ${a.first} and ${b.first} into married life. Somebody's uncle gives a speech that goes on a bit.`]), { T, nocap: true });
+    }
+  },
+  flood: {
+    yr: .035, n: 3,
+    begin() {
+      const ts = towns().filter(T => incFloodTiles(T.x, T.y).length >= 4); if (!ts.length) return null;
+      const T = pick(ts), f = incFloodTiles(T.x, T.y), c = f[(f.length / 2) | 0];
+      chron('🌊', pick([`The river bursts its banks at ${T.name}. Water in the lower streets, and everyone carrying things uphill.`, `After weeks of rain the river rises into ${T.name}. Boats in the lanes, chickens on the roofs.`]), { x: c % W, y: (c / W) | 0, cap: 'Flood!' });
+      return { k: 'flood', x: c % W, y: (c / W) | 0, tx: T.x, ty: T.y, sid: T.id };
+    },
+    end(I) {
+      const T = S.T[I.sid]; if (!T) return;
+      T.pop *= .97; // (a hard season, not a disaster)
+      chron('🧹', pick([`The water goes down in ${T.name}. Mud everywhere, but the fields will be richer for the silt.`, `${T.name} dries out after the flood and starts talking about a proper embankment.`]), { x: I.x, y: I.y, nocap: true });
+    }
+  },
+  cart: {
+    yr: .05, n: 2,
+    begin() {
+      if (!hasTech('wheel')) return null;
+      const ts = towns().filter(T => T.pop > 40 && M.road[idx(T.x, T.y)] !== undefined); if (!ts.length) return null;
+      const T = pick(ts), r = nearestRoad(T.x, T.y); if (!M.road[r]) return null;
+      chron('🥬', pick([`A cart of cabbages gets away from its farmer in ${T.name} and rolls off down the street, shedding cabbages as it goes.`, `Runaway cart in ${T.name}! Cabbages everywhere, and the children of the town are delighted.`]), { x: r % W, y: (r / W) | 0, cap: 'Runaway cart!' });
+      return { k: 'cart', x: r % W, y: (r / W) | 0, sid: T.id };
+    },
+    end(I) {
+      const T = S.T[I.sid]; if (!T) return;
+      chron('🥗', pick([`Every cabbage in ${T.name} is found, give or take a few. There is cabbage soup on every table tonight.`, `The runaway cart of ${T.name} is back on its wheels. The farmer is selling "bruised but brave" cabbages at half price.`]), { x: I.x, y: I.y, nocap: true });
+    }
+  },
+  whale: {
+    yr: .02, n: 3,
+    begin() {
+      if (!hasTech('boats')) return null;
+      const opts = [];
+      for (const T of towns()) for (let dy = -9; dy <= 9; dy++) for (let dx = -9; dx <= 9; dx++) { const x = T.x + dx, y = T.y + dy; if (!inb(x, y)) continue; const i = idx(x, y); if (M.water[i] || M.bld[i] || M.road[i]) continue; const d = N4.find(([a, b]) => inb(x + a, y + b) && M.water[idx(x + a, y + b)] === 1); if (d) opts.push([x, y, d[0], d[1], T]); }
+      if (!opts.length) return null;
+      const [x, y, dx, dy, T] = pick(opts);
+      chron('🐋', pick([`A whale has come ashore on the beach by ${T.name}. The whole town comes down to look, and to keep it wet.`, `There is a whale on the beach at ${T.name}! Buckets, blankets and a great deal of advice.`]), { x, y, cap: 'A whale!' });
+      return { k: 'whale', x, y, dx, dy, sid: T.id };
+    },
+    end(I) {
+      const T = S.T[I.sid];
+      chron('🌊', pick([`With the high tide and every back in ${T ? T.name : 'town'} pushing, the whale slides free and swims off. The children wave until it's gone.`, `The whale is back in the sea. ${T ? T.name : 'The town'} will tell the story for a hundred years, each time a little bigger.`]), { x: I.x, y: I.y, nocap: true });
+    }
+  }
+};
+// the low ground by a river near a town that a flood would cover (the same answer in the sim and the view)
+function incFloodTiles(tx, ty) {
+  const o = [];
+  for (let dy = -7; dy <= 7; dy++) for (let dx = -7; dx <= 7; dx++) {
+    const x = tx + dx, y = ty + dy; if (!inb(x, y)) continue; const i = idx(x, y); if (M.water[i]) continue;
+    let lo = 99; for (let yy = -2; yy <= 2; yy++) for (let xx = -2; xx <= 2; xx++) { const nx = x + xx, ny = y + yy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (M.water[j] && M.bio[j] === BIO.FRESH) lo = Math.min(lo, M.elev[j]); }
+    if (lo < 99 && M.elev[i] <= lo + 1) o.push(i);
+  }
+  return o.slice(0, 48);
+}
+function nearestRoad(x, y) { for (let r = 0; r <= 3; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const nx = x + dx, ny = y + dy; if (inb(nx, ny) && M.road[idx(nx, ny)]) return idx(nx, ny); } return idx(x, y); }
+// monthly, in the sim: incidents that are over end, and now and then a new one begins (one of each kind at a time)
+function stepIncidents() {
+  const L = S.inc || (S.inc = []);
+  for (let k = L.length - 1; k >= 0; k--) { const I = L[k]; if (S.month >= I.t0 + I.n) { L.splice(k, 1); const d = INC[I.k]; if (d) d.end(I); EV.fire('incident', { I, end: true }); } }
+  if (L.length >= 2 || S.flags.intro || yr() < 20) return;
+  for (const k in INC) if (!L.some(I => I.k === k) && chance(INC[k].yr / 12) && startIncident(k)) break;
+}
+function startIncident(k) { // (also SF.incident(k), for trying one out)
+  const d = INC[k], I = d && d.begin(); if (!I) return null;
+  Object.assign(I, { id: (S.incN = (S.incN || 0) + 1), t0: S.month, n: d.n }); (S.inc || (S.inc = [])).push(I); EV.fire('incident', { I });
+  return I;
+}
+// how far along an incident is right now, 0..1 (between sim months too, so it moves smoothly)
+function incProg(I) { const ms = (PACE[S.settings.pace] || 180) / 12, m = S.month + (UI.paused ? 0 : clamp(simAcc / ms, 0, 1)); return clamp((m - I.t0) / I.n, 0, 1); }
+
+/* ---------- what you see (3D) ---------- */
+const INCV = new Map(); // incident id -> its view state (never saved)
+const INC_LOOK = { col: ['#8a3f37', '#3f5f8a', '#6b5a3a', '#4f6f4a', '#7a5a7a', '#c9a24a', '#5a5a62'], skin: ['#e0b090', '#c68f6a', '#8d5a3f', '#f0c8a8', '#a8704f'], hair: ['#2b211c', '#5a3a24', '#8a6a3a', '#c9b48a', '#1c1c1c', '#9a9a9a'] };
+function incActor(i) { const r = k => INC_LOOK[k][(hash2(i, k.length, 331) * INC_LOOK[k].length) | 0]; return { col: r('col'), skin: r('skin'), hair: r('hair'), pants: '#3d3a38', ph: i * 1.7 }; }
+const incY = (x, z) => { const i = idx(clamp(Math.round(x), 0, W - 1), clamp(Math.round(z), 0, H - 1)); return tileZ(i) * ZS; };
+function glIncidents(dt) {
+  const L = S.inc || []; if (!L.length) { if (INCV.size) INCV.clear(); return; }
+  const live = new Set();
+  for (const I of L) { live.add(I.id); const f = INC_VIEW[I.k]; if (!f) continue; let st = INCV.get(I.id); if (!st) INCV.set(I.id, st = {}); try { f(I, st, incProg(I), dt); } catch (e) { if (QS.has('dev')) console.error(e); } }
+  for (const k of INCV.keys()) if (!live.has(k)) INCV.delete(k);
+}
+function incFlame(X, Y, Z, w, h, col, spin) { // a glowing four-sided tongue of flame, bent a little by the wind
+  const T = [X + Math.sin(spin * 1.7) * w * .6, Y + h, Z + Math.cos(spin * 1.3) * w * .6], P = k => { const a = spin + k * TAU / 4; return [X + Math.cos(a) * w, Y, Z + Math.sin(a) * w]; };
+  GLB.ctr = [X, Y - .05, Z]; for (let k = 0; k < 4; k++) gtri(P(k), P(k + 1), T, col, 2);
+}
+const INC_VIEW = {
+  fire(I, st, p, dt) {
+    const x = I.x, z = I.y, base = incY(x, z), top = Math.max(base + .35, hfAt(x, z) || 0), heat = p < .12 ? p / .12 : p > .75 ? (1 - p) / .25 : 1;
+    if (!st.chain) { // a bucket chain from the nearest water or well, else a crowd round the house
+      let src = null, bd = 9;
+      for (let dy = -7; dy <= 7; dy++) for (let dx = -7; dx <= 7; dx++) { const nx = x + dx, ny = z + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny), B = S.B[M.bld[j]], d = Math.hypot(dx, dy); if (d < bd && (M.water[j] && !M.road[j] || B && B.type === 'well')) { bd = d; src = [nx, ny]; } }
+      st.chain = []; const n = src ? clamp(Math.round(bd * 2.2), 3, 12) : 0;
+      for (let k = 0; k < n; k++) { const t = (k + .5) / n, px = src[0] + (x - src[0]) * t * .92, pz = src[1] + (z - src[1]) * t * .92, j = idx(Math.round(px), Math.round(pz)); if (M.bld[j] && M.bld[j] !== M.bld[idx(x, z)] && !(S.B[M.bld[j]] && S.B[M.bld[j]].type === 'well')) continue; st.chain.push({ o: incActor(I.id * 31 + k), x: px + (k % 2 ? .06 : -.06), z: pz, h: Math.atan2(z - src[1], x - src[0]) + (k % 2 ? 1.2 : -1.2) }); }
+      st.crowd = []; for (let k = 0; k < 5; k++) { const a = k / 5 * TAU + I.id, r = 1.15 + (k % 2) * .25; st.crowd.push({ o: incActor(I.id * 17 + k + 50), x: x + Math.cos(a) * r, z: z + Math.sin(a) * r, h: a + Math.PI }); }
+    }
+    const t = GL3.t;
+    for (const a of st.chain) { a.o.ph += dt * 2; glPerson(a.o, a.x, a.z, incY(a.x, a.z), a.h, false, false); }
+    for (let k = 0; k + 1 < st.chain.length; k++) { const a = st.chain[k], b = st.chain[k + 1], u = (t * .9 + k * .5) % 1; if (u > .5) continue; const w = u * 2, bx = a.x + (b.x - a.x) * w, bz = a.z + (b.z - a.z) * w; GLB.mat = 0; glOBox([bx, incY(bx, bz) + .1, bz], [.012, 0, 0], [0, 0, .012], [0, .014, 0], '#6b5040'); } // buckets going hand to hand
+    for (const a of st.crowd) glPerson(a.o, a.x, a.z, incY(a.x, a.z), a.h, false, false);
+    if (heat <= .02) return;
+    GLB.mat = 0;
+    for (let k = 0; k < 11; k++) { // tongues of flame licking up out of the roof, flickering, yellow at the heart
+      const a = k / 11 * TAU + I.id, r = k < 3 ? .03 : .1 + ((k * 7) % 3) * .06, fl = .5 + .5 * Math.sin(t * (6 + k * .7) + k * 2.1), h = (.2 + .26 * fl) * heat * (k < 3 ? 1.35 : 1), w = (.06 + .025 * fl) * heat;
+      incFlame(x + Math.cos(a) * r, top - .04, z + Math.sin(a) * r, w, h, k < 3 ? [1, .86, .35] : k % 2 ? [1, .52, .14] : [.98, .33, .08], t * 1.3 + k);
+    }
+    if (GL3.carry) GL3.carry.push([x, top + .15, z]); // it lights up the street at night
+    const P = GL3.smoke; if (P && P.length < 900 && Math.random() < dt * 9 * heat) P.push({ x: x + (Math.random() - .5) * .3, y: top + .12, z: z + (Math.random() - .5) * .3, a: 0, L: 5 + Math.random() * 3, s0: .2, s1: 1.3, o: .9, sh: .3 });
+  },
+  sheep(I, st, p, dt) {
+    const x = I.x, z = I.y;
+    if (!st.flock) {
+      st.spots = []; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const nx = x + dx, ny = z + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny), B = S.B[M.bld[j]]; if (!M.water[j] && (M.road[j] || !B || B.type === 'market' || B.type === 'plaza')) st.spots.push([nx, ny]); }
+      if (!st.spots.length) st.spots.push([x, z]);
+      st.flock = []; for (let k = 0; k < 9; k++) { const s = st.spots[(Math.random() * st.spots.length) | 0]; st.flock.push({ x: s[0] + (Math.random() - .5) * .6, z: s[1] + (Math.random() - .5) * .6, tx: s[0], tz: s[1], sp: .35 + Math.random() * .3, s: 1.15 + Math.random() * .3, ph: Math.random() * 6, rest: 0 }); }
+      st.herders = []; for (let k = 0; k < 3; k++) { const s = st.spots[(Math.random() * st.spots.length) | 0]; st.herders.push({ o: incActor(I.id * 13 + k), x: s[0], z: s[1], who: k % st.flock.length, dx: 1, dz: 0 }); }
+    }
+    const home = p > .72; // at the end they're driven back to their field
+    for (const m of st.flock) {
+      if (home) { m.tx = I.px; m.tz = I.py; }
+      else if (Math.hypot(m.tx - m.x, m.tz - m.z) < .1) { if ((m.rest -= dt) <= 0) { const s = st.spots[(Math.random() * st.spots.length) | 0]; m.tx = s[0] + (Math.random() - .5) * .7; m.tz = s[1] + (Math.random() - .5) * .7; m.rest = Math.random() * 2.5; } }
+      const dx = m.tx - m.x, dz = m.tz - m.z, d = Math.hypot(dx, dz), mv = d > .05;
+      if (mv) { const s = Math.min(d, m.sp * (home ? 1.4 : 1) * dt); m.x += dx / d * s; m.z += dz / d * s; m.ph += dt * 9; }
+      glSheep(m.x, m.z, incY(m.x, m.z), m.s, glHeading(m, dx, dz), mv ? m.ph : -1);
+    }
+    for (const h of st.herders) { // townsfolk running after them, arms out
+      const m = st.flock[h.who], dx = m.x - h.x - (home ? (I.px - m.x) * .15 : 0), dz = m.z - h.z - (home ? (I.py - m.z) * .15 : 0), d = Math.hypot(dx, dz), mv = d > .25;
+      if (mv) { const s = Math.min(d - .2, .5 * dt); h.x += dx / d * s; h.z += dz / d * s; h.o.ph += dt * 10; } else if (!home && Math.random() < dt * .4) h.who = (Math.random() * st.flock.length) | 0;
+      glPerson(h.o, h.x, h.z, incY(h.x, h.z), glHeading(h, dx, dz), mv, false);
+    }
+  },
+  wedding(I, st, p, dt) {
+    if (!st.route) {
+      const a = nearestRoad(I.x, I.y); let b = a;
+      for (let r = 5; r >= 2 && b === a; r--) for (let k = 0; k < 8 && b === a; k++) { const ang = k / 8 * TAU + I.id, j = nearestRoad(clamp(Math.round(I.x + Math.cos(ang) * r), 0, W - 1), clamp(Math.round(I.y + Math.sin(ang) * r), 0, H - 1)); if (M.road[j] && j !== a) b = j; }
+      const path = ((b !== a && navPath(a, b, 0)) || [a]).slice(0, 9); st.route = path.map(j => [j % W, (j / W) | 0]); st.len = Math.max(1, st.route.length - 1); // (a short walk the camera can follow)
+      st.folk = []; for (let k = 0; k < 10; k++) { const o = incActor(I.id * 7 + k); if (k === 0) Object.assign(o, { col: '#f4f1ea', pants: '#f4f1ea' }); if (k === 1) Object.assign(o, { col: '#2f2f3a', pants: '#2f2f3a' }); if (k === 2) o.col = '#c9a24a'; st.folk.push({ o, lag: k < 2 ? k * .25 : .6 + (k - 2) * .32, side: k % 2 ? .12 : -.12 }); }
+      st.petals = [];
+    }
+    const go = (p * 2) % 2, s0 = (go < 1 ? go : 2 - go) * st.len; // there and back again, all the way along
+    for (const f of st.folk) {
+      const s1 = clamp(s0 - f.lag * (go < 1 ? 1 : -1), 0, st.len), k = Math.min(st.route.length - 2, Math.floor(s1)), A = st.route[Math.max(0, k)], B = st.route[Math.max(0, Math.min(st.route.length - 1, k + 1))], u = s1 - Math.max(0, k);
+      const dx = B[0] - A[0], dz = B[1] - A[1], x = A[0] + dx * u - dz * f.side, z = A[1] + dz * u + dx * f.side, dir = go < 1 ? 1 : -1;
+      f.o.ph += dt * 7; glPerson(f.o, x, z, incY(x, z), glHeading(f, dx * dir, dz * dir), true, false); if (f === st.folk[0]) { st.fx = x; st.fz = z; }
+      if (f === st.folk[0] && Math.random() < dt * 14) st.petals.push({ x, z, y: incY(x, z) + .32, vx: (Math.random() - .5) * .3, vz: (Math.random() - .5) * .3, t: 0, c: FLOWER_C[(Math.random() * FLOWER_C.length) | 0] });
+    }
+    GLB.mat = 0;
+    for (let k = st.petals.length - 1; k >= 0; k--) { const q = st.petals[k]; q.t += dt; q.x += q.vx * dt; q.z += q.vz * dt; q.y -= dt * .12; if (q.t > 2.5) { st.petals.splice(k, 1); continue; } glOBox([q.x, q.y, q.z], [.008, 0, 0], [0, 0, .008], [0, .002, 0], q.c, .3); } // petals thrown over the couple
+  },
+  flood(I, st, p, dt) {
+    if (!st.tiles) { st.tiles = incFloodTiles(I.tx, I.ty); st.carry = []; for (let k = 0; k < 5; k++) st.carry.push({ o: incActor(I.id * 11 + k), s: Math.random(), i: st.tiles[(k * 7) % st.tiles.length] }); }
+    const rise = (p < .25 ? p / .25 : p > .7 ? (1 - p) / .3 : 1) * .11; if (rise <= .002) return;
+    GLB.mat = 0; GLB.ctr = [I.x, -5, I.y];
+    for (const i of st.tiles) { const x = i % W, z = (i / W) | 0, y = surfZ(i) * ZS + rise; gquad([x - .5, y, z - .5], [x - .5, y, z + .5], [x + .5, y, z + .5], [x + .5, y, z - .5], [.42, .55, .5], -1); } // brown-green floodwater (drawn as water)
+    for (const c of st.carry) { // folk wading uphill with their things, and back for more
+      c.s = (c.s + dt * .12) % 1; const x0 = c.i % W, z0 = (c.i / W) | 0, ax = I.tx - x0, az = I.ty - z0, L = Math.hypot(ax, az) || 1, u = c.s < .5 ? c.s * 2 : 2 - c.s * 2, x = x0 + ax / L * u * 2.2, z = z0 + az / L * u * 2.2;
+      c.o.ph += dt * 6; glPerson(c.o, x, z, incY(x, z), glHeading(c, ax * (c.s < .5 ? 1 : -1), az * (c.s < .5 ? 1 : -1)), true, false);
+      if (c.s < .5) { GLB.mat = M_PLANK; glOBox([x, incY(x, z) + .26, z], [.03, 0, 0], [0, 0, .025], [0, .025, 0], '#8a6a48'); GLB.mat = 0; } // a chest held up out of the wet
+    }
+  },
+  cart(I, st, p, dt) {
+    if (!st.route) {
+      const a = nearestRoad(I.x, I.y); let b = a, bd = 0;
+      for (let dy = -7; dy <= 7; dy++) for (let dx = -7; dx <= 7; dx++) { const x = I.x + dx, y = I.y + dy; if (!inb(x, y)) continue; const j = idx(x, y); if (!M.road[j] || M.water[j]) continue; const d = Math.hypot(dx, dy) + (surfZ(a) - surfZ(j)) * .8; if (d > bd && d < 9) { bd = d; b = j; } } // downhill, if there's a hill
+      const path = ((b !== a && navPath(a, b, 0)) || [a]).slice(0, 8); st.route = path.map(j => [j % W, (j / W) | 0]); st.len = Math.max(1, st.route.length - 1);
+      st.cabs = []; st.farmer = { o: incActor(I.id * 5), s: 0 }; st.kids = [0, 1, 2].map(k => ({ o: Object.assign(incActor(I.id * 9 + k), { kid: true }), x: I.x + k * .3, z: I.y, t: -1 }));
+      st.drop = 0;
+    }
+    const at = s => { const k = Math.min(st.route.length - 2, Math.floor(s)), A = st.route[Math.max(0, k)], B = st.route[Math.min(st.route.length - 1, Math.max(0, k) + 1)], u = s - Math.max(0, k); return [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u, B[0] - A[0], B[1] - A[1]]; };
+    const q = Math.min(1, p / .5), s = q * q * st.len, [cx, cz, hx, hz] = at(Math.min(s, st.len - .001)); st.fx = cx; st.fz = cz; const cy = incY(cx, cz), h = glHeading(st, hx, hz), f = [Math.cos(h), 0, Math.sin(h)], r = [-f[2], 0, f[0]], tip = p > .5 ? .5 : 0;
+    GLB.mat = M_PLANK; glOBox([cx, cy + .1, cz], V3s(f, .15), V3s(r, .09), [0, .045 + tip * .03, 0], '#8a6a48'); // the cart (on its side at the end)
+    GLB.mat = 0; for (const sg of [-1, 1]) glOBox([cx + r[0] * .1 * sg, cy + .065, cz + r[2] * .1 * sg], V3s(f, .06), V3s(r, .008), [0, .06, 0], '#4a3a2c');
+    if (p < .5) for (let k = 0; k < 4; k++) glBlob(cx + f[0] * (k - 1.5) * .065, cz + f[2] * (k - 1.5) * .065, .042, (cy + .17) / ZS, 1, '#7fb05a', 0); // what's left of the load
+    if (p < .5 && s - st.drop > .35) { st.drop = s; st.cabs.push({ x: cx, z: cz, vx: r[0] * (Math.random() - .5) * .8 + f[0] * .3, vz: r[2] * (Math.random() - .5) * .8 + f[2] * .3, got: false }); } // a cabbage bounces off
+    for (const c of st.cabs) { if (c.got) continue; c.x += c.vx * dt; c.z += c.vz * dt; c.vx *= Math.pow(.2, dt); c.vz *= Math.pow(.2, dt); glBlob(c.x, c.z, .038, incY(c.x, c.z) / ZS + .85, .85, '#8cbf62', 0); }
+    st.farmer.s = Math.min(s - .5, st.farmer.s + dt * .55); { const [fx, fz, dx, dz] = at(clamp(st.farmer.s, 0, st.len - .001)); st.farmer.o.ph += dt * 11; glPerson(st.farmer.o, fx, fz, incY(fx, fz), glHeading(st.farmer, dx, dz), st.farmer.s < s - .6 || p < .5, false); } // the farmer, running after it
+    for (const kd of st.kids) { // the children of the town, gathering cabbages
+      const c = st.cabs.find(c => !c.got && (!c.by || c.by === kd)); if (!c) { glPerson(kd.o, kd.x, kd.z, incY(kd.x, kd.z), kd._gh || 0, false, false); continue; } c.by = kd;
+      const dx = c.x - kd.x, dz = c.z - kd.z, d = Math.hypot(dx, dz); if (d < .06) { c.got = true; continue; }
+      const v = Math.min(d, dt * .7); kd.x += dx / d * v; kd.z += dz / d * v; kd.o.ph += dt * 12; glPerson(kd.o, kd.x, kd.z, incY(kd.x, kd.z), glHeading(kd, dx, dz), true, false);
+    }
+  },
+  whale(I, st, p, dt) {
+    const out = p > .82 ? (p - .82) / .18 : 0, x = I.x + I.dx * (.35 + out * 2.5), z = I.y + I.dy * (.35 + out * 2.5), y0 = incY(I.x, I.y) - out * .2, ang = Math.atan2(I.dy, I.dx), f = [Math.cos(ang), 0, Math.sin(ang)], r = [-f[2], 0, f[0]];
+    if (!st.crowd) { st.crowd = []; for (let k = 0; k < 8; k++) { const a = Math.PI * .6 + k / 7 * Math.PI * .8 + ang, rr = .75 + (k % 3) * .18; st.crowd.push({ o: Object.assign(incActor(I.id * 3 + k), { kid: k > 5 }), x: I.x + Math.cos(a) * rr, z: I.y + Math.sin(a) * rr, h: a + Math.PI, s: Math.random() }); } }
+    const Y = (y0 + .02) / ZS;
+    [[.18, .22, 4.2], [0, .21, 4.4], [-.18, .17, 3.6], [-.34, .11, 2.4], [-.46, .065, 1.5]].forEach(([a, rad, rz], k) => glBall(x + f[0] * a, z + f[2] * a, rad, Y + rz * .6, rz, k ? '#46525f' : '#3e4955', 0, 0)); // the whale, head to the sea
+    GLB.mat = 0; for (const sg of [-1, 1]) glOBox([x - f[0] * .55 + r[0] * sg * .09, y0 + .05, z - f[2] * .55 + r[2] * sg * .09], V3s(f, .05), V3s(r, .08), [0, .006, 0], '#3a4450'); // its tail flukes
+    for (const sg of [-1, 1]) glOBox([x + f[0] * .3 + r[0] * sg * .205, y0 + .16, z + f[2] * .3 + r[2] * sg * .205], [.008, 0, 0], [0, 0, .008], [0, .008, 0], '#101418'); // and its eyes
+    if (out < .9) for (const c of st.crowd) { // townsfolk: some stand and stare, some bring buckets from the sea
+      if (c.o.kid || (c.s += dt * .1) % 1 > .5) { glPerson(c.o, c.x, c.z, incY(c.x, c.z), c.h, false, false); continue; }
+      const u = Math.abs(((c.s * 2) % 2) - 1), sx = I.x + I.dx * 1.1, sz = I.y + I.dy * 1.1, px = c.x + (sx - c.x) * (1 - u), pz = c.z + (sz - c.z) * (1 - u); c.o.ph += dt * 8;
+      glPerson(c.o, px, pz, incY(px, pz), glHeading(c, sx - c.x, sz - c.z), true, false);
+    }
+    const P = GL3.smoke; if (P && P.length < 900 && ((out > 0 && out < .95) || Math.random() < dt * .15) && Math.random() < dt * (out > 0 ? 8 : 3)) P.push({ x: x + f[0] * .15, y: y0 + .45, z: z + f[2] * .15, a: 0, L: 1.6, s0: .06, s1: .3, o: .7, sh: 1.12 }); // it blows, now and then, and a great plume as it goes
+  }
+};
 
 /* ============================== people: traits, quirks, families ============================== */
 const STATS = [['cur', 'Curiosity'], ['kin', 'Kindness'], ['amb', 'Ambition'], ['cft', 'Craft'], ['wit', 'Humour']];
@@ -9588,6 +9878,52 @@ function glBigMarket(B, st) { // a cobbled market street of stalls under striped
   }
 }
 const GL_BIG = { station: glBigStation, market: glBigMarket, hall: glBigHall, museum: glBigMuseum, theatre: glBigTheatre, university: glBigUniversity, stadium: glBigStadium, fusion: glBigFusion };
+
+/* ---------- 3D-native models: buildings made straight in 3D (world units), not by running their 2D art ---------- */
+// glModel(B) picks the model a building is drawn with in 3D: a landmark on a bigger lot (GL_BIG), else one from
+// GL_MODEL, else nothing and its 2D art runs through the primitives as before. New building art belongs here: move a type
+// over by adding GL_MODEL[type] = (B, st) => {...}. Helpers: gBox/gBeam/gRoof/gSpire/gWins (world units: x, y = height,
+// z), glCylAt/glDomeAt/glPyr/glDoor (tile-local u, v and pixel heights), gCone below; GLB.x/GLB.y is the tile, GLB.base
+// its ground, GLB.lod true for the close-up version (put small detail behind it).
+function glModel(B) { return fpBig(B) && GL_BIG[B.type] || GL_MODEL[B.type] || null; }
+function gCone(u, v, r, z0, h, col, n = 12) { // a cone standing on tile-local (u, v), from pixel height z0 up h
+  const c = gcol(col), A = gw(u, v, z0 + h); GLB.ctr = gw(u, v, z0 - 1); GLB.mat = roofMat(c);
+  for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gtri(gw(u + Math.cos(a) * r, v + Math.sin(a) * r, z0), gw(u + Math.cos(b) * r, v + Math.sin(b) * r, z0), A, c); }
+}
+const GL_MODEL = {
+  well(B, st) { // a stone ring of water under a little roof, with a windlass and a bucket (a pump once the style turns modern)
+    const x = GLB.x, z = GLB.y, y = GLB.base;
+    if (B.style >= 4) { gBox([x, y, z], [.1, 0, 0], [0, 0, .1], 5 * ZS, '#8c96a3', M_STONE); gBeam([x + .1, y + 4 * ZS, z], [x + .22, y + 4 * ZS, z], .012, '#6c7683'); return; }
+    GLB.wall = M_STONE; glCylAt(0, 0, .15, 0, 3.5, '#bdb3a6', '#4f9cbc', 14); GLB.wall = 0;
+    for (const s of [-1, 1]) gBeam([x + s * .13, y + 3 * ZS, z], [x + s * .13, y + 9.2 * ZS, z], .012, '#7a5a44', M_PLANK);
+    gBeam([x - .15, y + 7.6 * ZS, z], [x + .15, y + 7.6 * ZS, z], .008, '#5f4636', M_PLANK); // the windlass
+    if (GLB.lod) { gBeam([x, y + 7.6 * ZS, z], [x, y + 5.4 * ZS, z], .002, '#c9b48a'); gBox([x, y + 4.6 * ZS, z], [.022, 0, 0], [0, 0, .022], 1.6 * ZS, '#6b5040', M_PLANK); } // its rope and bucket
+    gRoof([x, 0, z], [.19, 0, 0], [0, 0, .12], y + 9 * ZS, 3.2 * ZS, st.roof, st.wall);
+  },
+  granary(B, st) { // a round store up on staddle stones (so the rats can't climb in), with a steep roof and a ladder to its door
+    const x = GLB.x, z = GLB.y, y = GLB.base, wall = mix(st.wall, '#d9c29a', .4);
+    for (const [a, b] of [[-.12, -.12], [.12, -.12], [-.12, .12], [.12, .12]]) gBox([x + a, y, z + b], [.025, 0, 0], [0, 0, .025], 2.2 * ZS, '#a49c90', M_STONE);
+    GLB.wall = GLB.B ? glWallMat(GLB.B) : M_PLANK; glCylAt(0, 0, .2, 2.2, 10, wall, wall, 14); GLB.wall = 0;
+    gCone(0, 0, .26, 12.2, 8, st.roof);
+    gBox([x, y + 2.3 * ZS, z + .198], [.04, 0, 0], [0, 0, .008], 4.2 * ZS, '#5a4a40', M_PLANK); // its door, up off the ground
+    if (GLB.lod) for (const s of [-1, 1]) gBeam([x + s * .03, y, z + .34], [x + s * .03, y + 2.6 * ZS, z + .21], .004, '#6b5040', M_PLANK); // and the ladder
+  },
+  shrine(B, st) { // a stone plinth, a white pillar under a little pointed roof, and a candle burning before it
+    const x = GLB.x, z = GLB.y, y = GLB.base;
+    gBox([x, y, z], [.28, 0, 0], [0, 0, .28], 1.6 * ZS, '#d6cfc3', M_STONE);
+    GLB.wall = M_STONE; gBox([x, y + 1.6 * ZS, z], [.07, 0, 0], [0, 0, .07], 15 * ZS, '#e8e2d6', M_STONE); GLB.wall = 0;
+    glPyr(0, 0, 0, 0, .075, .075, 16.6, 4, st.accent);
+    gBox([x + .1, y + 1.6 * ZS, z + .22], [.012, 0, 0], [0, 0, .012], .9 * ZS, '#ffd27a', 0, 2); // the candle
+    if (GLB.lod) for (let k = 0; k < 3; k++) glBlob(-.16 + k * .1, .24, .03, 1.9, .9, FLOWER_C[(k + B.id) % FLOWER_C.length], 0); // flowers left on the plinth
+  },
+  watchstone(B, st) { // a tall pale obelisk with a gilded cap and a glowing teal stone set in its face
+    const x = GLB.x, z = GLB.y, y = GLB.base;
+    gBox([x, y, z], [.3, 0, 0], [0, 0, .3], 2 * ZS, '#d2cabd', M_STONE);
+    gBox([x, y + 2 * ZS, z], [.09, 0, 0], [0, 0, .09], 28 * ZS, '#e9e3d8', M_STONE);
+    gSpire([x, y + 30 * ZS, z], .095, 6 * ZS, '#d6b85a');
+    gBox([x, y + 23 * ZS, z + .092], [.03, 0, 0], [0, 0, .006], .03, '#5fd0c9', 0, 2);
+  }
+};
 function glSheep(X, Z, y0, s, ang, ph = -1) { // a woolly body, a black face and four legs, in world units; ph >= 0: walking
   const f = [Math.cos(ang), 0, Math.sin(ang)], r = [-Math.sin(ang), 0, Math.cos(ang)], u = X - GLB.x, v = Z - GLB.y, zz = (y0 - GLB.base) / ZS;
   for (const [a, b, q] of [[.03, .018, 0], [.03, -.018, Math.PI], [-.03, .018, Math.PI], [-.03, -.018, 0]]) glLimb([X + f[0] * a * s + r[0] * b * s, y0 + 1.1 * s * ZS, Z + f[2] * a * s + r[2] * b * s], f, r, ph >= 0 ? Math.sin(ph + q) * .45 : 0, 1.1 * s * ZS, .007 * s, '#3a3430');
@@ -9705,11 +10041,11 @@ void main(){
 }`;
 /* ---------- smoke: soft puffs from chimney pots and works, drawn as point sprites that grow, drift and fade ---------- */
 const GL_SMVS = `#version 300 es
-layout(location=0) in vec4 aP; layout(location=1) in float aA; uniform mat4 uVP; uniform float uPx, uMax; out float vA;
-void main(){ gl_Position=uVP*vec4(aP.xyz,1.); gl_PointSize=clamp(aP.w*uPx/gl_Position.w,1.,uMax); vA=aA; }`;
+layout(location=0) in vec4 aP; layout(location=1) in vec2 aA; uniform mat4 uVP; uniform float uPx, uMax; out float vA, vS;
+void main(){ gl_Position=uVP*vec4(aP.xyz,1.); gl_PointSize=clamp(aP.w*uPx/gl_Position.w,1.,uMax); vA=aA.x; vS=aA.y; }`;
 const GL_SMFS = `#version 300 es
-precision mediump float; in float vA; out vec4 o; uniform vec3 uCol;
-void main(){ vec2 d=gl_PointCoord-.5; float r=length(d)*2.; if(r>1.) discard; float a=vA*(1.-smoothstep(.15,1.,r))*(.8+.2*sin(d.x*9.+d.y*7.)); o=vec4(uCol*(1.-.12*d.y),a); }`;
+precision mediump float; in float vA, vS; out vec4 o; uniform vec3 uCol;
+void main(){ vec2 d=gl_PointCoord-.5; float r=length(d)*2.; if(r>1.) discard; float a=vA*(1.-smoothstep(.15,1.,r))*(.8+.2*sin(d.x*9.+d.y*7.)); o=vec4(uCol*vS*(1.-.12*d.y),a); }`;
 const SMOKE_AT = { workshop: [[.16, -.14, 21]], works: [[.28, -.18, 43]], power: [[-.16, -.2, 37], [.16, -.2, 37]], glassworks: [[.2, -.16, 24]] };
 function glSmoke(gl, dt, FR, VP, pxs, day, tgt) {
   GL3.smF = [FR, day, tgt]; const A = glSmokeStep(Math.min(dt, .25)), n = A.n; if (!n) return;
@@ -9717,9 +10053,9 @@ function glSmoke(gl, dt, FR, VP, pxs, day, tgt) {
   gl.useProgram(Q.p); gl.uniformMatrix4fv(Q.u.uVP, false, VP); gl.uniform1f(Q.u.uPx, pxs); gl.uniform1f(Q.u.uMax, GL3.ptMax || 64);
   gl.uniform3fv(Q.u.uCol, [.86, .85, .84].map(v => v * (.35 + .65 * day)));
   gl.bindBuffer(gl.ARRAY_BUFFER, GL3.smB); gl.bufferData(gl.ARRAY_BUFFER, A.a.subarray(0, n), gl.STREAM_DRAW);
-  gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 20, 0); gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 20, 16);
+  gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 24, 0); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 24, 16);
   gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE); gl.depthMask(false);
-  gl.drawArrays(gl.POINTS, 0, n / 5);
+  gl.drawArrays(gl.POINTS, 0, n / 6);
   gl.depthMask(true); gl.disable(gl.BLEND); gl.disableVertexAttribArray(0); gl.disableVertexAttribArray(1);
 }
 function glSmokeStep(dt) { // new puffs from what's in view, then everyone rises, drifts and grows
@@ -9730,12 +10066,12 @@ function glSmokeStep(dt) { // new puffs from what's in view, then everyone rises
     for (const [, sm] of ks) for (const q of sm) if (P.length < cap && Math.random() < rate * dt) P.push({ x: q[0], y: q[1], z: q[2], a: 0, L: 6 + Math.random() * 3, s0: .09, s1: .6, o: .72 });
     for (const B of DYN.anim || []) { const at = SMOKE_AT[B.type]; if (!at || P.length >= cap || Math.hypot(B.x - tgt[0], B.y - tgt[2]) > 40) continue; // the works smoke hard
       const soot = sootK() >= .5 && !hasTech('solar'), b = surfZ(idx(B.x, B.y)) * ZS;
-      for (const [u, v, z] of at) if (Math.random() < 2.2 * dt) P.push({ x: B.x + u, y: b + z * ZS, z: B.y + v, a: 0, L: 7 + Math.random() * 4, s0: .16, s1: 1.1, o: soot ? .8 : .6 }); }
+      for (const [u, v, z] of at) if (Math.random() < 2.2 * dt) P.push({ x: B.x + u, y: b + z * ZS, z: B.y + v, a: 0, L: 7 + Math.random() * 4, s0: .16, s1: 1.1, o: soot ? .8 : .6, sh: soot ? .6 : .92 }); }
   }
-  let n = 0; const A = GL3.smA && GL3.smA.length >= P.length * 5 ? GL3.smA : (GL3.smA = new Float32Array(Math.max(1024, P.length * 5 * 2)));
+  let n = 0; const A = GL3.smA && GL3.smA.length >= P.length * 6 ? GL3.smA : (GL3.smA = new Float32Array(Math.max(1024, P.length * 6 * 2)));
   for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; p.a += dt; if (p.a >= p.L) { P[i] = P[P.length - 1]; P.pop(); continue; }
     const t = p.a / p.L; p.x += (wind[0] * (.4 + t) + (Math.random() - .5) * .02) * dt; p.z += (wind[2] * (.4 + t)) * dt; p.y += (.16 - .1 * t) * dt;
-    A[n++] = p.x; A[n++] = p.y; A[n++] = p.z; A[n++] = p.s0 + (p.s1 - p.s0) * Math.sqrt(t); A[n++] = p.o * Math.min(1, t * 5) * Math.pow(1 - t, 1.6); }
+    A[n++] = p.x; A[n++] = p.y; A[n++] = p.z; A[n++] = p.s0 + (p.s1 - p.s0) * Math.sqrt(t); A[n++] = p.o * Math.min(1, t * 5) * Math.pow(1 - t, 1.6); A[n++] = p.sh || 1; } // (sh: how dark: soot and burning roofs)
   return { a: A, n };
 }
 /* ---------- rain and snow, a screen-space pass over the view: three layers, the nearest biggest ---------- */
@@ -9904,7 +10240,9 @@ function glFocusTown() { const ts = towns().sort((a, b) => b.pop - a.pop); if (!
 // Shots last 20-35 s: news from the chronicle first (a new landmark, a ship launched, a wedding), then ships coming in,
 // a townsperson on their way, a train, a landmark close up, a town from above. It eases between them and turns slowly
 // round what it's looking at, with a caption. Any touch hands the camera back; a minute later the film carries on.
-const FILM_IDLE = 60;
+const FILM_IDLE = 60, INC_CAP = { fire: '🔥 Fire', sheep: '🐑 Sheep loose', wedding: '💒 A wedding', flood: '🌊 Flood', cart: '🥬 A runaway cart', whale: '🐋 A whale on the beach' };
+GL3.incSeen = new Set();
+EV.on('incident', d => { if (!d.end && GL3.shot) GL3.shot.t0 = -1e9; }); // the film camera cuts to it
 function glTouch() { GL3.lastIn = performance.now(); if (GL3.shot) { GL3.shot = null; glCap(null); } }
 function glCap(t, sub) {
   let e = $('glCap');
@@ -9918,6 +10256,8 @@ function glShot() { // choose what to look at next
   const pick1 = a => a[(Math.random() * a.length) | 0];
   const major = news.filter(e => e.k === 'major' || e.k === 'era'), ev = major.length ? major[major.length - 1] : news.length && chance(.7) ? pick1(news) : null;
   const z = (x, y) => surfZ(idx(clamp(Math.round(x), 0, W - 1), clamp(Math.round(y), 0, H - 1))) * ZS;
+  const inc = (S.inc || []).find(I => !GL3.incSeen.has(I.id)) || ((S.inc || []).length && chance(.5) ? pick1(S.inc) : null); // an incident beats everything, and gets a second look now and then
+  if (inc) { GL3.incSeen.add(inc.id); const T = S.T[inc.sid]; return { at: () => { const v = INCV.get(inc.id), x = v && v.fx != null ? v.fx : inc.x, y = v && v.fx != null ? v.fz : inc.y; return [x, z(x, y), y]; }, zoom: rf(2.2, 3), pitch: rf(.3, .42), cap: (INC_CAP[inc.k] || '') + (T ? ' in ' + T.name : ''), dur: 30 }; }
   if (ev) return { at: () => [ev.tx, z(ev.tx, ev.ty), ev.ty], zoom: rf(2.6, 4), pitch: rf(.34, .5), cap: ev.ic + ' ' + ev.t, sub: 'Year ' + Math.floor(ev.yr) };
   const opts = [];
   const sail = DYN.ships.filter(sh => sh.st === 'sail' && sh.to && sh.path && sh.s > sh.path.length - 14 && sh.s < sh.path.length - 3);
@@ -10254,6 +10594,7 @@ function glPeople() {
     }
     GLB.id = 0; GLB.ao = 1;
     for (const hd of DYN.herds) for (const m of hd.members) { const [fx, fy, z] = agentPos(m), bx = m.b % W - m.a % W, by = ((m.b / W) | 0) - ((m.a / W) | 0); glSheep(fx, fy, z * ZS, (m.size || 1) * (m.baby ? .6 : 1), glHeading(m, bx, by), m.pause > 0 ? -1 : DYN.t * 3 + (m.a % 7)); }
+    GLB.id = 0; GLB.ao = 1; glIncidents(GL3.dt || .016);
     GLB.id = 0; GLB.ao = 1; try { glTraffic(); } catch (e) { if (QS.has('dev')) console.error(e); }
     for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; GLB.ao = .35 + .65 * aoAt(p[0], p[2] * ZS + .15, p[1], 0, 1, 0); glVehicle(c, p[0], p[1], p[2] * ZS, glHeading(c, p[4], p[5]), true); }
   } catch (e) { if (QS.has('dev')) console.error(e); } finally { GLB = null; }
@@ -10417,8 +10758,15 @@ function bindUI() {
   $('banner').addEventListener('click', () => reconnectFolder());
 }
 function confirmBox(title, text, yes) {
-  $('cTitle').textContent = title; $('cText').textContent = text; $('confirm').classList.add('show');
+  $('cTitle').textContent = title; $('cText').textContent = text; $('confirm').classList.add('show'); $('cSize').hidden = true;
   $('cYes').onclick = () => { $('confirm').classList.remove('show'); yes(); };
+}
+// how big a new world is: a valley (64 tiles a side, as it always was) or wide lands (128: four times the ground, more towns, and more for the PC to draw)
+const SIZE_OPTS = [[64, 'A valley', '64 × 64 tiles'], [128, 'Wide lands', '128 × 128: four times the ground, heavier on the PC']];
+function sizeRow(el) {
+  if (!UI.newSize) UI.newSize = W;
+  el.innerHTML = SIZE_OPTS.map(([n, a, b]) => `<button class="btn${n === UI.newSize ? ' sel' : ''}" data-size="${n}">${a}<small>${b}</small></button>`).join(''); el.hidden = false;
+  el.querySelectorAll('[data-size]').forEach(b => b.onclick = () => { UI.newSize = +b.dataset.size; el.querySelectorAll('[data-size]').forEach(x => x.classList.toggle('sel', x === b)); });
 }
 function togglePanel() { UI.panel = !UI.panel; document.body.classList.toggle('panel', UI.panel); if (UI.panel) { renderPanel(true); } }
 function selectTool(k) {
@@ -10736,6 +11084,16 @@ const IDB = {
   set(k, v) { return new Promise(res => { try { const t = this.db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(true); t.onerror = () => res(false); } catch (e) { res(false); } }); },
   del(k) { return new Promise(res => { try { const t = this.db.transaction('kv', 'readwrite'); t.objectStore('kv').delete(k); t.oncomplete = () => res(true); t.onerror = () => res(false); } catch (e) { res(false); } }); }
 };
+// a world is 64 or 128 tiles a side (S.size; older saves are 64). One of the other size is parked in IndexedDB
+// ('pending', with what was being done with it) and the page reloads at its size; boot() then carries on with it
+let RESIZING = false;
+const saveSize = o => { const s = o && (o.state || o); return s && MAP_SIZES.includes(s.size) ? s.size : 64; };
+async function fitSize(o, then, extra) { if (saveSize(o) === W) return true; await resizeTo(saveSize(o), Object.assign({ save: o, then }, extra)); return false; }
+async function resizeTo(n, pend) {
+  RESIZING = true; if (pend) await IDB.set('pending', pend);
+  try { localStorage.setItem('sfSize', String(n)); } catch (e) { }
+  const u = new URL(location.href); u.searchParams.set('size', n); u.searchParams.delete('fresh'); location.replace(u.href);
+}
 const FOLDER = { h: null, ok: false, name: '', last: 0, busy: false, err: null, lastSaveStr: '' };
 const HAS_FSA = typeof window.showDirectoryPicker === 'function';
 
@@ -10766,6 +11124,7 @@ function deserialize(obj) {
   for (const e of S.aiLog || []) { const d = e.kind === 'words' && e.input && e.doc && S.doctrines.find(x => x.id === e.doc); if (d && e.input.interpretation) e.summary = d.summary = clean(e.input.interpretation, 700); }
   recomputeCulture();
   if (!o0.map.plan) legacyStreets(); // saved before towns planned their own streets
+  if (typeof S.rs !== 'number') S.rs = (((S.seed | 0) * 2654435761) ^ (S.month | 0) * 40503) >>> 0; // saved before the sim had its own stream
   if ((S.roadV || 1) < 2) { for (let i = 0; i < W * H; i++) { const r = M.road[i]; if (r === 5) M.road[i] = R_GLOW; else if (r === 4) M.road[i] = R_ASPHALT; } S.roadV = 2; } // old road tiers become surfaces
   for (const k in S.P) ensurePerson(S.P[k]);
   if (S.P[S.founder]) S.P[S.founder].fl = 0;
@@ -10836,7 +11195,7 @@ async function folderFlush(txtFn) {
 // ?seed=N&fresh opens a scratch world: for testing, so nothing is ever saved (not to the cloud, the browser or a folder)
 let SCRATCH = false;
 async function saveAll(force) {
-  if (!S || S.flags.intro || SCRATCH) return;
+  if (!S || S.flags.intro || SCRATCH || RESIZING) return; // (a resize is reloading the page: the world it leaves is already kept)
   if (CLOUD.conflict) return; // another device owns the world now: writing anything here would only clobber it
   S.savedAt = Date.now();
   if (FOLDER.ok) await folderFlush(() => JSON.stringify(serialize()));
@@ -10860,6 +11219,7 @@ async function connectFolder(fromWelcome) {
     // folder holds another world: keep it safe before we write ours
     await archiveFolderWorld(fs);
   } else if (fs && S && fs.state.seed === S.seed && (fs.state.savedAt || 0) > (S.savedAt || 0) + 60000) {
+    if (!(await fitSize(fs, 'boot'))) return;
     deserialize(fs); startWorld(false); toast('Loaded the newer save from the folder.');
   }
   toast(`Saving to “${h.name}”.`);
@@ -11026,6 +11386,7 @@ async function cloudTakeOver() {
     CLOUD.conflict = false; CLOUD.err = null; hideBanner();
     if (c) {
       CLOUD.rev = c.meta.rev; CLOUD.last = c.meta.savedAt || 0;
+      if (saveSize(c.save) !== W) { await IDB.set('save', c.txt); await IDB.set('cloud', { email: CLOUD.email, rev: c.meta.rev }); await fitSize(c.save, 'cloud', { upload: false }); return; } // (the other device is on a world of the other size)
       deserialize(c.save); startWorld(false);
       await IDB.set('save', c.txt); await IDB.set('cloud', { email: CLOUD.email, rev: c.meta.rev });
       toast(`Carrying on with ${S.planet || 'your world'} here.`);
@@ -11038,6 +11399,7 @@ async function cloudTakeOver() {
 function choose(title, text, yes, no) {
   return new Promise(res => {
     const cY = $('cYes'), cN = $('cNo'), l = [cY.textContent, cN.textContent];
+    $('cSize').hidden = true;
     const done = v => { $('confirm').classList.remove('show'); cY.textContent = l[0]; cN.textContent = l[1]; cY.onclick = cN.onclick = null; res(v); };
     $('cTitle').textContent = title; $('cText').textContent = text; cY.textContent = yes; cN.textContent = no;
     cY.onclick = () => done(true); cN.onclick = () => done(false);
@@ -11067,7 +11429,7 @@ async function cloudStart() {
 }
 // after a world is on screen: this tab owns it now, so another device's next save gets a 409
 async function cloudOwn(upload) {
-  if (CLOUD.out) return;
+  if (CLOUD.out || RESIZING) return;
   try { await cloudClaim(); } catch (e) { if (!CLOUD.out) CLOUD.err = e.message; }
   CLOUD.lastTry = Date.now(); if (!upload) CLOUD.lastPlay = S.playSec;
   if (upload) await saveAll(true);
@@ -11089,6 +11451,7 @@ async function cloudLoadFile(welcome) {
   if (!welcome && S && !(await keepWorld())) return false; // never lose the world it replaces
   if (CLOUD.conflict) { CLOUD.conflict = false; hideBanner(); } // loading a file on purpose is a take-over too
   try { const c = await cloudGet(true); CLOUD.rev = c ? c.meta.rev : null; } catch (e) { } // and it replaces whatever is there
+  if (!(await fitSize(fs, 'load'))) return true;
   deserialize(fs); startWorld(false);
   toast(`Welcome back to ${S.planet || 'your world'}.`);
   await cloudOwn(true);
@@ -11100,7 +11463,7 @@ const worldId = () => `${S.seed}-${S.created || 0}`;
 async function cloudArchive() {
   S.savedAt = Date.now();
   const txt = JSON.stringify(serialize()), gz = typeof CompressionStream === 'function';
-  const h = { 'content-type': gz ? 'application/octet-stream' : 'application/json', 'x-seedfall-gzip': gz ? '1' : '0', 'x-seedfall-info': asciiJson({ year: yr(), planet: S.planet || '', pop: Math.round(totalPop()) }) };
+  const h = { 'content-type': gz ? 'application/octet-stream' : 'application/json', 'x-seedfall-gzip': gz ? '1' : '0', 'x-seedfall-info': asciiJson({ year: yr(), planet: S.planet || '', pop: Math.round(totalPop()), size: S.size || 64 }) };
   const r = await cloudApi('worlds/' + worldId(), { method: 'PUT', headers: h, body: gz ? await gzip(txt) : txt }, 60000);
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
@@ -11120,7 +11483,7 @@ async function cloudFetchWorld(wid) {
 }
 function openWorlds() {
   if (!CLOUD.on) { // file://: the old way, archived to the save folder if there is one
-    confirmBox('Start a new world?', `${S.planet || 'This world'} will be archived${FOLDER.ok ? ' to the worlds folder' : ''} and a new pod will fall somewhere else.`, () => newWorld(randSeed(), true));
+    confirmBox('Start a new world?', `${S.planet || 'This world'} will be archived${FOLDER.ok ? ' to the worlds folder' : ''} and a new pod will fall somewhere else.`, () => newWorld(randSeed(), true, UI.newSize)); sizeRow($('cSize'));
     return;
   }
   $('worlds').classList.add('show'); renderWorlds();
@@ -11133,15 +11496,16 @@ async function renderWorlds() {
   box.innerHTML = '<div class="wl-empty">Looking for your other worlds…</div>';
   let j; try { j = await cloudWorlds(); } catch (e) { box.innerHTML = `<div class="wl-empty">Couldn’t list your worlds (${esc(e.message)}).</div>`; return; }
   const ws = (j.worlds || []).filter(w => SCRATCH || w.wid !== worldId()).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
-  box.innerHTML = ws.length ? ws.map(w => `<div class="wl-row"><span><b>${esc(w.planet || 'An unnamed world')}</b><small>Year ${w.year || 0} · ${fmtInt(w.pop || 0)} people · kept ${w.savedAt ? agoStr(w.savedAt) : ''}</small></span><button class="btn" data-sw="${esc(w.wid)}"${SCRATCH || busy ? ' disabled' : ''}>Switch</button><button class="btn" data-fg="${esc(w.wid)}" title="Forget this world"${busy ? ' disabled' : ''}>×</button></div>`).join('') : '<div class="wl-empty">No other worlds kept yet.</div>';
+  box.innerHTML = ws.length ? ws.map(w => `<div class="wl-row"><span><b>${esc(w.planet || 'An unnamed world')}</b><small>${w.size === 128 ? 'Wide lands · ' : ''}Year ${w.year || 0} · ${fmtInt(w.pop || 0)} people · kept ${w.savedAt ? agoStr(w.savedAt) : ''}</small></span><button class="btn" data-sw="${esc(w.wid)}"${SCRATCH || busy ? ' disabled' : ''}>Switch</button><button class="btn" data-fg="${esc(w.wid)}" title="Forget this world"${busy ? ' disabled' : ''}>×</button></div>`).join('') : '<div class="wl-empty">No other worlds kept yet.</div>';
   box.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => switchWorld(ws.find(w => w.wid === b.dataset.sw)));
   box.querySelectorAll('[data-fg]').forEach(b => b.onclick = () => forgetWorld(ws.find(w => w.wid === b.dataset.fg)));
 }
 async function worldsNew() {
   $('worlds').classList.remove('show');
-  if (!(await choose('Start a new world?', `${S.planet || 'This world'} is kept in your list of worlds, and a new pod will fall somewhere else.`, 'Start a new world', 'Cancel'))) return;
+  const q = choose('Start a new world?', `${S.planet || 'This world'} is kept in your list of worlds, and a new pod will fall somewhere else.`, 'Start a new world', 'Cancel'); sizeRow($('cSize'));
+  if (!(await q)) return;
   if (!(await keepWorld())) return;
-  await newWorld(randSeed());
+  await newWorld(randSeed(), false, UI.newSize); if (RESIZING) return;
   toast('A new pod is falling. The old world is safe in your list.');
 }
 async function switchWorld(w) {
@@ -11151,6 +11515,7 @@ async function switchWorld(w) {
   let fs; try { fs = await cloudFetchWorld(w.wid); } catch (e) { toast(`Couldn’t open that world (${e.message}).`); return; }
   if (!fs) { toast('That kept world won’t open.'); return; }
   if (!(await keepWorld())) return;
+  if (!(await fitSize(fs, 'switch'))) return;
   deserialize(fs); S.lastLive = Date.now(); // it was on the shelf, not away: no catch-up
   startWorld(false);
   toast(`Welcome back to ${S.planet || 'your world'}.`);
@@ -11192,8 +11557,9 @@ function startWorld(isNew) {
   glBtn();
   if (!RUNNING) { RUNNING = true; requestAnimationFrame(frame); }
 }
-async function newWorld(seed, archive) {
+async function newWorld(seed, archive, size) {
   if (archive && S && FOLDER.ok) { S.savedAt = Date.now(); await archiveFolderWorld(serialize()); }
+  if (size && size !== W) { await resizeTo(size, { then: 'new', seed }); return; } // (a map of the other size: the page comes back at that size and starts it)
   newState(seed);
   const pod = Object.values(S.B).find(B => B.type === 'pod'); if (pod) pod.hid = 1;
   startWorld(true);
@@ -11322,6 +11688,7 @@ SF.hour = h => { LIGHT.forceHr = h; LIGHT.chk = 0; };               // dev: pin 
 SF.weather = (k, secs) => { setWeather(k, secs); const w = S.wx, T = WXK[k]; for (const p of ['cover', 'rain', 'snow', 'fog', 'storm']) w[p] = T[p] || 0; if (k === 'snow') w.sc = 1; LIGHT.chk = 0; };
 SF.relightNow = () => { renderAll(); };
 SF.pray = k => { const c = prayerCandidates().filter(x => !k || x[0] === k); if (!c.length) return false; const save = prayerCandidates; const [kk, , p, ex] = c[0]; const q = Object.assign({ id: (S.prayN = (S.prayN || 0) + 1), k: kk, pid: p.id, tid: p.sid, t0: S.playSec, exp: S.playSec + 1800, st: 'open' }, ex || {}); q.text = prayText(kk, p, q); q.rw = PRAY_TOOL[kk] ? Math.round(COST[kk] * 1.5 + 8) : 20; if (kk === 'town') S.T[q.tid].asked = 1; S.prayers.push(q); UIDIRTY.prayers = true; return q; };
+SF.incident = k => simRun(() => startIncident(k)); // dev: start an incident now ('fire', 'sheep')
 SF.season = s => { LIGHT.forceSeason = s ? Object.assign({ autumn: 0, winter: 0, spring: 0 }, s) : null; LIGHT.seasonT = 0; LIGHT.chk = 0; };
 
 async function boot() {
@@ -11335,9 +11702,18 @@ async function boot() {
     newState(+QS.get('seed')); if (QS.has('nointro')) { S.flags.intro = 0; introChronicle(); } else { const pod = Object.values(S.B).find(B => B.type === 'pod'); if (pod) pod.hid = 1; } startWorld(true);
     return;
   }
+  const pend = await IDB.get('pending'); if (pend) await IDB.del('pending'); // a world parked to come back at its own size
+  if (pend && pend.save && saveSize(pend.save) !== W) { await resizeTo(saveSize(pend.save), pend); return; } // (opened at the wrong size somehow: go again)
   if (cloud) {
+    if (pend) { // carry on with what was being done: a new world, a switch, a loaded file, a take-over or the startup pick
+      if (pend.then === 'new') { await newWorld(pend.seed); await cloudOwn(false); return; }
+      try { const c = await cloudGet(true); CLOUD.rev = c ? c.meta.rev : null; } catch (e) { }
+      deserialize(pend.save); if (pend.then === 'switch') S.lastLive = Date.now(); startWorld(false);
+      if (pend.then === 'switch' || pend.then === 'load') toast(`Welcome back to ${S.planet || 'your world'}.`);
+      await cloudOwn(pend.then === 'cloud' ? !!pend.upload : true); return;
+    }
     const r = await cloudStart();
-    if (r) { deserialize(r.save); startWorld(false); await cloudOwn(r.upload); return; }
+    if (r) { if (!(await fitSize(r.save, 'cloud', { upload: r.upload }))) return; deserialize(r.save); startWorld(false); await cloudOwn(r.upload); return; }
   } else {
     let st = parseSave(await IDB.get('save'));
     const h = await IDB.get('dir');
@@ -11350,17 +11726,19 @@ async function boot() {
         if (fs && (!st || (fs.state.savedAt || 0) > (st.state.savedAt || 0))) st = fs;
       } else showBanner();
     }
-    if (st) { deserialize(st); startWorld(false); return; }
+    if (pend && pend.then === 'new') { await newWorld(pend.seed); return; }
+    if (pend && pend.save) { deserialize(pend.save); startWorld(false); saveAll(); return; }
+    if (st) { if (!(await fitSize(st, 'boot'))) return; deserialize(st); startWorld(false); return; }
   }
   // first run
-  const w = $('welcome'); w.classList.add('show');
+  const w = $('welcome'); w.classList.add('show'); sizeRow($('wSize'));
   if (cloud) {
     $('wText').textContent = 'The world grows while it\'s on screen, and keeps going for up to 8 hours while you\'re away. It is saved to the cloud, so you can carry on from any browser you log in from. Already have a world? Load its save.json.';
     $('wFine').innerHTML = `World seed <input id="wSeed" spellcheck="false"> · saving to the cloud${CLOUD.email ? ' as ' + esc(CLOUD.email) : ''}.`;
     $('wSeed').value = randSeed();
     $('wFolder').textContent = 'Load a save.json…'; $('wLocal').textContent = 'Start a new world';
     $('wFolder').onclick = async () => { if (await cloudLoadFile(true)) w.classList.remove('show'); };
-    $('wLocal').onclick = async () => { w.classList.remove('show'); await newWorld(+$('wSeed').value || randSeed()); cloudOwn(false); };
+    $('wLocal').onclick = async () => { w.classList.remove('show'); await newWorld(+$('wSeed').value || randSeed(), false, UI.newSize); cloudOwn(false); };
     return;
   }
   $('wSeed').value = randSeed();
@@ -11369,15 +11747,15 @@ async function boot() {
     const fs = await connectFolder(true);
     if (fs === false) return;
     w.classList.remove('show');
-    if (fs) { deserialize(fs); startWorld(false); toast(`Welcome back to ${S.planet || 'your world'}.`); }
-    else { await newWorld(+$('wSeed').value || randSeed()); }
+    if (fs) { if (!(await fitSize(fs, 'boot'))) return; deserialize(fs); startWorld(false); toast(`Welcome back to ${S.planet || 'your world'}.`); }
+    else { await newWorld(+$('wSeed').value || randSeed(), false, UI.newSize); }
   };
-  $('wLocal').onclick = () => { w.classList.remove('show'); newWorld(+$('wSeed').value || randSeed()); };
+  $('wLocal').onclick = () => { w.classList.remove('show'); newWorld(+$('wSeed').value || randSeed(), false, UI.newSize); };
 }
-setInterval(() => { if (S && RUNNING) saveAll(); }, 45000);
+setInterval(() => { if (S && RUNNING && !RESIZING) saveAll(); }, 45000);
 setInterval(() => { if (S && RUNNING) aiMaybeGossip(); }, 30000);
 document.addEventListener('visibilitychange', () => { if (document.hidden && S && RUNNING) saveAll('hidden'); else lastT = 0; });
-addEventListener('beforeunload', () => { if (S && RUNNING && !CLOUD.conflict && !SCRATCH) { S.savedAt = Date.now(); try { IDB.set('save', JSON.stringify(serialize())); } catch (e) { } } });
+addEventListener('beforeunload', () => { if (S && RUNNING && !CLOUD.conflict && !SCRATCH && !RESIZING) { S.savedAt = Date.now(); try { IDB.set('save', JSON.stringify(serialize())); } catch (e) { } } });
 boot();
 </script>
 </body>

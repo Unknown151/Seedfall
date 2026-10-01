@@ -44,16 +44,17 @@ function chron(ic, t, o = {}) {
   S.chron.push(e);
   if (S.chron.length > 3000) S.chron.splice(0, S.chron.length - 3000);
   if (e.tx != null && !o.nocap) fx('caption', { x: e.tx, y: e.ty, ic, t: o.cap || shortCap(t), major: e.k === 'major' || e.k === 'era' });
-  UIDIRTY.chron = true;
+  UIDIRTY.chron = true; EV.fire('chron', { e, o });
   return e;
 }
 function shortCap(t) { const s = t.split(/[.:;!]/)[0]; return s.length > 58 ? s.slice(0, 55) + '…' : s; }
 
 /* ---------- new world ---------- */
-function newState(seed) {
-  const g = genWorld(seed);
+function newState(seed) { S = { rs: (seed * 2654435761) >>> 0 }; return simRun(() => newState0(seed)); } // (a new world's first draws come from its seed too)
+function newState0(seed) {
+  const g = genWorld(seed), rs = S.rs;
   S = {
-    v: 1, roadV: 2, seed, created: Date.now(), savedAt: 0, playSec: 0,
+    v: 1, roadV: 2, size: W, rs, seed, created: Date.now(), savedAt: 0, playSec: 0,
     year: 0, month: 0, map: g.M, B: {}, nextB: 1, T: {}, nextT: 1, P: {}, nextP: 1,
     tech: { done: {}, cur: 0, pts: 0 }, era: 0, age: null, ageN: 0, ageUsed: {},
     styles: [Object.assign({}, STYLES0[0])], styleIdx: 0,
@@ -157,6 +158,7 @@ function mkBuilding(type, x, y, T, o = {}) {
   if (T) { T.bl.push(B.id); econNewBuilding(B, T); }
   markDirty(i);
   if ((type === 'dock' || type === 'harbor') && B.dir) { const j = idx(x + B.dir[0], y + B.dir[1]); markDirty(j); }
+  EV.fire('placed', { B });
   return B;
 }
 function removeBuilding(B) {
@@ -165,6 +167,7 @@ function removeBuilding(B) {
   M.bld[i] = 0; delete S.B[B.id]; CNT_M = -1;
   const T = S.T[B.sid]; if (T) { const k = T.bl.indexOf(B.id); if (k >= 0) T.bl.splice(k, 1); econDirty(T); }
   markDirty(i); if (B.type === 'house') houseNbrDirty(B); // its terrace neighbours close the gap
+  EV.fire('removed', { B });
 }
 function workFor(B) { return B.type === 'house' ? HT[B.up != null ? B.up : B.tier].work : (BT[B.type] ? BT[B.type].work : 10); }
 function bcount(T, type) { let n = 0; for (const id of T.bl) { const B = S.B[id]; if (B && B.type === type) n++; } return n; }
@@ -705,6 +708,7 @@ const FIRST_TXT = {
   watertower: '{T} raises a water tower. Every street gets a tap, and the queues at the wells are gone.'
 };
 function completeBuilding(B, T) {
+  EV.fire('built', { B, T }); econDirty(T);
   if (B.up != null) { B.tier = B.up; B.up = null; }
   B.style = S.styleIdx; B.built = yr();
   if (B.type === 'house') houseNbrDirty(B); // joins a terrace, maybe
@@ -738,24 +742,25 @@ function growTown(T) {
 
 /* ---------- founding ---------- */
 const MAX_TOWNS = [1, 1, 2, 3, 4, 5, 6, 6, 7, 7];
+const BIGMAP = W > 64; // wide lands: twice the towns, and settlers who go further afield to find open country
 function tryFound() {
-  const ts = towns(), g = lever('growth'), PT = S.pendingTown;
+  const ts = towns(), g = lever('growth'), PT = S.pendingTown, K = BIGMAP ? 2 : 1;
   if (PT && S.year > PT.until) { S.pendingTown = null; chron('🧭', `The settlers who meant to found ${PT.name} never find the right valley, and quietly unpack.`); return; }
-  const forced = PT && S.year >= PT.at && ts.length < 10;
+  const forced = PT && S.year >= PT.at && ts.length < 10 * K;
   if (!forced) {
     if (g === 'stay_small') return;
     const more = g === 'more_towns' ? 2 : 0;
-    if (ts.length >= MAX_TOWNS[S.era] + (S.age ? 1 : 0) + more || ts.length >= 8 + more) return;
-    if (S.year - S.lastFound < (more ? 12 : 25)) return;
+    if (ts.length >= MAX_TOWNS[S.era] * K + (S.age ? 1 : 0) + more || ts.length >= 8 * K + more) return;
+    if (S.year - S.lastFound < (more ? 12 : BIGMAP ? 16 : 25)) return;
   }
   const parent = ts.filter(T => T.pop > (forced ? 20 : 40 + ts.length * 30)).sort((a, b) => b.pop - a.pop)[0];
   if (!parent) return;
   let best = null, bs = -1e9;
-  for (let t = 0; t < (forced ? 1500 : 500); t++) {
+  for (let t = 0; t < (forced ? 1500 : 500) * K; t++) {
     const x = 3 + ri(0, W - 7), y = 3 + ri(0, H - 7), i = idx(x, y);
     if (M.water[i] || M.bld[i] || M.ruin[i] || M.elev[i] > 5 || M.bio[i] === BIO.ROCK || M.bio[i] === BIO.SNOW) continue;
     const dp = dist(x, y, parent.x, parent.y);
-    if (dp < (forced ? 7 : 10) || dp > (forced ? 40 : 26)) continue;
+    if (dp < (forced ? 7 : 10) || dp > (forced ? 40 : 26) * (BIGMAP ? 1.6 : 1)) continue;
     if (ts.some(T => dist(x, y, T.x, T.y) < Math.max(forced ? 8 : 11, townRadius(T) + 2.5))) continue; // open country, not someone else's back streets
     let ok = 0, fert = 0, water = 0;
     for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
@@ -763,7 +768,7 @@ function tryFound() {
       if (M.water[j]) water++; else if (!M.bld[j] && !M.road[j] && !M.plan[j] && Math.abs(M.elev[j] - M.elev[i]) <= 1) { ok++; fert += M.fert[j]; }
     }
     if (ok < (forced ? 16 : 22)) continue;
-    const s = ok * .4 + fert * .25 + (water > 0 && water < 12 ? 6 : 0) - dp * .15 + rnd() * 4 + ((S.springs || []).some(o => dist(o.x, o.y, x, y) < 6) ? 5 : 0); // settlers like a hot spring
+    const s = ok * .4 + fert * .25 + (water > 0 && water < 12 ? 6 : 0) - dp * (BIGMAP ? .04 : .15) + rnd() * 4 + ((S.springs || []).some(o => dist(o.x, o.y, x, y) < 6) ? 5 : 0); // settlers like a hot spring
     if (s > bs) { bs = s; best = { x, y }; }
   }
   if (!best) { if (!forced) S.lastFound = S.year - 15; else PT.at = S.year + 3; return; }
@@ -775,7 +780,7 @@ function tryFound() {
   f.sid = T.id; T.founder = f.id; T.leader = f.id;
   const sp = f.sp && S.P[f.sp]; if (sp && sp.died === null) sp.sid = T.id;
   for (const k of f.kids) { const c = S.P[k]; if (c && c.died === null && S.year - c.born < 16) c.sid = T.id; }
-  S.T[T.id] = T; econFound(T, parent);
+  S.T[T.id] = T; econFound(T, parent); EV.fire('town', { T, parent });
   S.lastFound = S.year;
   const pl = mkBuilding('plaza', best.x, best.y, T, { prog: 1 });
   if (streetMode(T) === 'grid') growDistrict(T); else { growLane(T); growLane(T); }
@@ -805,7 +810,7 @@ function researchRate() {
   }
   m = Math.min(m, 6);
   if (S.age) { const th = AGE_THEMES.find(a => a.k === S.age.k); if (th && th.research) m *= th.research; }
-  return (0.9 * Math.pow(pop, 0.62) * m + (S.year < 20 ? 3 : 0)) * (1 + .25 * (CULT.rs || 0));
+  return (0.9 * Math.pow(pop, 0.62) * m + (S.year < 20 ? 3 : 0)) * (1 + .25 * (CULT.rs || 0)) * (BIGMAP ? .78 : 1); // (wide lands hold more people and schools, not a faster march of discovery)
 }
 function stepResearch() {
   if (S.tech.cur >= TECHS.length) return;
@@ -829,7 +834,7 @@ function techInventor(t) {
 }
 function completeTech(i) {
   const t = TECHS[i];
-  S.tech.done[t.id] = yr();
+  S.tech.done[t.id] = yr(); EV.fire('tech', { t });
   const p = techInventor(t);
   const T = S.T[p.sid] || biggestTown();
   p.deeds.push(t.name);
@@ -861,7 +866,7 @@ function newEra(e) {
   S.styles.push(inheritForm(Object.assign({}, STYLES0[e]))); S.styleIdx = S.styles.length - 1;
   driftLang(S.lang, 2);
   chron('🌅', ERAS[e].title, { k: 'era', nocap: true });
-  gainRev(25, 'a new era');
+  gainRev(25, 'a new era'); EV.fire('era', { n: e });
   if (e >= 2 && S.wondersUsed.length < WONDERS.length) queueWonder();
 }
 function queueWonder() {
@@ -880,7 +885,7 @@ function startAge() {
   const n = S.ageUsed[nm];
   const name = (n > 1 ? `The ${['', '', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'][n] || ordinal(n)} Age of ` : 'The Age of ') + nm;
   S.ageN++;
-  S.age = { n: S.ageN, name, k: th.k, start: yr(), len: ri(70, 150) };
+  S.age = { n: S.ageN, name, k: th.k, start: yr(), len: ri(70, 150) }; EV.fire('age', { age: S.age });
   const st = inheritForm(newStyle()); S.styles.push(st); S.styleIdx = S.styles.length - 1;
   driftLang(S.lang, 3);
   chron('🌀', name, { k: 'era', nocap: true });
@@ -1037,7 +1042,7 @@ function rollEvent() {
   if (!avail.length) return;
   const e = wpick(avail.map(e => [e, e.w * (theme && theme.ev && theme.ev[e.k] ? theme.ev[e.k] : 1) * (1 + (CULT.ev[e.k] || 0))]));
   if (e.once) S.flags['ev_' + e.k] = 1;
-  e.run();
+  e.run(); EV.fire('event', { k: e.k });
 }
 function elect(T) {
   const old = person(T.leader);
@@ -1109,9 +1114,11 @@ function milestones() {
 }
 
 /* ---------- the monthly tick ---------- */
-function simMonth() {
+function simMonth() { return simRun(simMonth0); }
+function simMonth0() {
   S.month++; S.year = S.month / 12;
   const newYear = S.month % 12 === 0;
+  stepIncidents();
   // vault decanting
   if (S.vault > 0 && S.year >= 2 && chance(0.1 + (S.year > 12 ? 0.05 : 0))) { S.vault--; S.T[1] && (S.T[1].pop += 1); }
   for (const T of towns()) { growTown(T); stepEcon(T); buildTown(T); planTown(T); if (newYear) { planBridges(T); planFerries(T); } if (S.month % 3 === T.id % 3) paveTown(T); }

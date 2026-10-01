@@ -104,7 +104,7 @@ const ECX = {};
 function econDirty(T) { if (T && ECX[T.id]) ECX[T.id].m = -1e9; }
 function econCache(T) {
   let e = ECX[T.id];
-  if (e && e.S === S && e.m <= S.month && S.month - e.m < 12) return e;
+  if (e && e.S === S && e.m > -1e9) return e; // (it only changes when buildings do, and every change marks it dirty, so it always matches a fresh one: a reloaded world makes the same choices)
   e = ECX[T.id] = { S, m: S.month, ex: [], n: {}, done: {} };
   for (const id of T.bl) {
     const B = S.B[id]; if (!B) continue;

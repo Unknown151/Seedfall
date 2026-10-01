@@ -151,7 +151,7 @@ async function putWorld(request, env, who, wid) {
   const body = await request.arrayBuffer();
   if (body.byteLength > MAX_SAVE) return json({ error: 'save too big' }, 413);
   let info = {}; try { info = JSON.parse(request.headers.get('x-seedfall-info') || '{}'); } catch (e) { }
-  const meta = { planet: String(info.planet || '').slice(0, 60), year: +info.year || 0, pop: +info.pop || 0, savedAt: Date.now(), gz: request.headers.get('x-seedfall-gzip') === '1' ? 1 : 0 };
+  const meta = { planet: String(info.planet || '').slice(0, 60), year: +info.year || 0, pop: +info.pop || 0, size: +info.size === 128 ? 128 : 64, savedAt: Date.now(), gz: request.headers.get('x-seedfall-gzip') === '1' ? 1 : 0 };
   await env.SAVES.put(key, body, { metadata: meta });
   return json({ ok: true });
 }
