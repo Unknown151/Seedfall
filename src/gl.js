@@ -344,10 +344,10 @@ function glPack(v) {
 }
 function glUpload(ch, v, near) { // into the chunk's far (always) or near (close to the camera, more detail) buffer
   const gl = GL3.gl, P = glPack(v);
-  if (near) { if (!ch.nb) ch.nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ch.nb); gl.bufferData(gl.ARRAY_BUFFER, P.buf, gl.STATIC_DRAW); ch.nn = P.n; ch.near = true; }
+  if (near) { if (!ch.nb) ch.nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ch.nb); gl.bufferData(gl.ARRAY_BUFFER, P.buf, gl.STATIC_DRAW); ch.nn = P.n; ch.near = true; ch.stale = false; }
   else { gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf); gl.bufferData(gl.ARRAY_BUFFER, P.buf, gl.STATIC_DRAW); ch.n = P.n; ch.y0 = P.y0; ch.y1 = P.y1; }
 }
-function glDropNear(ch) { if (ch.nb) { GL3.gl.deleteBuffer(ch.nb); ch.nb = null; } ch.nn = 0; ch.near = false; }
+function glDropNear(ch) { if (ch.nb) { GL3.gl.deleteBuffer(ch.nb); ch.nb = null; } ch.nn = 0; ch.near = false; ch.stale = false; }
 // the view's six planes, to skip chunks outside it
 function glFrustum(m) { const r = i => [m[i], m[4 + i], m[8 + i], m[12 + i]], R3 = r(3), o = []; for (let i = 0; i < 3; i++) { const Ri = r(i); o.push(R3.map((v, j) => v + Ri[j]), R3.map((v, j) => v - Ri[j])); } return o; }
 function glSees(P, ch, k) {
@@ -646,6 +646,32 @@ function glBigMarket(B, st) { // a cobbled market street of stalls under striped
   }
 }
 const GL_BIG = { station: glBigStation, market: glBigMarket, hall: glBigHall, museum: glBigMuseum, theatre: glBigTheatre, university: glBigUniversity, stadium: glBigStadium, fusion: glBigFusion };
+
+/* ---------- building sites in 3D: rising walls (or the old house, being done up) in scaffolding, materials stacked by, a crane on tall ones ---------- */
+function glBuildSite(c, B, cx, cy, st, f, hh) {
+  const C0 = gw(0, 0, 0, cx, cy), x = C0[0], z = C0[2], y = GLB.base, steel = hasTech('concrete'), pole = steel ? '#8c939b' : '#a07f58', plank = steel ? '#b8a37a' : '#8f6f4c';
+  let top = 0, hw = .3;
+  if (B.type === 'house' && B.up != null && B.tier >= 1) { const sv = B.prog; B.prog = 1; try { drawHouse(c, B, cx, cy, st); } finally { B.prog = sv; } top = HOUSE_H[B.tier] * .7; hw = .38; } // the old house stays up while it's done up
+  else if (f >= .2) { const h = Math.max(2, hh * Math.min(1, (f - .2) / .8)); top = h; GLB.wall = GLB.B ? glWallMat(GLB.B) : M_PLASTER; box(c, cx, cy, 0, 0, .28, .28, 0, h, st.wall); hw = .3; } // walls going up
+  const H = Math.max(top + 3, f < .2 ? 3 : 0) * ZS, o = hw + .05, mat = steel ? 0 : M_PLANK;
+  if (f >= .2 || top) {
+    for (const [a, b] of [[-o, -o], [o, -o], [-o, o], [o, o], [0, o], [0, -o], [o, 0], [-o, 0]]) gBox([x + a, y, z + b], [.008, 0, 0], [0, 0, .008], H, pole, mat); // standards
+    for (let lv = 4 * ZS; lv < H; lv += 5 * ZS) { // ledgers, with planks laid along two faces to stand on
+      for (const [P0, P1] of [[[-o, -o], [o, -o]], [[o, -o], [o, o]], [[o, o], [-o, o]], [[-o, o], [-o, -o]]]) gBeam([x + P0[0], y + lv, z + P0[1]], [x + P1[0], y + lv, z + P1[1]], .005, pole, mat);
+      GLB.mat = M_PLANK; glOBox([x, y + lv + .006, z + o], [o, 0, 0], [0, 0, .028], [0, .004, 0], plank); glOBox([x + o, y + lv + .006, z], [.028, 0, 0], [0, 0, o], [0, .004, 0], plank);
+    }
+    if (GLB.lod) gBeam([x - o, y, z + o], [x + o * .1, y + Math.min(H, 9 * ZS), z + o], .004, pole, mat); // a brace
+  } else for (const [a, b] of [[-.3, -.3], [.3, -.3], [-.3, .3], [.3, .3]]) gBox([x + a, y, z + b], [.01, 0, 0], [0, 0, .01], 3 * ZS, '#8a6d57', M_PLANK); // pegs marking out the plot
+  GLB.mat = M_BRICK; gBox([x + .36, y, z + .36], [.05, 0, 0], [0, 0, .035], 1.6 * ZS, steel ? '#b0aaa0' : '#b8684f', M_BRICK); // bricks on a pallet
+  gBox([x + .36, y, z - .3], [.03, 0, 0], [0, 0, .08], 1.2 * ZS, '#9b7a54', M_PLANK); // and timber
+  if (hh > 40 && f >= .3 && !(B.type === 'house' && B.up != null && hh < 60)) { // a tower crane on the tall ones
+    const mx = x - .42, mz = z - .42, mh = hh * ZS * 1.15;
+    gBox([mx, y, mz], [.022, 0, 0], [0, 0, .022], mh, '#e0a43a', 0);
+    gBeam([mx - .25, y + mh, mz], [mx + .75, y + mh, mz + .2], .014, '#e0a43a'); gBox([mx - .22, y + mh - .05, mz - .01], [.04, 0, 0], [0, 0, .04], .06, '#7a7f86', 0); // jib and counterweight
+    gBeam([mx + .5, y + mh, mz + .14], [mx + .5, y + top * ZS + .1, mz + .14], .002, '#3a3a3a'); // the hook line
+  }
+  GLB.wall = 0; GLB.mat = 0;
+}
 
 /* ---------- 3D-native models: buildings made straight in 3D (world units), not by running their 2D art ---------- */
 // glModel(B) picks the model a building is drawn with in 3D: a landmark on a bigger lot (GL_BIG), else one from
@@ -1073,13 +1099,13 @@ function glFrame(dt) {
   const batch = [], again = new Set(); let n = 0;
   for (const k of GL3.dirty) { if (n++ >= (GL3.first ? 3 : 64)) break; batch.push(k); }
   const built = batch.map(k => { GL3.dirty.delete(k); const r = glBuildChunk(k), old = glEdge(k); hfRaster(k, r.v); if (GL3.first && glEdge(k) !== old) for (const j of glNbrs(k)) if (!batch.includes(j)) again.add(j); return [k, r]; });
-  for (const [k, r] of built) { glAO(r.v); const ch = GL3.chunks[k]; glUpload(ch, r.v, false); ch.lamps = r.lamps; glDropNear(ch); }
+  for (const [k, r] of built) { glAO(r.v); const ch = GL3.chunks[k]; glUpload(ch, r.v, false); ch.lamps = r.lamps; if (ch.near) ch.stale = true; } // (its detailed version stays up until a fresh one replaces it: dropping it here made busy streets flicker plain and back)
   // the chunks round the camera get a detailed version, one a frame, nearest first (and lose it again once well out of range)
   { const nr = cam.zoom <= 9 ? 11 : cam.zoom <= 15 ? 7 : 0, cx = cam.tx, cz = cam.tz; let best = -1, bd = 1e9;
     for (let k = 0; k < GNC * GNC; k++) { const ch = GL3.chunks[k], d = Math.hypot((k % GNC) * GCH + GCH / 2 - cx, ((k / GNC) | 0) * GCH + GCH / 2 - cz);
-      if (ch.near && d > nr + 8) glDropNear(ch); else if (!ch.near && ch.n && d < nr && d < bd && !GL3.dirty.has(k)) { best = k; bd = d; } }
+      if (ch.near && d > nr + 8) glDropNear(ch); else if ((!ch.near || ch.stale) && ch.n && d < nr && d < bd && !GL3.dirty.has(k)) { best = k; bd = d; } }
     // one detailed chunk at a time, a few milliseconds a frame: rows first, then its shading, then off to the GPU
-    let J = GL3.nj; if (J && (GL3.chunks[J.k].near || GL3.dirty.has(J.k))) J = GL3.nj = null;
+    let J = GL3.nj; if (J && ((GL3.chunks[J.k].near && !GL3.chunks[J.k].stale) || GL3.dirty.has(J.k))) J = GL3.nj = null;
     if (!J && best >= 0 && !GL3.noNear) J = GL3.nj = { k: best, row: 0, v: [], lamps: [], a: -1, memo: new Map() };
     if (J && !built.length) { const t0 = performance.now(), budget = GL3.nearMs || 6;
       while (performance.now() - t0 < budget) {
