@@ -44,11 +44,11 @@ function wkBits(at, tau, n, col, glow, seed) { // a burst of chips or sparks, ta
     glOBox([at[0] + Math.cos(a) * v * tau, at[1] + up * tau - 2.4 * tau * tau, at[2] + Math.sin(a) * v * tau], [.005, 0, 0], [0, 0, .005], [0, .005, 0], col, glow ? 2 : 0);
   }
 }
-function gLog(A, Bp, r, col, end = '#d8b98a') { // a round log from A to B: eight staves and two cut ends
+function gLog(A, Bp, r, col, end = '#d8b98a', mat = M_BARK) { // a round log from A to B: eight staves and two cut ends
   const C = gcol(col), E = gcol(end), d = [Bp[0] - A[0], Bp[1] - A[1], Bp[2] - A[2]], L = Math.hypot(...d) || 1, ax = V3s(d, 1 / L);
   let s = Math.abs(ax[1]) < .9 ? V3x(ax, [0, 1, 0]) : V3x(ax, [1, 0, 0]); s = V3s(s, 1 / (Math.hypot(...s) || 1)); const t = V3x(ax, s);
   const R = k => { const a = k / 8 * TAU; return V3a(V3s(s, Math.cos(a) * r), V3s(t, Math.sin(a) * r)); };
-  GLB.ctr = V3a(A, V3s(d, .5)); GLB.mat = M_BARK;
+  GLB.ctr = V3a(A, V3s(d, .5)); GLB.mat = mat;
   for (let k = 0; k < 8; k++) { const p = R(k), q = R(k + 1); gquad(V3a(A, p), V3a(Bp, p), V3a(Bp, q), V3a(A, q), C); }
   GLB.mat = 0; for (const [P0, sg] of [[A, -1], [Bp, 1]]) { GLB.ctr = V3a(P0, V3s(ax, -sg * r)); for (let k = 0; k < 8; k++) gtri(P0, V3a(P0, R(k)), V3a(P0, R(k + 1)), E); }
 }

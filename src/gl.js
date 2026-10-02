@@ -384,7 +384,7 @@ function glBuildRows(k, near, r0, r1, v, lamps, c0 = 0, c1 = GCH) {
       if (M.tree[i] && !M.bld[i]) glTrees(i, x, y);
       // what stands on the tile, drawn by the same art as the 2D view
       { const Bw = M.bld[i] && S.B[M.bld[i]]; GLB.wall = Bw ? glWallMat(Bw) : M_PLANK; GLB.B = Bw || null; GLB.smk = lamps.smk || (lamps.smk = []); } // walls by what the building is made of; street furniture is wooden
-      try { drawTileObjects(GSTUB, i, x, y, 0, 0); } catch (e) { }
+      try { drawTileObjects(GSTUB, i, x, y, 0, 0); } catch (e) { if (QS.has('dev')) console.error(e); }
       const B = M.bld[i] && S.B[M.bld[i]];
       if (B && !B.hid && FLAT_TYPES[B.type]) { GLB.flat = B.type === 'farm' ? 'farm' : B.type === 'park' || B.type === 'pasture' ? 'green' : B.type === 'plaza' || B.type === 'airfield' ? 'paved' : ''; try { drawBuilding(GSTUB, B, 0, 0, i); } catch (e) { } GLB.flat = ''; }
     }
@@ -773,7 +773,7 @@ void main(){ vP=aP; vN=aN; vC=aC; vE = uPk>.5 ? (aE<.5 ? -1. : aE<1.5 ? 0. : aE>
 const GL_FS = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vP, vN, vC; in float vE, vO; in vec4 vS; flat in float vI, vM; out vec4 o;
-uniform highp sampler2DArray uTex; uniform vec3 uAvg[20]; uniform float uTS[20], uRaw[20];
+uniform highp sampler2DArray uTex; uniform vec3 uAvg[20]; uniform float uTS[20], uRaw[20], uBump[20];
 uniform float uHi, uFog0, uFogL; uniform vec3 uFogC; uniform vec3 uSun, uSunC, uSky, uGnd, uWin, uLamp, uEye; uniform float uLit, uShK, uT;
 uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64]; uniform vec4 uSea; uniform vec3 uWx; uniform float uLo; // autumn, winter, spring, snow on the ground; rain, cloud cover, lightning` + GL_SKY + `
 float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
@@ -787,6 +787,10 @@ void main(){
   if(m>0){ // triplanar: the ground and roofs take the texture from above, walls from the side they face
     vec3 a=abs(n); vec2 uv = a.y>.55 ? vP.xz : (a.x>a.z ? vec2(vP.z,-vP.y) : vec2(vP.x,-vP.y));
     vec3 t=texture(uTex, vec3(uv*uTS[m], float(m))).rgb;
+    if(uBump[m]>0.){ // relief from the texture itself: brighter is higher, so mortar, tile edges and plank seams sink in and catch the light
+      vec2 tc=uv*uTS[m]; const vec3 Y=vec3(.3,.59,.11); float e=1.5/256., l0=dot(t,Y), lx=dot(texture(uTex,vec3(tc+vec2(e,0.),float(m))).rgb,Y), ly=dot(texture(uTex,vec3(tc+vec2(0.,e),float(m))).rgb,Y);
+      vec3 Tg=a.y>.55||a.x<=a.z ? vec3(1.,0.,0.) : vec3(0.,0.,1.), Bg=a.y>.55 ? vec3(0.,0.,1.) : vec3(0.,-1.,0.);
+      n=normalize(n-(Tg*(lx-l0)+Bg*(ly-l0))*uBump[m]); }
     c=mix(c*t/uAvg[m], t, uRaw[m]);
   }
   // the season, painted live: autumn leaves turn, winter fades them, spring puts blossom in some trees, grass follows
@@ -1180,7 +1184,7 @@ function glFrame(dt) {
   gl.uniform3fv(U.uWin, gcol((LIGHT.cur && LIGHT.cur.winC || ['#ffd07a'])[0])); gl.uniform3fv(U.uLamp, [1.25, .86, .5]);
   gl.uniform1f(U.uLit, lit); gl.uniform1f(U.uShK, shK); gl.uniform1f(U.uT, GL3.t);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, GL3.shT); gl.uniform1i(U.uSh, 0);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex); gl.uniform1i(U.uTex, 1); gl.uniform3fv(U.uAvg, GL3.texAvg); gl.uniform1fv(U.uTS, TX.SCALE); gl.uniform1fv(U.uRaw, TX.RAW); gl.activeTexture(gl.TEXTURE0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex); gl.uniform1i(U.uTex, 1); gl.uniform3fv(U.uAvg, GL3.texAvg); gl.uniform1fv(U.uTS, TX.SCALE); gl.uniform1fv(U.uRaw, TX.RAW); gl.uniform1fv(U.uBump, TX.BUMP); gl.activeTexture(gl.TEXTURE0);
   gl.uniform1i(U.uNL, lamps.length); if (lamps.length) gl.uniform3fv(U.uLP, new Float32Array(lamps.flat()));
   gl.uniform1f(U.uHi, GL3.hover || 0);
   // the season and the weather: snow lies where it has fallen, rain wets things, fog closes in, lightning flashes
@@ -1409,7 +1413,8 @@ function glBtn() { const b = $('glBtn'); if (b) b.remove(); } // (the 2D/3D swit
 // Materials: 0 none, 1 grass, 2 brick, 3 roof tiles, 4 bark, 5 leaves, 6 plaster, 7 stone, 8 planks, 9 cobbles, 10 asphalt, 11 earth.
 // The shader lays them on by world position (triplanar), so nothing needs unwrapping. RAW is how much of the texture's own
 // colour replaces the art's colour (grass and bark look real; plaster keeps the building's own colour and only gains grain).
-const TX = { N: 256, L: 20, SCALE: [1, .5, 1.8, 1.6, 3.5, 2.2, 1.2, 1.4, 2, 1.6, .7, .6, 1.8, 1, 2.2, .6, 1.2, 1.4, 2.6, 1.6], RAW: [0, .85, .55, .4, .9, .7, 0, .35, .45, .55, .7, .7, .3, .75, .35, .7, .5, .25, .7, .6] };
+const TX = { N: 256, L: 20, SCALE: [1, .5, 1.8, 1.6, 3.5, 2.2, 1.2, 1.4, 2, 1.6, .7, .6, 1.8, 1, 2.2, .6, 1.2, 1.4, 2.6, 1.6], RAW: [0, .85, .55, .4, .9, .7, 0, .35, .45, .55, .7, .7, .3, .75, .35, .7, .5, .25, .7, .6],
+  BUMP: [0, 1, 3.2, 3, 3, .8, .6, 2.6, 2.2, 3.2, .6, 1, 2.6, 1.2, .8, .6, .4, 0, .8, 2.6] }; // (how strongly each texture's own light and dark becomes relief)
 const M_NEEDLE = 18, M_THATCH = 19; // (pine needles: the leaf texture, but they stay green all winter)
 const M_SOIL = 13, M_CROP = 14, M_SAND = 15, M_TAR = 16, M_GLASS = 17, M_SLATE = 12, M_GRASS = 1, M_BRICK = 2, M_ROOF = 3, M_BARK = 4, M_LEAF = 5, M_PLASTER = 6, M_STONE = 7, M_PLANK = 8, M_COBBLE = 9, M_ASPHALT = 10, M_EARTH = 11;
 function glTextures() {
