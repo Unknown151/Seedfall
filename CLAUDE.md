@@ -153,7 +153,7 @@ itself is covered by `glpick`, `glphone` and `soak`. Add `&2d` to a new test unl
 - `perf_mat`: cost of the material textures.
 - `praysample`: prints sample prayers, answers and give-ups at a few points in history.
 - `roadshot`: close-ups of the biggest town's streets at a few years, with a count of each surface.
-- `glpick`: the 3D view's pointing and clicking: tooltips, the top of a tall building picking that building, following a person, a nudge landing where you click, and a rebuilt chunk keeping its detail until the new one is ready (no flicker).
+- `glpick`: the 3D view's pointing and clicking: tooltips, the top of a tall building picking that building, following a person, a nudge landing where you click, a rebuilt chunk keeping its detail until the new one is ready (no flicker), and the N, P, T and R keys.
 - `glphone`: the 3D view on a phone-sized touch screen: opening in 3D with no flag, tap to see what's there, pinch to zoom, and no 2D/3D switch.
 - `glshot`: screenshots of the 3D view (`?gl`) at noon, turned, evening and night, plus the time to build every chunk. `node glshot.mjs [seed] [year] [noon,night...]`.
 - `houseshot`: screenshots of the biggest town at a few years (`FLAT=1` for flat roofs, `ZONES=1` adds the zone view).

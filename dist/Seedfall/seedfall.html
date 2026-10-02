@@ -10247,8 +10247,8 @@ function glInit() {
   addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     const k = e.key.toLowerCase();
+    if ('ntp'.includes(k)) glTouch(); // (they hand the camera back, then do their own thing below)
     if (k === 'r') { GL3.cam.auto = !GL3.cam.auto; GL3.film = GL3.cam.auto; if (!GL3.cam.auto) glCap(null); toast(GL3.cam.auto ? 'Film camera on: it wanders to wherever something is happening' : 'Film camera off'); }
-    else if ('ntp'.includes(k)) glTouch();
     else if (k === 'n') { GL3.hi = (GL3.hi + 1) % GL3.hr.length; SF.hour(GL3.hr[GL3.hi]); toast(GL3.hr[GL3.hi] == null ? 'Time of day: live' : `Time of day: ${Math.floor(GL3.hr[GL3.hi])}:${String(Math.round(GL3.hr[GL3.hi] % 1 * 60)).padStart(2, '0')}`); }
     else if (k === 'p') { GL3.cam.persp = !GL3.cam.persp; if (!GL3.cam.persp) GL3.cam.pitch = Math.max(.2, GL3.cam.pitch); toast(GL3.cam.persp ? 'Perspective view' : 'Isometric view'); }
     else if (k === 't') { GL3.town++; GL3.follow = null; GL3.goto = null; glFocusTown(); }
