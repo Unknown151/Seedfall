@@ -38,6 +38,10 @@ const r = await p.evaluate(() => { S.rev = 200; UI.tool = 'rain'; const id = GL3
 ok(r.id > 0 && r.spent > 0 && !r.tool, 'a nudge lands where you click', JSON.stringify(r));
 await p.mouse.move(640, 400); await p.waitForTimeout(700); await p.screenshot({ path: 'gl_pick.png' });
 const glErr = await p.evaluate(() => { const gl = GL3.gl; while (gl.getError()); glFrame(.016); glFrame(.016); const e = []; let x; while ((x = gl.getError())) e.push(x); return e; });
+const nf = await p.evaluate(() => { GL3.noNear = false; GL3.nearMs = 5000; GL3.cam.auto = false; GL3.cam.zoom = 3; let n = 0, k; // (a big budget: the detailed version builds in one frame)
+  while ((k = Object.keys(GL3.chunks).map(Number).find(k => GL3.chunks[k].near)) == null && n++ < 8) glFrame(.016); if (k == null) return { none: true }; const ch = GL3.chunks[k];
+  GL3.dirty.add(k); glFrame(.016); const kept = ch.near && !!ch.nb, stale = !!ch.stale; n = 0; while (ch.stale && n++ < 8) glFrame(.016); GL3.nearMs = 0; return { kept, stale, fresh: !ch.stale && ch.near, frames: n }; });
+ok(!nf.none && nf.kept && nf.stale && nf.fresh, 'a busy street keeps its close-up detail while it is rebuilt (no flicker)', JSON.stringify(nf));
 ok(!glErr.length, 'WebGL draws without errors (a silently skipped bloom pass leaves old glows on screen)', glErr.join(','));
 ok(!errs.length, 'no page errors', errs.join(' | '));
 await b.close(); console.log(fails ? `${fails} FAILED` : 'all ok'); process.exit(fails ? 1 : 0);

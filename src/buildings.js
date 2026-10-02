@@ -906,6 +906,7 @@ function drawConstruction(c, B, cx, cy, st, i) {
     if (B.type === 'farm') { drawFarm(c, B, cx, cy, i); return; }
   } else flat(c, cx, cy, 0, 0, .42, .42, .3, '#cdbda3');
   const hh = buildH(B);
+  if (GLB && !FLAT_TYPES[B.type]) return glBuildSite(c, B, cx, cy, st, f, hh); // (3D: scaffolding, a crane, the old house standing inside while it's done up)
   if (f < .2) {
     for (const [u, v] of [[-.3, -.3], [.3, -.3], [-.3, .3], [.3, .3]]) { const [px, py] = pt(cx, cy, u, v, 0); line(c, px, py, px, py - 3, '#8a6d57', .7); }
     c.strokeStyle = 'rgba(217,119,75,.8)'; c.lineWidth = .4; c.beginPath();
