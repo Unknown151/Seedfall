@@ -38,6 +38,10 @@ const r = await p.evaluate(() => { S.rev = 200; UI.tool = 'rain'; const id = GL3
 ok(r.id > 0 && r.spent > 0 && !r.tool, 'a nudge lands where you click', JSON.stringify(r));
 await p.mouse.move(640, 400); await p.waitForTimeout(700); await p.screenshot({ path: 'gl_pick.png' });
 const glErr = await p.evaluate(() => { const gl = GL3.gl; while (gl.getError()); glFrame(.016); glFrame(.016); const e = []; let x; while ((x = gl.getError())) e.push(x); return e; });
+const keys = await p.evaluate(() => { const o = {}, fire = k => dispatchEvent(new KeyboardEvent('keydown', { key: k }));
+  const hi = GL3.hi, persp = GL3.cam.persp, town = GL3.town, auto = GL3.cam.auto, cam0 = Object.assign({}, GL3.cam);
+  fire('n'); o.n = GL3.hi !== hi; fire('p'); o.p = GL3.cam.persp !== persp; fire('p'); fire('t'); o.t = GL3.town !== town; fire('r'); o.r = GL3.cam.auto !== auto; fire('r'); SF.hour(null); GL3.hi = hi; Object.assign(GL3.cam, cam0); GL3.goto = null; GL3.shot = null; return o; }); // (and back to where we were)
+ok(keys.n && keys.p && keys.t && keys.r, 'the keys work: N time of day, P perspective, T next town, R film camera', JSON.stringify(keys));
 const nf = await p.evaluate(() => { GL3.noNear = false; GL3.nearMs = 5000; GL3.cam.auto = false; GL3.cam.zoom = 3; let n = 0, k; // (a big budget: the detailed version builds in one frame)
   while ((k = Object.keys(GL3.chunks).map(Number).find(k => GL3.chunks[k].near)) == null && n++ < 8) glFrame(.016); if (k == null) return { none: true }; const ch = GL3.chunks[k];
   GL3.dirty.add(k); glFrame(.016); const kept = ch.near && !!ch.nb, stale = !!ch.stale; n = 0; while (ch.stale && n++ < 8) glFrame(.016); GL3.nearMs = 0; return { kept, stale, fresh: !ch.stale && ch.near, frames: n }; });
