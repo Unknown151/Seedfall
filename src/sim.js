@@ -91,7 +91,6 @@ function introChronicle() {
 const fpW = B => B.w || 1, fpH = B => B.h || 1, fpBig = B => fpW(B) > 1 || fpH(B) > 1;
 function fpTiles(B) { const o = []; for (let y = B.y; y < B.y + fpH(B); y++) for (let x = B.x; x < B.x + fpW(B); x++) if (inb(x, y)) o.push(idx(x, y)); return o; }
 const fpFront = B => idx(B.x + fpW(B) - 1, B.y + fpH(B) - 1);
-function fpOff(B) { const dx = -(fpW(B) - 1) / 2, dy = -(fpH(B) - 1) / 2; return [(dx - dy) * 16, (dx + dy) * 8]; } // from the front tile to the middle of the lot, on screen
 // room for it to spread: free, level ground that isn't street, planned street, water or ruin
 function fpFree(j, z) { return !M.bld[j] && !M.road[j] && !M.plan[j] && !M.water[j] && !M.ruin[j] && !M.rail[j] && surfZ(j) === z; }
 // ...or ground a town would happily give up for a landmark: a small house, a field, a pasture (they're rebuilt elsewhere)

@@ -1,6 +1,6 @@
 /* ============================== the world's moments in 3D: particles, nudges, the sky, things that fly and walk ============================== */
 // Everything here is the view: it runs on Math.random (rf, pick... outside simRun) and GL3.t, is never saved, and never
-// decides anything in the sim. Positions are world units: x and z are tile coordinates, y is height (pixels * ZS).
+// decides anything in the sim. Positions are world units: x and z are tile coordinates, y is height (height units * ZS).
 //  - Particles (DYN.parts): smoke, mist, dust, rain, sparks, fire, lanterns. Drawn as point sprites in two passes:
 //    soft ones blended (dimmed at night), glowing ones added on top and into the bloom mask.
 //  - See-through triangles (glTr): the lighthouse beams, the zone view, the target under a nudge, lightning.

@@ -7,9 +7,9 @@ const TAU = Math.PI * 2;
 const MAP_SIZES = [64, 128];
 const MAPN = (() => { let n = +new URLSearchParams(location.search).get('size'); if (!MAP_SIZES.includes(n)) { try { n = +localStorage.getItem('sfSize'); } catch (e) { } } return MAP_SIZES.includes(n) ? n : 64; })();
 const W = MAPN, H = MAPN;
-const EH = 6;                      // one step of elevation, in height pixels (22 to a tile: ZS in gl.js)
-const SEAZ = 9;                    // the sea's surface, in height pixels
-const SLAB = 70;                   // how deep the island's edge goes down, in height pixels
+const EH = 6;                      // one step of elevation, in height units (22 to a tile: ZS in gl.js)
+const SEAZ = 9;                    // the sea's surface, in height units
+const SLAB = 70;                   // how deep the island's edge goes down, in height units
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;

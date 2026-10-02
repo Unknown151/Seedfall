@@ -83,8 +83,11 @@ only, or a few invited emails.
 - Done: 3D only. The 2D view, its camera, static canvases, relight, sprites and `?2d` are gone; everything it alone drew
   is in 3D now (fx3d.js: the nudges, rockets, the sky, flyers, Longstriders, birds, caravans, captions, place names, the zone
   view, lighthouse beams, lightning, the landing). Tests that don't need drawing use `&headless`.
-- Next: move the other building types to `GL_MODEL` a few at a time (houses by tier; the worker house is done), then drop
-  the older art's pixel-term primitives (`pt`, `cx/cy`, the unused canvas argument, the no-op strokes).
+- Done: the building art is all 3D and tile-local (no screen points, no canvas, no 2D-only strokes); what only the 2D art had
+  (the works' sawtooth roof, solar panels, masts and dishes, the launch gantry, clocks, crosses, banners, statues, the harp
+  and the colossus, round fields and orchards, the plaza fire, dome lattices) is real geometry now.
+- Next: give the busiest types their own detailed models in the worker house's spirit (cottages and townhouses, the blocks
+  of flats, the market, the church-like landmarks), and more own-colour glows at night.
 - Done: incidents (incidents.js): a house fire, sheep loose in the market, a wedding procession, a river flood, a
   runaway cabbage cart and a whale on the beach.
 - Next: more incidents (a storm tearing tiles off roofs, a hot-air balloon that drifts off with the mayor, a mine

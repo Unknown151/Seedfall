@@ -1,8 +1,7 @@
 /* ============================== the art of the valley: building primitives, and what stands on each tile ============================== */
-// The 3D view builds its chunks by running this art with GLB set: the primitives below emit triangles (gl.js).
-// (The art still speaks in its old tile-local pixel terms: pt, cx/cy, a canvas argument it no longer uses. Each building
-// type moves to a native model in gl.js / GL_MODEL in turn, and these go with the last of them.)
-
+// The 3D view builds its chunks by running this art with GLB set (gl.js glBuildRows): every primitive here emits triangles.
+// Positions are tile-local: u, v in tiles from the middle of the tile being built (x and y on the map), heights z, h in
+// height units, 22 to a tile (ZS). Round building styles (DS) turn boxes into towers and roofs into cones or domes.
 function objH(i) {
   const b = M.bld[i];
   if (b) {
@@ -22,7 +21,6 @@ const HOUSE_H = [14, 20, 22, 28, 34, 64, 128, 185];
 function markDirty(i) { if (GL3.on) glDirty(i); } // (the 3D chunk round this tile is rebuilt)
 function markDirtyXY(x, y) { if (inb(x, y)) markDirty(idx(x, y)); }
 
-// the 2D canvases (the whole valley at 2×, twice over, plus the glow layers: ~100 MB) only exist once the 2D view is shown
 function renderAll() { // a new or loaded world: the light from scratch, every chunk rebuilt
   LIGHT.sun = sunNow(); LIGHT.season = LIGHT.forceSeason || seasonNow(); LIGHT.seasonT = 300;
   LIGHT.cur = LT = mkLight(envNow()); LIGHT.artKey = null; LIGHT.chk = 0;
@@ -30,61 +28,41 @@ function renderAll() { // a new or loaded world: the light from scratch, every c
 }
 
 /* ---------- primitives ---------- */
-function pt(cx, cy, u, v, z) { return [cx + (u - v) * 16, cy + (u + v) * 8 - z]; }
-function poly() { } // (flat shapes and strokes in the old art: nothing in 3D)
-// DS: the shape/roof of the building style being drawn (set by drawBuilding). Round styles turn boxes into cylinders.
-let DS = null, DM = null; // DM: the material of the building being drawn (timber, stone, brick, adobe)
+// DS: the shape and roof of the building style being built (set by drawBuilding); DM: what it's made of (timber, stone, brick, adobe)
+let DS = null, DM = null;
 function dsRound() { return DS && (DS.shape === 'round' || DS.shape === 'organic'); }
-function box(c, cx, cy, u0, v0, hw, hd, z0, h, col, top) {
-  if (GLB) return glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top);
-}
-function flat(c, cx, cy, u0, v0, hw, hd, z, col) {
-  if (GLB) return glFlat(cx, cy, u0, v0, hw, hd, z, col);
-}
-function cylWindows(c, cx, cy, u0, v0, r, z0, h, floors, n, col, onlyLit) {
-  if (GLB) return glCylWindows(cx, cy, u0, v0, r, z0, h, floors, n, col);
-}
-function windows(c, cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col, colR, onlyLit) {
-  if (GLB) glWindows(cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col);
-}
-function door(c, cx, cy, u0, v0, hd, w, h, col) {
-  if (GLB) return glDoor(cx, cy, u0, v0, hd, w, h, col);
-}
-function dsRoof(c, cx, cy, u0, v0, hw, hd, z, rh, col) {
+const box = (u0, v0, hw, hd, z0, h, col, top) => glBox(u0, v0, hw, hd, z0, h, col, top);
+const flat = (u0, v0, hw, hd, z, col) => dsRound() && Math.abs(hw - hd) < .12 ? disc(u0, v0, Math.max(hw, hd), z, col) : glFlat(u0, v0, hw, hd, z, col);
+const cylWindows = (u0, v0, r, z0, h, floors, n, col) => glCylWindows(u0, v0, r, z0, h, floors, n, col);
+const windows = (u0, v0, hw, hd, z0, h, floors, cols, col) => dsRound() ? glCylWindows(u0, v0, Math.max(hw, hd) * 1.08, z0, h, floors, Math.min(cols + 1, 5), col) : glWindows(u0, v0, hw, hd, z0, h, floors, cols, col);
+const door = (u0, v0, hd, w, h, col) => glDoor(u0, v0, dsRound() ? hd * 1.08 : hd, w, h, col);
+const cyl = (u, v, r, z0, h, col, top, n) => glCylAt(u, v, r, z0, h, col, top, n);
+const cone = (u, v, z0, r, h, col, n) => gCone(u, v, r, z0, h, col, n);
+const dome = (u, v, r, z0, h, col) => glDomeAt(u, v, r, z0, h, col);
+const ball = (u, v, r, zc, rz, col, mat = 0) => glBlob(u, v, r, zc, rz, col, mat);
+function disc(u, v, r, z, col, e = 0) { const C = gcol(col), O = gw(u, v, z + .25); GLB.mat = 0; GLB.ctr = gw(u, v, z - 20); for (let k = 0; k < 16; k++) { const a = k / 16 * TAU, b = (k + 1) / 16 * TAU; gtri(O, gw(u + Math.cos(a) * r, v + Math.sin(a) * r, z + .25), gw(u + Math.cos(b) * r, v + Math.sin(b) * r, z + .25), C, e); } }
+function ring(u, v, r, w, z, col, a0 = 0, a1 = TAU, n = 24, e = 0, mat = 0) { const C = gcol(col); GLB.mat = mat; GLB.ctr = gw(u, v, z - 20); for (let k = 0; k < n; k++) { const a = a0 + (a1 - a0) * k / n, b = a0 + (a1 - a0) * (k + 1) / n, P = (an, rr) => gw(u + Math.cos(an) * rr, v + Math.sin(an) * rr, z + .3); gquad(P(a, r - w), P(b, r - w), P(b, r), P(a, r), C, e); } } // a band laid flat (on the ground, round a tower)
+const beam = (u0, v0, z0, u1, v1, z1, w, col, mat = 0, e = 0) => gBeam(gw(u0, v0, z0), gw(u1, v1, z1), w, col, mat, e); // a square beam between two tile-local points
+const lamp = (u, v, z, r, col = '#fff3d0') => { GLB.mat = 0; glOBox(gw(u, v, z), [r, 0, 0], [0, 0, r], [0, r, 0], col, 2); }; // something that glows after dark (a lamp, a window, a stone)
+function dsRoof(u0, v0, hw, hd, z, rh, col) { // the style's own roof, when it has one
   const round = dsRound(), k = DS.roofK || (DS.shape === 'round' ? 'cone' : DS.shape === 'organic' ? 'dome' : DS.shape === 'square' ? 'flat' : null);
   if (!k) return false;
-  const [X, Y] = pt(cx, cy, u0, v0, 0), r = Math.max(hw, hd) * (round ? 1.08 : 1);
-  if (round && (k === 'cone' || k === 'pyramid' || k === 'gable')) { cone(c, X, Y - z, r * 1.12, rh * 1.2 + 2, col); return true; }
+  const r = Math.max(hw, hd) * (round ? 1.08 : 1);
+  if (round && (k === 'cone' || k === 'pyramid' || k === 'gable')) { cone(u0, v0, z, r * 1.12, rh * 1.2 + 2, col); return true; }
   if (z < 3 || rh > 12) return false; // spires, huts and glass pyramids keep their form
-  if (k === 'dome') { dome(c, X, Y, r * (round ? 1 : 1.12), z, rh + r * 7, col); return true; }
+  if (k === 'dome') { dome(u0, v0, r * (round ? 1 : 1.12), z, rh + r * 7, col); return true; }
   if (k === 'flat' || k === 'garden') {
-    box(c, cx, cy, u0, v0, hw + .02, hd + .02, z, 1.3, shade(col, 1.04));
-    if (k === 'garden') { flat(c, cx, cy, u0, v0, hw - .02, hd - .02, z + 1.35, '#7cc47f'); parkTree(c, cx, cy - z - 1.3, u0 + hw * .25, v0 - hd * .2, (X * .37) % 1); }
+    box(u0, v0, hw + .02, hd + .02, z, 1.3, shade(col, 1.04));
+    if (k === 'garden') { flat(u0, v0, hw - .02, hd - .02, z + 1.35, '#7cc47f'); parkTree(u0 + hw * .25, v0 - hd * .2, hash2(GLB.x, GLB.y, 77), z + 1.3); }
     return true;
   }
   const sv = DS; DS = null;
-  if (k === 'gable') roofGable(c, cx, cy, u0, v0, hw, hd, z, rh, col, col, hw >= hd); else if (k === 'pyramid') roofPyr(c, cx, cy, u0, v0, hw, hd, z, rh, col); else if (k === 'cone') { DS = sv; cone(c, X, Y - z, Math.max(hw, hd) * 1.25, rh * 1.3 + 2, col); }
+  if (k === 'gable') roofGable(u0, v0, hw, hd, z, rh, col, col, hw >= hd); else if (k === 'pyramid') roofPyr(u0, v0, hw, hd, z, rh, col); else if (k === 'cone') cone(u0, v0, z, Math.max(hw, hd) * 1.25, rh * 1.3 + 2, col);
   DS = sv; return true;
 }
-function roofGable(c, cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
-  if (DS && dsRoof(c, cx, cy, u0, v0, hw, hd, z, rh, col)) return;
-  if (GLB) return glGable(cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU);
-}
-function roofMansard(c, cx, cy, u0, v0, hw, hd, z, rh, col) { if (GLB) return glMansard(cx, cy, u0, v0, hw, hd, z, rh, col); }
-function roofPyr(c, cx, cy, u0, v0, hw, hd, z, rh, col) {
-  if (DS && dsRoof(c, cx, cy, u0, v0, hw, hd, z, rh, col)) return;
-  if (GLB) return glPyr(cx, cy, u0, v0, hw, hd, z, rh, col);
-}
-function cone(c, x, y, r, h, col) {
-  if (GLB) return glCone(x, y, r, h, col);
-}
-function cyl(c, x, y, r, z0, h, col, top) {
-  if (GLB) return glCyl(x, y, r, z0, h, col, top);
-}
-function dome(c, x, y, r, z0, h, col, alpha = 1) {
-  if (GLB) return glDome(x, y, r, z0, h, col);
-}
-function line() { } function circ() { } function ell() { } function emit() { } // (strokes, dots and painted glows in the old art: nothing in 3D)
+function roofGable(u0, v0, hw, hd, z, rh, col, wall, alongU) { if (!(DS && dsRoof(u0, v0, hw, hd, z, rh, col))) glGable(u0, v0, hw, hd, z, rh, col, wall, alongU); }
+function roofPyr(u0, v0, hw, hd, z, rh, col) { if (!(DS && dsRoof(u0, v0, hw, hd, z, rh, col))) glPyr(u0, v0, hw, hd, z, rh, col); }
+const roofMansard = (u0, v0, hw, hd, z, rh, col) => glMansard(u0, v0, hw, hd, z, rh, col);
 
 /* ---------- terrain ---------- */
 const STRATA = ['#a77a60', '#bb8f70', '#94705f', '#ad8671', '#86665b', '#9a7666'];
@@ -122,12 +100,12 @@ function drawTileObjects(i, x, y) {
   if (!B && !bid && springAt(i)) glSpring(i);
   if (!w && S.ferries && S.ferries.length) { const fl = ferryLandings().get(i); if (fl) tileLanding(fl); }
   if (M.road[i] && !w && !bid) tileVerge(i, x, y);
-  if (B && fpBig(B)) { if (i === fpFront(B) && !FLAT_TYPES[B.type]) { const [ox, oy] = fpOff(B); drawBuilding(GSTUB, B, ox, oy, i); } } // a big lot is built once, from its front tile
-  else if (B && !FLAT_TYPES[B.type]) { drawBuilding(GSTUB, B, 0, 0, i); if (B.type === 'house' && B.prog >= 1) glYard(B, x, y); }
+  if (B && fpBig(B)) { if (i === fpFront(B) && !FLAT_TYPES[B.type]) drawBuilding(B, i); } // a big lot is built once, from its front tile (its model works in world units: gl.js GL_BIG)
+  else if (B && !FLAT_TYPES[B.type]) { drawBuilding(B, i); if (B.type === 'house' && B.prog >= 1) glYard(B, x, y); }
   else if (!B && !w && !M.tree[i] && (M.bio[i] === BIO.ROCK || M.bio[i] === BIO.HIGH) && hash2(x, y, 11) < 0.3 && !M.road[i]) tileRocks(x, y);
   else if (!B && !bid && !w && !M.tree[i] && !M.road[i] && !M.rail[i] && !M.ruin[i]) tileGround(i, x, y);
 }
-const gp = (u, v, z = 0) => [GLB.x + u, GLB.base + z * ZS, GLB.y + v]; // a spot on this tile (u, v from its middle, z in pixels) in the world
+const gp = (u, v, z = 0) => [GLB.x + u, GLB.base + z * ZS, GLB.y + v]; // a spot on this tile (u, v from its middle, z in height units) in the world
 const post = (u, v, h, w, col, z0 = 0) => gBeam(gp(u, v, z0), gp(u, v, z0 + h), w, col); // an upright: a post, a pole, a stem
 function tileRocks(x, y) { // grey stones on the high and rocky ground
   const n = 1 + (hash2(x, y, 12) * 2 | 0);
@@ -136,21 +114,21 @@ function tileRocks(x, y) { // grey stones on the high and rocky ground
 }
 function tileRuin(i, x, y) { // three broken Maker pillars, a lintel, and the glyph that still glows
   const stone = '#e4dccb', hs = [9 + hash2(x, y, 1) * 6, 5 + hash2(x, y, 2) * 8, 11 + hash2(x, y, 3) * 5], us = [[-.22, -.18], [.2, -.2], [-.2, .2]];
-  glFlat(0, 0, 0, 0, .38, .38, .2, '#d2c8b4');
-  for (let k = 0; k < 3; k++) glBox(0, 0, us[k][0], us[k][1], .06, .06, 0, hs[k], stone);
-  glBox(0, 0, -.01, -.19, .3, .06, hs[0] - 1, 2.2, shade(stone, .95)); glBox(0, 0, .18, .18, .1, .08, 0, 2, shade(stone, .9));
+  glFlat(0, 0, .38, .38, .2, '#d2c8b4');
+  for (let k = 0; k < 3; k++) glBox(us[k][0], us[k][1], .06, .06, 0, hs[k], stone);
+  glBox(-.01, -.19, .3, .06, hs[0] - 1, 2.2, shade(stone, .95)); glBox(.18, .18, .1, .08, 0, 2, shade(stone, .9));
   GLB.mat = 0; glOBox(gp(.18, .18, 2.6), [.022, 0, 0], [0, 0, .022], [0, .022, 0], '#5fd0c9', 2);
   if (M.ruin[i] === 2) { post(.3, -.32, 12, .006, '#6b5a4c'); GLB.ctr = gp(.3, -.32, 0); gtri(gp(.3, -.32, 12), gp(.3 + .16, -.32, 10.5), gp(.3, -.32, 9), gcol('#d9774b')); } // someone's flag on it
 }
 function tileLanding(d) { // a ferry landing: a timber stage and its lantern
-  const [dx, dy] = d; glBox(0, 0, dx * .38, dy * .38, dx ? .12 : .16, dy ? .12 : .16, -1.5, 2, '#9b7657');
+  const [dx, dy] = d; glBox(dx * .38, dy * .38, dx ? .12 : .16, dy ? .12 : .16, -1.5, 2, '#9b7657');
   const u = dx * .3 + dy * .14, v = dy * .3 + dx * .14; post(u, v, 6, .006, '#6b5040'); GLB.mat = 0; glOBox(gp(u, v, 6.4), [.014, 0, 0], [0, 0, .014], [0, .016, 0], '#ffd27a', 2);
 }
 function tuftAt(u, v, col) { glTuftUV(u, v, 0, col); }
 function flowersAt(u, v, h, z = 0) { glFlowersUV(u, v, z, h); }
-function benchAt(u, v, col) { glBox(0, 0, u, v, .07, .03, 1, .5, col); glBox(0, 0, u, v - .03, .07, .008, 1.5, 1.2, col); for (const o of [-.055, .055]) glBox(0, 0, u + o, v, .008, .025, 0, 1, shade(col, .8)); }
+function benchAt(u, v, col) { glBox(u, v, .07, .03, 1, .5, col); glBox(u, v - .03, .07, .008, 1.5, 1.2, col); for (const o of [-.055, .055]) glBox(u + o, v, .008, .025, 0, 1, shade(col, .8)); }
 const treeAt = (u, v, h) => glSmallTree(u, v, 0, h, .8 + h * .3, ['#5f9a4d', '#6aa556', '#7fae5e', '#ee9fbe'][(h * 4) | 0]);
-const planter = (u, v, h, col, z = 1.6) => { glBox(0, 0, u, v, .06, .06, 0, z, col); flowersAt(u, v, h, z); };
+const planter = (u, v, h, col, z = 1.6) => { glBox(u, v, .06, .06, 0, z, col); flowersAt(u, v, h, z); };
 // the streetscape: what stands in a road tile's free corners, by the surface (so the era), whether it's in town and the quarter
 // (all chosen from hashes of the tile: the same on every rebuild, nothing stored)
 function tileVerge(i, x, y) {
@@ -160,13 +138,13 @@ function tileVerge(i, x, y) {
   for (const [u, v, k] of [[-.37, -.37, 0], [-.38, .37, 1], [.37, .38, 2]]) {
     const h = hash2(x, y, 300 + k);
     if (!inT) { // country roads: tufts, flowers, a bit of fence, a milestone, a road sign
-      if (sf <= R_GRAVEL) { if (h < .45) tuftAt(u, v, grass); else if (h < .6) flowersAt(u, v, h); else if (h < .7) { post(u, v, 3, .007, wood); post(u + .1, v - .06, 3, .007, wood); GLB.mat = M_PLANK; gBeam(gp(u, v, 2.2), gp(u + .1, v - .06, 2.2), .005, wood, M_PLANK); } else if (k === 0 && h > .94) glBox(0, 0, u, v, .04, .03, 0, 2.6, '#b9b3aa'); }
+      if (sf <= R_GRAVEL) { if (h < .45) tuftAt(u, v, grass); else if (h < .6) flowersAt(u, v, h); else if (h < .7) { post(u, v, 3, .007, wood); post(u + .1, v - .06, 3, .007, wood); GLB.mat = M_PLANK; gBeam(gp(u, v, 2.2), gp(u + .1, v - .06, 2.2), .005, wood, M_PLANK); } else if (k === 0 && h > .94) glBox(u, v, .04, .03, 0, 2.6, '#b9b3aa'); }
       else if (h < .4) tuftAt(u, v, grass); else if (h > .93 && sf < R_GLOW) { post(u, v, 5, .005, '#8c9199'); GLB.mat = 0; glOBox(gp(u, v, 5.6), [.04, 0, 0], [0, 0, .004], [0, .025, 0], h > .965 ? '#3f8f5f' : '#e8e2cf'); }
       continue;
     }
     if (sf <= R_GRAVEL) { // a village lane: a water barrel, a crate, a bench
       if (h < .35) tuftAt(u, v, grass); else if (h < .55) flowersAt(u, v, h);
-      else if (h < .62) glCylAt(u, v, .045, 0, 2.2, '#9a7456', '#7a5a44', 8); else if (h < .68) glBox(0, 0, u, v, .05, .05, 0, 1.6, '#a88462'); else if (h < .73) benchAt(u, v, wood);
+      else if (h < .62) glCylAt(u, v, .045, 0, 2.2, '#9a7456', '#7a5a44', 8); else if (h < .68) glBox(u, v, .05, .05, 0, 1.6, '#a88462'); else if (h < .73) benchAt(u, v, wood);
       continue;
     }
     if (sf <= R_BRICK) { // cobbled and brick streets: street trees, planters, benches, bollards, the old pump
@@ -179,11 +157,11 @@ function tileVerge(i, x, y) {
     }
     if (sf <= R_CONCRETE) { // modern streets: trees, a bus shelter, a post box, a hydrant, bins, benches, a phone box, traffic lights
       if ((z === Z_HOME || z === Z_GREEN) && h < .34) treeAt(u, v, h);
-      else if (k === 2 && nb.length >= 2 && h > .9) { glBox(0, 0, u - .02, v - .02, .1, .05, 0, .6, '#8c9199'); glBox(0, 0, u - .02, v - .07, .1, .004, .6, 5, '#bfe3f0'); glBox(0, 0, u - .02, v - .03, .12, .07, 5.6, .6, '#5b6770'); }
+      else if (k === 2 && nb.length >= 2 && h > .9) { glBox(u - .02, v - .02, .1, .05, 0, .6, '#8c9199'); glBox(u - .02, v - .07, .1, .004, .6, 5, '#bfe3f0'); glBox(u - .02, v - .03, .12, .07, 5.6, .6, '#5b6770'); }
       else if (h < .4) glCylAt(u, v, .03, 0, 3, '#c0392b', '#a83226', 8);
       else if (h < .45) { glCylAt(u, v, .022, 0, 1.6, '#e0b030', '#e0b030', 8); glBlob(u, v, .022, 1.7, .8, '#e0b030', 0); }
       else if (h < .5) glCylAt(u, v, .03, 0, 2, '#4f5a4f', '#3a423a', 8); else if (h < .56) benchAt(u, v, '#5b6770');
-      else if (h < .59 && hasTech('radio') && !hasTech('net')) { glBox(0, 0, u, v, .035, .035, 0, 6.5, '#c0392b'); glBox(0, 0, u, v + .036, .025, .002, 1, 4.5, '#bcd3e0'); }
+      else if (h < .59 && hasTech('radio') && !hasTech('net')) { glBox(u, v, .035, .035, 0, 6.5, '#c0392b'); glBox(u, v + .036, .025, .002, 1, 4.5, '#bcd3e0'); }
       else if (h < .66) planter(u, v, h, '#9aa0a6');
       else if (h < .7 && z === Z_CORE) { post(u, v, 6, .006, '#5b6770'); GLB.mat = 0; glOBox(gp(u, v, 7.2), [.014, 0, 0], [0, 0, .014], [0, .03, 0], '#2a2c30'); const lc = ['#e05b52', '#e0b030', '#4fa06a'][(h * 30 | 0) % 3], q = [8.3, 7.2, 6.1][(h * 30 | 0) % 3]; glOBox(gp(u, v + .015, q), [.009, 0, 0], [0, 0, .002], [0, .009, 0], lc, 2); }
       continue;
@@ -228,14 +206,14 @@ function glYard(B, x, y) {
   const row = houseJoin(B), big = B.tier > 3;
   if (!row && B.tier >= 1 && B.tier <= 3 && B.prog >= 1) glYardBits(B, x, y);
   for (const [u, v, k] of [[-.42, -.42, 0], [-.42, .42, 1], [.42, .42, 2], [.42, -.42, 3]]) {
-    const h = hash2(x, y, 510 + k), X = pt(0, 0, u, v, 0);
+    const h = hash2(x, y, 510 + k);
     if (row && h < .7) continue; // terraces keep to window boxes and the odd pot
     if (h < .3) { glBlob(u, v, .075, 1, 1.7, leafC(h < .15 ? '#5a9a4e' : '#4f8a45')); glBlob(u + .05, v - .04, .05, .8, 1.2, leafC('#6aa556')); }
-    else if (h < .5) { glFlowers(...pt(0, 0, u, v - .05, 0), h); glFlowers(...pt(0, 0, u - .05, v + .03, 0), h + .3); }
-    else if (h < .58 && !big) glTreeAt(0, 0, u, v, h, .7 + h * .4, ['#5f9a4d', '#6aa556', '#7fae5e', '#ee9fbe'][((h * 40) | 0) % 4]);
-    else if (h < .8) glTuft(X[0], X[1], '#6aa556');
+    else if (h < .5) { glFlowersUV(u, v - .05, 0, h); glFlowersUV(u - .05, v + .03, 0, h + .3); }
+    else if (h < .58 && !big) glSmallTree(u, v, 0, h, .7 + h * .4, ['#5f9a4d', '#6aa556', '#7fae5e', '#ee9fbe'][((h * 40) | 0) % 4]);
+    else if (h < .8) glTuftUV(u, v, 0, '#6aa556');
   }
-  const hh = hash2(x, y, 500); if (!row && hh > .3 && hh < .6) { const sw = GLB.wall; GLB.wall = M_LEAF; glBox(0, 0, .45, 0, .03, .32, 0, 2.2, leafC('#4f8a45')); GLB.wall = sw; } // a clipped hedge
+  const hh = hash2(x, y, 500); if (!row && hh > .3 && hh < .6) { const sw = GLB.wall; GLB.wall = M_LEAF; glBox(.45, 0, .03, .32, 0, 2.2, leafC('#4f8a45')); GLB.wall = sw; } // a clipped hedge
 }
 
 function lampC(x, y) { return LT.lampCs ? LT.lampCs[(hash2(x | 0, y | 0, 17) * LT.lampCs.length) | 0] : LT.lampC; }
