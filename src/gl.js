@@ -526,14 +526,10 @@ function glHarbour(B) {
       const hc = .95, col = h < .5 ? '#d6703a' : '#3f6f9f';
       for (const [sa, ta] of [[-.14, .12], [.14, .12], [-.14, .42], [.14, .42]]) gBeam(P(s + sa, ta), P(s + sa, ta, y + hc), .014, col);
       for (const sa of [-.14, .14]) gBeam(P(s + sa, -.05, y + hc), P(s + sa, 1.3, y + hc), .016, col);
-      gBox(P(s, .9, y + hc - .06), V3s(A3, .16), V3s(D3, .06), .06, '#e8e2d6'); // the trolley
-      gBeam(P(s, .9, y + hc - .06), P(s, .9, y + .35), .004, '#2a2a2a');
+      // (its trolley and what it lifts move: works.js, glHarbourCranes)
     } else {
       const hc = (steel ? 16 : 11) * ZS, col = steel ? '#c8603a' : '#8a6446';
-      gBox(P(s - .22, .32), [.022, 0, 0], [0, 0, .022], hc, col, steel ? 0 : M_PLANK);
-      gBeam(P(s - .22, .32, y + hc * .75), P(s - .22, .95, y + hc * 1.08), .012, col, steel ? 0 : M_PLANK);
-      gBeam(P(s - .22, .95, y + hc * 1.08), P(s - .22, .95, y + hc * .45), .003, '#2a2a2a');
-      gBox(P(s - .22, .95, y + hc * .38), [.03, 0, 0], [0, 0, .03], .04, '#9b7657', M_PLANK); // what it's lifting
+      gBox(P(s - .22, .32), [.022, 0, 0], [0, 0, .022], hc, col, steel ? 0 : M_PLANK); // (the jib swings: works.js)
     }
     // cargo on the quay
     if (boxes) { const cols = ['#c0584f', '#3f7fb0', '#e0a43a', '#4e9a6a', '#7a5a9a']; for (let r2 = 0; r2 < 2; r2++) for (let c2 = 0; c2 < 3; c2++) { const nH = 1 + ((hash2(B.x + k, r2 * 3 + c2, 9) * 3) | 0); for (let l = 0; l < nH; l++) gBox(P(s - .25 + c2 * .17, .1 + r2 * .1, y + .03 + l * .05), V3s(A3, .075), V3s(D3, .04), .048, cols[(k + r2 + c2 + l) % cols.length]); } }
@@ -1062,6 +1058,7 @@ function glShot() { // choose what to look at next
   const big = Object.values(S.B).filter(B => fpBig(B) && B.prog >= 1);
   if (big.length) opts.push([2, () => { const B = pick1(big), T = S.T[B.sid], [x, y] = glLot(B); return { at: () => [x, z(x, y), y], zoom: rf(2, 3), pitch: rf(.35, .55), cap: (B.name || (BT[B.type] ? BT[B.type].n : B.type)) + (T ? ' · ' + T.name : '') }; }]);
   opts.push([2, () => { const T = pick1(T0.slice().sort((a, b) => b.pop - a.pop).slice(0, 4)); return { at: () => [T.x, z(T.x, T.y), T.y], zoom: clamp(townRadius(T) * .8 + 3, 5, 14), pitch: rf(.4, .75), cap: T.name, sub: Math.round(T.pop).toLocaleString('en-GB') + ' people' }; }]);
+  { const w = glWorkShot(); if (w) opts.push([1.5, () => w]); } // a workplace close up (works.js)
   const hs = harbours(); const sun = LIGHT.sun;
   if (hs.length && sun && sun.el > -2 && sun.el < 14) opts.push([4, () => { const B = pick1(hs), [x, y] = glLot(B), T = S.T[B.sid]; return { at: () => [x + B.dir[0] * .6, z(x, y), y + B.dir[1] * .6], zoom: rf(2.5, 3.5), pitch: rf(.18, .3), cap: '🌇 Evening at the harbour' + (T ? ' of ' + T.name : ''), yaw: Math.atan2(-B.dir[0], -B.dir[1]) }; }]); // golden hour by the water
   let tot = 0; for (const o of opts) tot += o[0]; let r = Math.random() * tot; for (const o of opts) if ((r -= o[0]) <= 0) return o[1]();
@@ -1335,24 +1332,25 @@ function glPerson(o, X, Z, y0, h, moving, carryLamp) {
   for (const sg of [1, -1]) glLimb(B(0, sg * .016 * s, hip), f, r, sw * sg * .55, .105 * s, .012 * s, o.pants || '#555'); // legs
   glOBox(B(0, 0, (hip + sh) / 2 + .006 * s), V3(f, .02 * s), V3(r, .033 * s), [0, (sh - hip) / 2 + .01 * s, 0], o.col || '#e5874f'); // body
   if (o.kind === 'founder') glOBox(B(.001, 0, hip + .045 * s), V3(f, .0205 * s), V3(r, .0335 * s), [0, .006 * s, 0], '#f2f0ea'); // the founder's sash
-  let hand = null;
-  for (const sg of [1, -1]) { const e = glLimb(B(0, sg * .043 * s, sh), f, r, -sw * sg * .45 + (carryLamp && sg > 0 ? .5 : 0), .095 * s, .0095 * s, sg > 0 ? o.col : shade(o.col || '#e5874f', .85)); if (sg > 0) hand = e; } // arms swing against the legs
+  let hand = null, hand2 = null; const arms = o.arms; // (o.arms: [right, left] held in a pose, for folk at work)
+  for (const sg of [1, -1]) { const e = glLimb(B(0, sg * .043 * s, sh), f, r, arms ? arms[sg > 0 ? 0 : 1] : -sw * sg * .45 + (carryLamp && sg > 0 ? .5 : 0), .095 * s, .0095 * s, sg > 0 ? o.col : shade(o.col || '#e5874f', .85)); if (sg > 0) hand = e; else hand2 = e; } // arms swing against the legs
   glOBox(B(0, 0, sh + .012 * s), V3(f, .01 * s), V3(r, .01 * s), [0, .012 * s, 0], o.skin || '#e0b090'); // neck
   const hy = sh + .045 * s, hc = B(0, 0, hy), u = hc[0], v = hc[2];
   glOBox(hc, V3(f, .022 * s), V3(r, .021 * s), [0, .025 * s, 0], o.skin || '#e0b090'); // head
   glOBox(B(-.005 * s, 0, hy + .012 * s), V3(f, .02 * s), V3(r, .023 * s), [0, .016 * s, 0], o.hair || '#5a3a28'); // hair, sitting back on the head
   if (carryLamp && hand) { glOBox([hand[0], hand[1] - .012, hand[2]], [.008, 0, 0], [0, 0, .008], [0, .012, 0], '#ffd08a', 2); GL3.carry.push([hand[0], hand[1], hand[2]]); } // a lantern
-  if (far > 12) return;
+  if (far > 12) return [hand, hand2];
   if (!o.kid && (o.hat || 1) < .22) { const era = S.era;
     if (era <= 3) { glOBox([u, hy + .024 * s, v], V3(f, .046 * s), V3(r, .046 * s), [0, .003, 0], '#d8b86a'); glBlob(u, v, .026 * s, (hy + .026 * s) / ZS, .5 * s, '#caa458', 0); } // a straw hat
     else if (era <= 6) { glBlob(u, v, .028 * s, (hy + .012 * s) / ZS, .55 * s, shade(o.pants || '#555', .8), 0); glOBox(B(.028 * s, 0, hy + .012 * s), V3(f, .014 * s), V3(r, .022 * s), [0, .002, 0], shade(o.pants || '#555', .8)); } } // a cap
-  if (o.pet) { // the dog trots at their heel
-    const d = B(-.07, .05, y0), dph = ph * 1.35;
-    for (const [lf, lr, q] of [[.022, .012, 0], [.022, -.012, Math.PI], [-.022, .012, Math.PI], [-.022, -.012, 0]]) glLimb([d[0] + f[0] * lf + r[0] * lr, y0 + .028, d[2] + f[2] * lf + r[2] * lr], f, r, moving ? Math.sin(dph + q) * .6 : 0, .028, .005, '#7a5e46');
-    glOBox([d[0], y0 + .036, d[2]], V3(f, .032), V3(r, .012), [0, .011, 0], '#9a7a5c');
-    const hd = [d[0] + f[0] * .036, y0 + .052, d[2] + f[2] * .036]; glOBox(hd, V3(f, .012), V3(r, .01), [0, .01, 0], '#9a7a5c');
-    const tw = Math.sin(GL3.t * 9 + ph) * .4; glLimb([d[0] - f[0] * .03, y0 + .044, d[2] - f[2] * .03], V3(f, -1), r, -1.1 + tw, .025, .004, '#9a7a5c');
-  }
+  if (o.pet) glDog(B(-.07, .05, y0), f, r, y0, ph * 1.35, moving); // the dog trots at their heel
+  return [hand, hand2];
+}
+function glDog(d, f, r, y0, dph, moving, col = '#9a7a5c') { // d: where it stands; dph: its stride
+  for (const [lf, lr, q] of [[.022, .012, 0], [.022, -.012, Math.PI], [-.022, .012, Math.PI], [-.022, -.012, 0]]) glLimb([d[0] + f[0] * lf + r[0] * lr, y0 + .028, d[2] + f[2] * lf + r[2] * lr], f, r, moving ? Math.sin(dph + q) * .6 : 0, .028, .005, shade(col, .8));
+  glOBox([d[0], y0 + .036, d[2]], V3(f, .032), V3(r, .012), [0, .011, 0], col);
+  const hd = [d[0] + f[0] * .036, y0 + .052, d[2] + f[2] * .036]; glOBox(hd, V3(f, .012), V3(r, .01), [0, .01, 0], col);
+  const tw = Math.sin(GL3.t * 9 + dph) * .4; glLimb([d[0] - f[0] * .03, y0 + .044, d[2] - f[2] * .03], V3(f, -1), r, -1.1 + tw, .025, .004, col);
 }
 function glVehicle(c, X, Z, y0, h, moving) {
   const f = [Math.cos(h), 0, Math.sin(h)], r = [-Math.sin(h), 0, Math.cos(h)], B = (dx, dr, y) => [X + f[0] * dx + r[0] * dr, y, Z + f[2] * dx + r[2] * dr], ph = (c.s || 0) * 22;
@@ -1389,6 +1387,7 @@ function glPeople() {
     GLB.id = 0; GLB.ao = 1;
     for (const hd of DYN.herds) for (const m of hd.members) { const [fx, fy, z] = agentPos(m), bx = m.b % W - m.a % W, by = ((m.b / W) | 0) - ((m.a / W) | 0); glSheep(fx, fy, z * ZS, (m.size || 1) * (m.baby ? .6 : 1), glHeading(m, bx, by), m.pause > 0 ? -1 : DYN.t * 3 + (m.a % 7)); }
     GLB.id = 0; GLB.ao = 1; glIncidents(GL3.dt || .016);
+    GLB.id = 0; GLB.ao = 1; try { glWorks(); } catch (e) { if (QS.has('dev')) console.error(e); }
     GLB.id = 0; GLB.ao = 1; try { glTraffic(); } catch (e) { if (QS.has('dev')) console.error(e); }
     for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; GLB.ao = .35 + .65 * aoAt(p[0], p[2] * ZS + .15, p[1], 0, 1, 0); glVehicle(c, p[0], p[1], p[2] * ZS, glHeading(c, p[4], p[5]), true); }
   } catch (e) { if (QS.has('dev')) console.error(e); } finally { GLB = null; }

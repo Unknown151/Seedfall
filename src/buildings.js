@@ -100,7 +100,7 @@ function drawBuilding0(c, B, cx, cy, i, st) {
       const a = pt(cx, cy, .2, -.1, 0), b = pt(cx, cy, .2, -.1, 22);
       line(c, a[0] - 4, a[1], b[0], b[1], '#7a5a44', 1.2); line(c, a[0] + 4, a[1], b[0], b[1], '#7a5a44', 1.2);
       c.strokeStyle = '#5a4538'; c.lineWidth = 1; c.beginPath(); c.arc(b[0], b[1] + 1, 3, 0, TAU); c.stroke();
-      box(c, cx, cy, .05, .3, .06, .04, 0, 2.5, '#6b6470'); return;
+      box(c, cx, cy, .05, .3, .06, .04, 0, 2.5, '#6b6470'); if (GLB) glMineFrame(B); return;
     }
     case 'lumber': return drawLumber(c, B, cx, cy, st, i);
     case 'harbor': return drawHarbour(c, B, cx, cy, st, i);
@@ -152,6 +152,7 @@ function drawBuilding0(c, B, cx, cy, i, st) {
       cyl(c, ...pt(cx, cy, -.16, -.2, 0), .06, 14, 22, '#a39a92', '#333'); cyl(c, ...pt(cx, cy, .16, -.2, 0), .06, 14, 22, '#a39a92', '#333'); return;
     }
     case 'turbine': {
+      if (GLB) return glTurbine(B);
       const a = pt(cx, cy, 0, 0, 0); ell(c, a[0], a[1], 3, 1.5, '#cfcac4');
       c.fillStyle = '#f2f3f5'; c.beginPath(); c.moveTo(a[0] - 1.3, a[1]); c.lineTo(a[0] - .6, a[1] - 56); c.lineTo(a[0] + .6, a[1] - 56); c.lineTo(a[0] + 1.3, a[1]); c.fill();
       box(c, cx, cy, .04, 0, .07, .035, 55, 3, '#e7e9ec'); return;
@@ -319,6 +320,7 @@ function drawBuilding0(c, B, cx, cy, i, st) {
       door(c, cx, cy, -.08, -.06, .22, .1, 5, '#5c4a3e');
       roofGable(c, cx, cy, -.08, -.06, .28, .22, 9, 5.5, st.roof, st.wall, v < .5);
       // freshly dyed cloth drying on a frame
+      if (GLB) return glDryFrame(.3); // (the cloth moves: works.js)
       const cols = ['#c77fb0', '#7fb2c4', '#e0b04f', '#8fbf88'], a = pt(cx, cy, .3, -.3, 0), b = pt(cx, cy, .3, .3, 0);
       for (const p of [a, b]) line(c, p[0], p[1], p[0], p[1] - 8, '#7a5a44', .7);
       line(c, a[0], a[1] - 8, b[0], b[1] - 8, '#7a5a44', .5);
@@ -351,6 +353,7 @@ function drawBuilding0(c, B, cx, cy, i, st) {
 
 /* ---------- where the materials come from ---------- */
 function logPile(c, cx, cy, u, v, n, col) {
+  if (GLB) return glLogPile(cx, cy, u, v, n, col);
   const [px, py] = pt(cx, cy, u, v, 0);
   for (let r = 0; r < n; r++) for (let k = 0; k < n - r; k++) {
     const x = px + k * 2.3 + r * 1.15 - n * 1.1, y = py - 1.1 - r * 1.9 + k * .15;
@@ -375,7 +378,8 @@ function drawLumber(c, B, cx, cy, st, i) {
   if (hasTech('steam')) { box(c, cx, cy, .2, -.18, .1, .08, 0, 4, '#8f8a86'); const [kx, ky] = pt(cx, cy, .2, -.18, 7); emit(kx, ky, 4, '#ffcf8a', .4); }
 }
 function stoneCol(i) { const b = M.bio[i]; return b === BIO.ROCK ? '#bdb6cf' : b === BIO.HIGH ? '#dcc39c' : b === BIO.SNOW ? '#d8d7e2' : '#cfc8bb'; }
-function pit(c, cx, cy, hw, hd, depth, rim, wall, floor, steps) {
+function pit(c, cx, cy, hw, hd, depth, rim, wall, floor, steps, mat) {
+  if (GLB) return glPit(cx, cy, hw, hd, depth, rim, wall, floor, steps, mat); // (in 3D: banks round it, works.js)
   const P = (u, v, z) => pt(cx, cy, u, v, z);
   const o = [P(-hw, -hd, .3), P(hw, -hd, .3), P(hw, hd, .3), P(-hw, hd, .3)];
   poly(c, [P(-hw - .06, -hd - .06, .3), P(hw + .06, -hd - .06, .3), P(hw + .06, hd + .06, .3), P(-hw - .06, hd + .06, .3)], topC(shade(rim, LT.fG)));
@@ -391,11 +395,12 @@ function pit(c, cx, cy, hw, hd, depth, rim, wall, floor, steps) {
 }
 function drawQuarry(c, B, cx, cy, i) {
   const sc = stoneCol(i), v = B.var || 0;
-  pit(c, cx, cy, .36, .34, 9, shade(sc, 1.03), sc, shade(sc, .9), 3);
+  pit(c, cx, cy, .36, .34, 9, shade(sc, 1.03), sc, shade(sc, .9), 3, M_STONE);
   for (const [u, w] of [[.12, .14], [.22, .02]]) { const [bx, by] = pt(cx, cy, u, w, -9); c.fillStyle = shade(sc, LT.fL * 1.05); c.fillRect(bx - 2, by - 1.6, 4, 1.6); c.fillStyle = topC(shade(sc, LT.fT * 1.08)); c.fillRect(bx - 2, by - 2.4, 4, .8); }
   // cut blocks waiting to be carted off
   for (const [u, w, z] of [[.36, .12, 0], [.36, .26, 0], [.36, .19, 2.2], [.2, .38, 0]]) box(c, cx, cy, u, w, .055, .05, z, 2.2, shade(sc, 1.04));
   // a wooden derrick over the pit
+  if (GLB) { glDerrick(-.34, .3); if (hasTech('steam')) box(c, cx, cy, -.38, -.34, .08, .07, 0, 3.5, '#8f8a86'); return; } // (its boom swings: works.js)
   const a = pt(cx, cy, -.34, .3, 0), t = pt(cx, cy, -.34, .3, 17), e = pt(cx, cy, .02 + v * .1, -.05, 12);
   line(c, a[0] - 1.5, a[1], t[0], t[1], '#7a5a44', .9); line(c, a[0] + 1.5, a[1] + .5, t[0], t[1], '#7a5a44', .9);
   line(c, t[0], t[1] + 4, e[0], e[1], '#8a6446', .8); line(c, t[0], t[1], e[0], e[1], 'rgba(90,70,55,.7)', .3);
@@ -406,6 +411,7 @@ function drawClaypit(c, B, cx, cy, i) {
   const clay = '#b8664a', v = B.var || 0;
   pit(c, cx, cy, .22, .2, 3, '#caa27c', '#a85c44', clay, 1);
   const [wx, wy] = pt(cx, cy, -.08, -.05, -3); ell(c, wx, wy, 3.2, 1.4, topC(shade('#7fb2c4', LT.fG * .9)));
+  if (GLB) gBox([GLB.x - .08, GLB.base, GLB.y - .05], [.1, 0, 0], [0, 0, .06], .5 * ZS, '#7fb2c4'); // (a puddle)
   // rows of bricks drying in the sun
   for (let r = 0; r < 2; r++) for (let k = 0; k < 4; k++) box(c, cx, cy, -.3 + k * .09, .32 + r * .08, .03, .02, 0, 1.2, r ? '#c9795c' : '#d68b6a');
   // the kiln
@@ -479,6 +485,7 @@ function drawPasture(c, B, cx, cy, st) {
   sheep(c, ...P(.06, .12, 0), 2.2, v < .5); sheep(c, ...P(.28, -.1, 0), 1.8, v >= .5); if (v > .3) sheep(c, ...P(-.18, .26, 0), 1.2, true);
 }
 function drawShipyard(c, B, cx, cy, st) {
+  if (GLB) return glShipyard(B, st);
   const d = B.dir || [1, 0], P = (a, b, z) => pt(cx, cy, d[0] * a + d[1] * b, d[1] * a + d[0] * b, z); // a: out to the water, b: across
   poly(c, [P(-.3, -.2, .2), P(.7, -.2, -2.5), P(.7, .2, -2.5), P(-.3, .2, .2)], shade('#b8a489', LT.fG)); // the slipway runs down into the water
   const hull = shipKind() === 'sail' || shipKind() === 'steamer' ? '#9b7657' : '#7d8793', frac = .35 + (B.var || 0) * .6;
@@ -496,7 +503,7 @@ function drawShipyard(c, B, cx, cy, st) {
 }
 function drawSandpit(c, B, cx, cy, i) {
   const v = B.var || 0;
-  pit(c, cx, cy, .3, .26, 4, '#ecd5a8', '#d9b77f', '#e7cc98', 2);
+  pit(c, cx, cy, .3, .26, 4, '#ecd5a8', '#d9b77f', '#e7cc98', 2, M_SAND);
   for (const [u, w, s] of [[.3, .2, 1], [.22, .34, .8]]) { const [hx, hy] = pt(cx, cy, u, w, 0); ell(c, hx, hy - 1.2 * s, 3 * s, 1.8 * s, topC(shade('#efd9ad', LT.fT))); }
   // a cart full of sand
   box(c, cx, cy, -.32, .3, .08, .05, 1, 2, '#9b7657'); const [wx, wy] = pt(cx, cy, -.32, .36, 1); circ(c, wx, wy, 1, '#6b5040');
