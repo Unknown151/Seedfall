@@ -298,6 +298,15 @@ THE 3D VIEW
   low streets, a cart of cabbages gets away down a hill, or a whale comes
   ashore and the whole town turns out to keep it wet. The film camera goes to
   look, and the chronicle tells how it ended.
+  The workplaces are busy too. Windmill sails and turbine blades turn faster
+  in a storm, harbour cranes swing cargo in and out, the mine's winding wheel
+  lowers its cage, a derrick hoists blocks out of the quarry, and the works
+  run a great flywheel. By day you'll find a woodcutter splitting logs, a
+  quarryman at the face, a smith striking sparks off the anvil, a glassblower
+  at the furnace, someone shovelling sand into a cart, hands hoeing the rows
+  (and harvesting in autumn, then on tractors), a shepherd and the dog, and
+  crates carried into the warehouse. They go home at dusk. The film camera
+  drops in on them now and then.
   Zoom in and the streets near you fill in: sills and shutters, cornices, door
   steps, gutters, balconies, the glazing on glass towers.
   The towns grow up in the style of the old city-builders: thatch and earth
