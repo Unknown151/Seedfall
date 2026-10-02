@@ -115,7 +115,7 @@ function answerWithTool(q) {
   let x = T.x, y = T.y;
   if (k === 'rain') { const ix = townIndex()[T.id]; const fs = (ix && ix.farm || []).map(id => S.B[id]).filter(Boolean); if (fs.length) { fs.sort((a, b) => dist(a.x, a.y, T.x, T.y) - dist(b.x, b.y, T.x, T.y)); x = fs[0].x; y = fs[0].y; } }
   if (k === 'bloom' || k === 'starfall') { const a = rnd() * TAU, R = townRadius(T) + 2.5; x = clamp(Math.round(T.x + Math.cos(a) * R), 1, W - 2); y = clamp(Math.round(T.y + Math.sin(a) * R), 1, H - 2); }
-  focusOn(x, y, 1.6, 25);
+  camLook(x, y, 4); // (you answered: watch it land)
   if (useTool(k, x, y)) { UIDIRTY.chron = true; renderTools(); }
 }
 function answerWithWords(q, text) {
@@ -237,7 +237,7 @@ function bindFaith() {
   $('prayers').addEventListener('click', e => {
     const x = e.target.closest('[data-px]'); if (x) { const q = S.prayers.find(q => q.id === +x.dataset.px); if (q) { q.st = 'gone'; q.tEnd = S.playSec - 5; UIDIRTY.prayers = true; renderFaith(); } return; }
     const g = e.target.closest('[data-pgo]'); if (g) { const q = S.prayers.find(q => q.id === +g.dataset.pgo); if (!q || q.st !== 'open') return; if (PRAY_TOOL[q.k]) answerWithTool(q); else openAnswer(q); return; }
-    const pp = e.target.closest('[data-pid]'); if (pp) { const w = DYN.walkers.find(w => w.pid === +pp.dataset.pid); if (w) { CAM.followPid = w.pid; CAM.followUntil = DYN.t + 25; CAM.manualUntil = 0; if (w.st === 'in') w.until = Math.min(w.until, DYN.t + 1.5); } else { const p = S.P[+pp.dataset.pid]; const T = p && S.T[p.sid]; if (T) focusOn(T.x, T.y, 1.8, 25); } }
+    const pp = e.target.closest('[data-pid]'); if (pp) { const w = DYN.walkers.find(w => w.pid === +pp.dataset.pid); if (!w || !camFollow(w.pid)) { const p = S.P[+pp.dataset.pid]; const T = p && S.T[p.sid]; if (T) camLook(T.x, T.y, 4); } }
   });
   $('ansCancel').onclick = () => $('answer').classList.remove('show');
   $('ansGo').onclick = () => { const q = (S.prayers || []).find(q => q.id === UI.answering); const t = $('ansText').value; if (!q || !t.trim()) return; $('answer').classList.remove('show'); answerWithWords(q, t); renderFaith(); };

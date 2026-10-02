@@ -1,8 +1,7 @@
-/* ============================== the world in real 3D (WebGL2): the default view; ?2d or the switch gives the flat one ============================== */
-// Opened with ?gl, the world is drawn as real 3D geometry instead of the 2D isometric canvas. The sim, UI and saves
-// are untouched. The building art is reused as it is: while a chunk is being built (GLB set), the drawing
-// primitives in render.js (box, cyl, cone, dome, roofs, windows, doors, flat) emit triangles instead of painting,
-// and the purely 2D strokes (lines, circles, polygons) are skipped. Terrain, water, roads, trees, lamps and people
+/* ============================== the world in real 3D (WebGL2) ============================== */
+// The world is drawn as real 3D geometry with WebGL2. While a chunk is being built (GLB set), the building art's
+// primitives in render.js (box, cyl, cone, dome, roofs, windows, doors, flat) emit triangles; types with a native model
+// (GL_MODEL, GL_BIG) are built straight in world units. Terrain, water, roads, trees, lamps and people
 // are built here. Lighting is per pixel, every frame: the sun (or moon) with a shadow map, sky and ground ambient,
 // lit windows at night, and street lamps as real point lights.
 const GL3 = { on: false, c: null, gl: null, chunks: [], dirty: new Set(), cam: { yaw: Math.PI / 4, pitch: .62, zoom: 14, tx: 32, ty: 0, tz: 32, auto: true, persp: true }, lamps: [], hr: [null, 13, 18.6, 20.4, 23.5], hi: 0, drag: null, town: 0, t: 0 };
@@ -359,7 +358,7 @@ function glBuildChunk(k, near = false) { const v = [], lamps = []; glBuildRows(k
 // some rows of a chunk (the detailed version is built a row or two a frame, so it never stalls the view)
 function glBuildRows(k, near, r0, r1, v, lamps, c0 = 0, c1 = GCH) {
   const cx0 = (k % GNC) * GCH, cy0 = ((k / GNC) | 0) * GCH;
-  const svLT = LT, svEM = EMQ; LT = GLT_FLAT(); EMQ = null;
+  const svLT = LT; LT = GLT_FLAT();
   try {
     for (let y = cy0 + r0; y < cy0 + r1; y++) for (let x = cx0 + c0; x < cx0 + c1; x++) {
       const i = idx(x, y), h = GT(i);
@@ -382,13 +381,13 @@ function glBuildRows(k, near, r0, r1, v, lamps, c0 = 0, c1 = GCH) {
         GLB.mat = 0; glBoxW(x + .36, y - .36, .025, b, 9.5 * ZS, '#4c4f58'); glBoxW(x + .36, y - .36, .05, b + 9.5 * ZS, 1.2 * ZS, '#fff3d0', 2); lamps.push(L);
       }
       if (M.tree[i] && !M.bld[i]) glTrees(i, x, y);
-      // what stands on the tile, drawn by the same art as the 2D view
+      // what stands on the tile (render.js)
       { const Bw = M.bld[i] && S.B[M.bld[i]]; GLB.wall = Bw ? glWallMat(Bw) : M_PLANK; GLB.B = Bw || null; GLB.smk = lamps.smk || (lamps.smk = []); } // walls by what the building is made of; street furniture is wooden
-      try { drawTileObjects(GSTUB, i, x, y, 0, 0); } catch (e) { if (QS.has('dev')) console.error(e); }
+      try { drawTileObjects(i, x, y); } catch (e) { if (QS.has('dev')) console.error(e); }
       const B = M.bld[i] && S.B[M.bld[i]];
       if (B && !B.hid && FLAT_TYPES[B.type]) { GLB.flat = B.type === 'farm' ? 'farm' : B.type === 'park' || B.type === 'pasture' ? 'green' : B.type === 'plaza' || B.type === 'airfield' ? 'paved' : ''; try { drawBuilding(GSTUB, B, 0, 0, i); } catch (e) { } GLB.flat = ''; }
     }
-  } finally { GLB = null; LT = svLT; EMQ = svEM; }
+  } finally { GLB = null; LT = svLT; }
 }
 let GLT_N = null;
 function GLT_FLAT() { // the light the colours are picked under: none at all (the shader does the lighting)
@@ -426,19 +425,21 @@ function glTrees(i, x, y) {
   }
   GLB.base = surfZ(i) * ZS;
 }
-/* ---------- foliage and small life: the 2D streetscape's tufts, flowers, bushes and trees, in 3D ---------- */
+/* ---------- foliage and small life: tufts, flowers, bushes and trees ---------- */
 // small things drawn at a screen point; a negative cy with no cx is art lifting them onto a roof
 function glAt(X, Y) { for (const [sx, sy, z] of GLB.tops) if (Math.abs(sx - X) < .7 && Math.abs(sy - z - Y) < 1.6) return [...gunscreen(sx, sy), z]; return [...gunscreen(X, Y), 0]; }
 function glBlob(u, v, r, zc, rz, col, mat = M_LEAF) { // a low-poly ball (bushes, flowers, sheep)
   const c = gcol(col), n = 7, P = (a, t) => gw(u + Math.cos(a) * r * Math.cos(t), v + Math.sin(a) * r * Math.cos(t), zc + rz * Math.sin(t)); GLB.ctr = gw(u, v, zc); GLB.mat = mat;
   for (let j = -2; j < 2; j++) { const t0 = j / 2 * Math.PI / 2, t1 = (j + 1) / 2 * Math.PI / 2; for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gquad(P(a, t0), P(b, t0), P(b, t1), P(a, t1), c); } }
 }
-function glTuft(X, Y, col) { // a clump of grass blades
-  const [u, v, z] = glAt(X, Y), c = gcol(mix(col, '#3f6f35', .35)), h0 = hash2((u * 97) | 0, (v * 89) | 0, 7); GLB.mat = 0; GLB.ctr = gw(u, v, z - 5);
+function glTuft(X, Y, col) { const [u, v, z] = glAt(X, Y); glTuftUV(u, v, z, col); }
+function glTuftUV(u, v, z, col) { // a clump of grass blades
+  const c = gcol(mix(col, '#3f6f35', .35)), h0 = hash2((u * 97) | 0, (v * 89) | 0, 7); GLB.mat = 0; GLB.ctr = gw(u, v, z - 5);
   for (let k = 0; k < 6; k++) { const a = (h0 + k / 6) * TAU, du = Math.cos(a) * .012, dv = Math.sin(a) * .012, ou = Math.cos(a * 3) * .03, ov = Math.sin(a * 3) * .03; gtri(gw(u + ou - dv, v + ov + du, z), gw(u + ou + dv, v + ov - du, z), gw(u + ou * 1.8, v + ov * 1.8, z + 1.2 + (k % 3) * .35), c); }
 }
-function glFlowers(X, Y, h) { // a clump of stems and blooms
-  const [u, v, z] = glAt(X, Y); GLB.mat = 0;
+function glFlowers(X, Y, h) { const [u, v, z] = glAt(X, Y); glFlowersUV(u, v, z, h); }
+function glFlowersUV(u, v, z, h) { // a clump of stems and blooms
+  GLB.mat = 0;
   for (let k = 0; k < 3; k++) { const du = (k - 1) * .05, dv = ((k % 2) - .5) * .05; glBoxW(GLB.x + u + du, GLB.y + v + dv, .006, GLB.base + z * ZS, 1.4 * ZS, '#4f8a45'); glBlob(u + du, v + dv, .022, z + 1.6, .6, FLOWERS[(((h * 17) | 0) + k) % FLOWERS.length], 0); }
 }
 function glSmallTree(u, v, z, h, s, col) { // street, garden and park trees: a trunk and a leafy crown
@@ -669,9 +670,9 @@ function glBuildSite(c, B, cx, cy, st, f, hh) {
   GLB.wall = 0; GLB.mat = 0;
 }
 
-/* ---------- 3D-native models: buildings made straight in 3D (world units), not by running their 2D art ---------- */
+/* ---------- native models: buildings made straight in world units ---------- */
 // glModel(B) picks the model a building is drawn with in 3D: a landmark on a bigger lot (GL_BIG), else one from
-// GL_MODEL, else nothing and its 2D art runs through the primitives as before. New building art belongs here: move a type
+// GL_MODEL, else nothing and its older art (render.js primitives) builds it. New building art belongs here: move a type
 // over by adding GL_MODEL[type] = (B, st) => {...}. Helpers: gBox/gBeam/gRoof/gSpire/gWins (world units: x, y = height,
 // z), glCylAt/glDomeAt/glPyr/glDoor (tile-local u, v and pixel heights), gCone below; GLB.x/GLB.y is the tile, GLB.base
 // its ground, GLB.lod true for the close-up version (put small detail behind it).
@@ -952,11 +953,11 @@ function m4look(e, t, up) {
 function glInit() {
   const c = document.createElement('canvas'); c.id = 'gl3'; c.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;display:block;touch-action:none';
   const gl = c.getContext('webgl2', { antialias: false, alpha: false }); // (smoothing comes from the multisampled view below)
-  if (!gl) { toast('This browser has no WebGL2, so the 3D view can’t run here. Here’s the 2D one.'); return false; }
-  $('view').style.display = 'none'; document.body.insertBefore(c, $('view'));
+  if (!gl) { const m = $('nogl'); if (m) m.classList.add('show'); return false; } // (no WebGL2 in this browser: a note says so; the world still grows)
+  document.body.insertBefore(c, document.body.firstChild);
   GL3.c = c; GL3.gl = gl; GL3.on = true;
   GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sky = glProg(gl, GL_KVS, GL_KFS); GL3.prc = glProg(gl, GL_KVS, GL_PFS2);
-  GL3.smp = glProg(gl, GL_SMVS, GL_SMFS); GL3.smB = gl.createBuffer(); GL3.ptMax = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 64;
+  GL3.smp = glProg(gl, GL_SMVS, GL_SMFS); GL3.smB = gl.createBuffer(); GL3.ptMax = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 64; glFxInit(gl);
   try { GL3.post = { pr: glProg(gl, GL_KVS, GL_BFS), msF: gl.createFramebuffer(), msC: gl.createRenderbuffer(), msD: gl.createRenderbuffer(), ns: (GL3.lo = glSoft(gl) || QS.has('lo')) ? 0 : Math.min(4, gl.getParameter(gl.MAX_SAMPLES)), hdr: !!gl.getExtension('EXT_color_buffer_float'), lv: [], w: 0, h: 0 }; } catch (e) { GL3.post = null; }
   GL3.sh = glProg(gl, GL_SVS, GL_SFS); GL3.pk = glProg(gl, GL_PVS, GL_PFS);
   { const t0 = performance.now(), T = glTextures(); GL3.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex);
@@ -1050,6 +1051,7 @@ function glShot() { // choose what to look at next
   const pick1 = a => a[(Math.random() * a.length) | 0];
   const major = news.filter(e => e.k === 'major' || e.k === 'era'), ev = major.length ? major[major.length - 1] : news.length && chance(.7) ? pick1(news) : null;
   const z = (x, y) => surfZ(idx(clamp(Math.round(x), 0, W - 1), clamp(Math.round(y), 0, H - 1))) * ZS;
+  const hn = GL3.hint; GL3.hint = null; if (hn && GL3.t - hn.t < 20) return { at: () => [hn.x, z(hn.x, hn.y), hn.y], zoom: hn.zoom, pitch: rf(.3, .45), cap: hn.cap, dur: 22, hint: true }; // something the world asked us to look at
   const inc = (S.inc || []).find(I => !GL3.incSeen.has(I.id)) || ((S.inc || []).length && chance(.5) ? pick1(S.inc) : null); // an incident beats everything, and gets a second look now and then
   if (inc) { GL3.incSeen.add(inc.id); const T = S.T[inc.sid]; return { at: () => { const v = INCV.get(inc.id), x = v && v.fx != null ? v.fx : inc.x, y = v && v.fx != null ? v.fz : inc.y; return [x, z(x, y), y]; }, zoom: rf(2.2, 3), pitch: rf(.3, .42), cap: (INC_CAP[inc.k] || '') + (T ? ' in ' + T.name : ''), dur: 30 }; }
   if (ev) return { at: () => [ev.tx, z(ev.tx, ev.ty), ev.ty], zoom: rf(2.6, 4), pitch: rf(.34, .5), cap: ev.ic + ' ' + ev.t, sub: 'Year ' + Math.floor(ev.yr) };
@@ -1074,7 +1076,7 @@ function glDirector(dt) {
   if (idle < (GL3.userFollow && GL3.follow === GL3.userFollow ? FILM_IDLE * 3 : FILM_IDLE) && GL3.lastIn) return; // (someone you chose to follow gets longer)
   GL3.userFollow = null;
   let sh = GL3.shot;
-  if (!sh || (GL3.t - sh.t0) > (sh.dur || 30)) {
+  if (!sh || (GL3.t - sh.t0) > (sh.dur || 30) || GL3.hint && !sh.hint) { // (a hint from the world cuts in)
     try { sh = glShot(); } catch (e) { sh = null; }
     if (!sh) return;
     sh.t0 = GL3.t; sh.dur = sh.dur || rf(20, 34); sh.spin = (Math.random() < .5 ? -1 : 1) * rf(.025, .05);
@@ -1091,8 +1093,6 @@ function glDirector(dt) {
 }
 function glFrame(dt) {
   const gl = GL3.gl, c = GL3.c, cam = GL3.cam; GL3.t += dt; GL3.dt = dt; GL3.ft = performance.now(); // (when this frame began: a slow frame mustn't make the pointer look idle)
-  LIGHT.sun = sunNow(); if (!LIGHT.season || (LIGHT.seasonT -= dt) <= 0) { LIGHT.season = LIGHT.forceSeason || seasonNow(); LIGHT.seasonT = 300; }
-  stepWeather(dt); DIRTY.length = 0;
   const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
   // rebuild what changed, a few chunks a frame
@@ -1130,7 +1130,7 @@ function glFrame(dt) {
   const lit = el > 6 ? 0 : clamp((6 - el) / 12, 0, .75);
   // cameras
   const aspect = w / h, zz = cam.zoom; let pit = cam.pitch, dir = [Math.cos(pit) * Math.sin(cam.yaw), Math.sin(pit), Math.cos(pit) * Math.cos(cam.yaw)];
-  // perspective: a 38° lens backed off so the zoom still means "how much ground fits"; isometric: the flat lens of the 2D view
+  // perspective: a 38° lens backed off so the zoom still means "how much ground fits"; isometric: an orthographic lens
   if (cam.persp) { const d0 = zz / Math.tan(19 * DEG); pit = Math.max(pit, Math.asin(Math.min(.95, 2.2 / d0))); dir[0] = Math.cos(pit) * Math.sin(cam.yaw); dir[1] = Math.sin(pit); dir[2] = Math.cos(pit) * Math.cos(cam.yaw); } // stay above the rooftops
   const fov = 38 * DEG, dist = cam.persp ? zz / Math.tan(fov / 2) : 90, tgt = [cam.tx, cam.ty, cam.tz]; let eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
   if (cam.persp) for (let k = 0; k < 24; k++) { // tall buildings: tip the camera up until neither it nor the middle of its view line is inside one
@@ -1195,6 +1195,7 @@ function glFrame(dt) {
   gl.uniform1f(U.uFog0, (dist + zz * .6) * (1 - .85 * fog)); gl.uniform1f(U.uFogL, cam.persp ? 55 * (1 - .8 * fog) : 0);
   drawAll(true);
   glSmoke(gl, dt, FR, VP, h / 2 * (cam.persp ? 1 / Math.tan(fov / 2) : 1 / zz), day, tgt);
+  glFx(gl, VP, h / 2 * (cam.persp ? 1 / Math.tan(fov / 2) : 1 / zz), day); // particles, beams, overlays (fx3d.js)
   if ((wxs.rain || 0) > .05 || (wxs.snow || 0) > .05) { // rain or snow falling across the view
     const Q = GL3.prc; for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
     gl.useProgram(Q.p); gl.uniform1f(Q.u.uT, GL3.t); gl.uniform1f(Q.u.uRain, wxs.rain || 0); gl.uniform1f(Q.u.uSnow, wxs.snow || 0); gl.uniform1f(Q.u.uAsp, aspect); gl.uniform1f(Q.u.uYaw, cam.yaw);
@@ -1221,9 +1222,9 @@ function glFrame(dt) {
     GL3.hover = px[0] + px[1] * 256 + px[2] * 65536; GL3.hoverT = performance.now();
     if (GL3.tapAt) { const t = GL3.tapAt; GL3.tapAt = null; UI.lastMove = performance.now(); GL3.touched = true; if (UI.tool || GL3.hover >= GPID) glClick(t[0], t[1]); } // a tap: show what's there (a person or a nudge acts too)
   }
-  glTip();
+  glTip(); glOverlay(VP);
 }
-// the tooltip for whatever the pointer is on: the same cards as the 2D view
+// the tooltip for whatever the pointer is on
 function glTip() {
   const tip = $('tip'), id = GL3.hover || 0, now = GL3.ft || performance.now();
   if (!id || GL3.drag && GL3.drag[4] || now - UI.lastMove > (GL3.touched ? 6000 : 2500) || document.querySelector('.modal.show') || document.elementFromPoint(UI.mouse.x, UI.mouse.y) !== GL3.c) { tip.style.opacity = 0; DYN.hover = -1; return; }
@@ -1387,27 +1388,19 @@ function glPeople() {
       const w = DYN.walkers[k], p = walkerPos(w); if (!p || p[3] < .3) continue; GLB.id = w.pid ? GPID + k : 0; // a person you can point at
       const X = p[0], Z = p[1], y0 = p[2] * ZS; GLB.ao = .35 + .65 * aoAt(X, y0 + .15, Z, 0, 1, 0); // darker down an alley
       glPerson(w, X, Z, y0, glHeading(w, p[4], p[5]), !!p[6], night && w.ln < (S.era === 0 ? .6 : .12));
+      if (w.pid) glMark(w, X, Z, y0); // (the people you know: a diamond over them)
     }
+    glPrayerCandles();
     GLB.id = 0; GLB.ao = 1;
     for (const hd of DYN.herds) for (const m of hd.members) { const [fx, fy, z] = agentPos(m), bx = m.b % W - m.a % W, by = ((m.b / W) | 0) - ((m.a / W) | 0); glSheep(fx, fy, z * ZS, (m.size || 1) * (m.baby ? .6 : 1), glHeading(m, bx, by), m.pause > 0 ? -1 : DYN.t * 3 + (m.a % 7)); }
     GLB.id = 0; GLB.ao = 1; glIncidents(GL3.dt || .016);
     GLB.id = 0; GLB.ao = 1; try { glWorks(); } catch (e) { if (QS.has('dev')) console.error(e); }
+    GLB.id = 0; GLB.ao = 1; try { glFxDyn(); } catch (e) { if (QS.has('dev')) console.error(e); }
     GLB.id = 0; GLB.ao = 1; try { glTraffic(); } catch (e) { if (QS.has('dev')) console.error(e); }
     for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; GLB.ao = .35 + .65 * aoAt(p[0], p[2] * ZS + .15, p[1], 0, 1, 0); glVehicle(c, p[0], p[1], p[2] * ZS, glHeading(c, p[4], p[5]), true); }
   } catch (e) { if (QS.has('dev')) console.error(e); } finally { GLB = null; }
   return v.a.subarray(0, v.length);
 }
-
-/* ---------- switching between the 2D and 3D views (3D by default) ---------- */
-const GL_DEFAULT = true; // new worlds and new browsers open in 3D (the choice is remembered)
-function glWanted() { if (QS.has('2d')) return false; try { if (localStorage.getItem('sf2d') === '1') return false; } catch (e) { } return true; } // always 3D (2D stays as the fallback for ?2d and browsers without WebGL2)
-function glToggle() {
-  const want = !GL3.on; try { localStorage.setItem('sf3d', want ? '1' : '0'); } catch (e) { }
-  if (want) { if (!GL3.gl) glInit(); else { GL3.on = true; GL3.c.style.display = 'block'; $('view').style.display = 'none'; for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); } }
-  else { ensure2D(); GL3.on = false; GL3.c.style.display = 'none'; $('view').style.display = 'block'; const h = $('glHint'); if (h) h.remove(); $('tip').style.opacity = 0; renderAll(); relightNow(); }
-  glBtn();
-}
-function glBtn() { const b = $('glBtn'); if (b) b.remove(); } // (the 2D/3D switch is gone)
 
 /* ---------- textures, painted in code at start-up (no image files): one layer each in a texture array ---------- */
 // Materials: 0 none, 1 grass, 2 brick, 3 roof tiles, 4 bark, 5 leaves, 6 plaster, 7 stone, 8 planks, 9 cobbles, 10 asphalt, 11 earth.

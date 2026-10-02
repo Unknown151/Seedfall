@@ -18,7 +18,7 @@ await p.route('https://api.anthropic.com/v1/messages', async route => {
     : { entries: [{ years_from_now: 0, icon: '🥧', text: 'Somebody has been eating the festival decorations again. Everyone suspects the speaker.' }, { years_from_now: 3, icon: '🪁', text: 'A kite contest ends in a tie when both kites land on the same mossback.' }] };
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id:'msg_test123', type:'message', role:'assistant', model: body.model, content:[{type:'tool_use', id:'toolu_1', name: body.tools[0].name, input}], stop_reason:'tool_use', usage:{input_tokens:1912, output_tokens:436} }) });
 });
-await p.goto(ROOT+'seedfall.html?seed=4242&fresh&nointro&2d'); // (the Voice panel; 3D is glpick's)
+await p.goto(ROOT+'seedfall.html?seed=4242&fresh&nointro&headless'); // (the Voice panel: nothing needs drawing)
 await p.waitForTimeout(800);
 await p.evaluate(()=>SF.ff(300));
 await p.evaluate(async()=>{ await speak('Remember to drink water.'); });                       // offline (no key)

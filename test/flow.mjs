@@ -5,7 +5,7 @@ const p = await ctx.newPage();
 const errs=[]; p.on('pageerror', e=>errs.push('PAGEERR '+e.message+' '+e.stack)); p.on('console', m=>{ if(m.type()==='error') errs.push('console: '+m.text())});
 // mock the folder picker with OPFS
 await p.addInitScript(()=>{ window.showDirectoryPicker = async()=>{ const root = await navigator.storage.getDirectory(); return await root.getDirectoryHandle('seedfall-data',{create:true}); }; });
-await p.goto(HTTP+'seedfall.html?2d'); // (saving is the same in both views; headless 3D is too slow for these timings)
+await p.goto(HTTP+'seedfall.html?headless'); // (saving: nothing needs drawing, and software 3D is too slow for these timings)
 await p.waitForTimeout(1200);
 await p.screenshot({path:'flow_welcome.png'});
 await p.click('#wFolder');

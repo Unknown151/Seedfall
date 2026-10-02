@@ -185,21 +185,3 @@ function drawShops(c, B, cx, cy, st) {
   box(c, cx, cy, 0, 0, .37, .33, 37, 1.2, shade(st.trim, 1.2));
 }
 
-/* ---------- zone view (Z): a tint over every town's quarters ---------- */
-function drawZoneView(c) {
-  const lw = 1.4 / CAM.z;
-  for (let i = 0; i < W * H; i++) {
-    const z = M.zone[i]; if (!z) continue;
-    const x = i % W, y = (i / W) | 0, [X, Y] = tileTop(i), col = ZONE_COL[z];
-    c.fillStyle = `rgba(${col},.4)`;
-    c.beginPath(); c.moveTo(X, Y); c.lineTo(X + 16, Y + 8); c.lineTo(X, Y + 16); c.lineTo(X - 16, Y + 8); c.closePath(); c.fill();
-    // a firmer line where one quarter meets another
-    const diff = (dx, dy) => !inb(x + dx, y + dy) || M.zone[idx(x + dx, y + dy)] !== z;
-    c.strokeStyle = `rgba(${col},.95)`; c.lineWidth = lw; c.beginPath();
-    if (diff(1, 0)) { c.moveTo(X + 16, Y + 8); c.lineTo(X, Y + 16); }
-    if (diff(0, 1)) { c.moveTo(X, Y + 16); c.lineTo(X - 16, Y + 8); }
-    if (diff(-1, 0)) { c.moveTo(X - 16, Y + 8); c.lineTo(X, Y); }
-    if (diff(0, -1)) { c.moveTo(X, Y); c.lineTo(X + 16, Y + 8); }
-    c.stroke();
-  }
-}

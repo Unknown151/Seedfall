@@ -3,7 +3,7 @@ const b = await launch();
 const ctx = await b.newContext({viewport:{width:1920,height:1080}});
 const p = await ctx.newPage();
 const errs=[]; p.on('pageerror', e=>errs.push('PAGEERR '+e.message+' '+(e.stack||'').split('\n').slice(0,3).join(' | ')));
-await p.goto(ROOT+'seedfall.html?seed=4242&fresh&nointro&2d'); // (the Voice panel; 3D is glpick's)
+await p.goto(ROOT+'seedfall.html?seed=4242&fresh&nointro&headless'); // (the Voice panel: nothing needs drawing)
 await p.waitForTimeout(800);
 await p.evaluate(()=>SF.ff(400));
 

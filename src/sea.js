@@ -169,58 +169,6 @@ function shipPos(sh) {
   return [p[0], p[1], 1, p[4], p[5]];
 }
 
-/* ---------- drawing things that float: oriented shapes in any heading ---------- */
-function orient(x, y, fx, fy) { const rx = -fy, ry = fx; return (a, b, z) => { const u = a * fx + b * rx, v = a * fy + b * ry; return [x + (u - v) * 16, y + (u + v) * 8 - z]; }; }
-function prism(c, P, fx, fy, pts, z0, z1, side, top) {
-  const n = pts.length; let ca = 0, cb = 0; for (const [a, b] of pts) { ca += a / n; cb += b / n; }
-  const rx = -fy, ry = fx;
-  for (let k = 0; k < n; k++) {
-    const [a0, b0] = pts[k], [a1, b1] = pts[(k + 1) % n];
-    let na = b1 - b0, nb = -(a1 - a0);
-    if (na * ((a0 + a1) / 2 - ca) + nb * ((b0 + b1) / 2 - cb) < 0) { na = -na; nb = -nb; }
-    const gx = na * fx + nb * rx, gy = na * fy + nb * ry;
-    if (gx + gy <= 0) continue;
-    poly(c, [P(a0, b0, z0), P(a1, b1, z0), P(a1, b1, z1), P(a0, b0, z1)], shade(side, lf(gx, gy, 0)));
-  }
-  if (top) poly(c, pts.map(([a, b]) => P(a, b, z1)), topC(shade(top, LT.fT)));
-}
-const HULL = (L, B) => [[-L, -B], [-L, B], [L * .45, B], [L, 0], [L * .45, -B]];
-function wake(c, P, L, moving) { if (!moving) return; c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = .5; for (const s of [-1, 1]) { const a = P(-L, s * .03, 0), b = P(-L - .35, s * .14, 0); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); } }
-function drawShip(c, sh, x, y, fx, fy, al, dl, moving) {
-  c.globalAlpha = al;
-  const P = orient(x, y, fx, fy), k = sh.kind;
-  const L = k === 'sail' ? .5 : k === 'steamer' ? .62 : k === 'freighter' ? .78 : k === 'boxship' ? .92 : .75, Bw = k === 'sail' ? .13 : k === 'boxship' ? .18 : .15;
-  const [sx, sy] = P(0, 0, 0); ell(c, sx, sy + .5, L * 26, L * 11, 'rgba(20,40,60,.14)');
-  wake(c, P, L, moving);
-  if (k === 'hover') { ell(c, sx, sy, L * 24, L * 10, 'rgba(95,208,201,.25)'); dl(sx, sy, 14, '#7fe8e0', .5, 1); }
-  const zb = k === 'hover' ? 2.5 : 0, hullC = k === 'sail' ? '#7b5238' : k === 'hover' ? '#eef2f6' : sh.col, deck = k === 'sail' ? '#c9a06a' : k === 'hover' ? '#f8fafc' : '#b9b3aa';
-  prism(c, P, fx, fy, HULL(L, Bw), zb, zb + (k === 'sail' ? 2.2 : 2.8), hullC, deck);
-  const zd = zb + (k === 'sail' ? 2.2 : 2.8);
-  if (k === 'sail') {
-    prism(c, P, fx, fy, [[-L, -Bw * .9], [-L, Bw * .9], [-L * .6, Bw * .9], [-L * .6, -Bw * .9]], zd, zd + 2.2, '#8a6446', '#a57c55'); // the stern castle
-    for (const [a, h] of [[L * .15, 17], [-L * .3, 13]]) {
-      const m0 = P(a, 0, zd), m1 = P(a, 0, zd + h); line(c, m0[0], m0[1], m1[0], m1[1], '#5a4436', .6);
-      const w = Bw * 2.1, face = shade('#fbf4e2', lf(fx, fy, .2) > lf(-fx, -fy, .2) ? lf(fx, fy, .2) : lf(-fx, -fy, .2));
-      poly(c, [P(a, -w, zd + h * .3), P(a, w, zd + h * .3), P(a + .03, w * .9, zd + h * .95), P(a + .03, -w * .9, zd + h * .95)], face);
-    }
-    if (LIGHT.emK > .02) { const [lx, ly] = P(-L, 0, zd + 3); circ(c, lx, ly, .6, '#ffd27a'); dl(lx, ly, 5, '#ffb45e', .9); }
-  } else if (k === 'steamer') {
-    prism(c, P, fx, fy, [[-L * .5, -Bw * .7], [-L * .5, Bw * .7], [L * .15, Bw * .7], [L * .15, -Bw * .7]], zd, zd + 3.2, '#f2efe8', '#e6e1d8');
-    const [fx0, fy0] = P(-L * .05, 0, zd + 3.2); c.fillStyle = '#2f2f36'; c.fillRect(fx0 - 1, fy0 - 5, 2, 5); c.fillStyle = '#c0584f'; c.fillRect(fx0 - 1, fy0 - 5, 2, 1.2);
-    if (moving && chance(.08)) addPart(fx0, fy0 - 5.5, rf(-3, 3), rf(-7, -4), rf(2.5, 4), '#e8e4df', .45, 'smoke', 1.4);
-    if (LIGHT.emK > .02) { const [wx, wy] = P(-L * .2, Bw * .7, zd + 1.6); dl(wx, wy, 6, '#ffe2a0', .8); }
-  } else if (k === 'freighter' || k === 'boxship') {
-    prism(c, P, fx, fy, [[-L, -Bw * .8], [-L, Bw * .8], [-L * .7, Bw * .8], [-L * .7, -Bw * .8]], zd, zd + 5, '#f2efe8', '#e6e1d8'); // bridge at the stern
-    const [bx, by] = P(-L * .85, 0, zd + 5); c.fillStyle = '#2f2f36'; c.fillRect(bx - .8, by - 3, 1.6, 3);
-    if (k === 'boxship') { const cols = ['#c0584f', '#3f7fb0', '#e0a43a', '#4e9a6a', '#8a6ab0']; let n = 0; for (let a = -L * .6; a < L * .35; a += .12) for (let lay = 0; lay < 2; lay++) { const cc = cols[(n++ * 7 + ((sh.id * 10) | 0)) % cols.length]; prism(c, P, fx, fy, [[a, -Bw * .75], [a, Bw * .75], [a + .1, Bw * .75], [a + .1, -Bw * .75]], zd + lay * 2, zd + lay * 2 + 2, cc, cc); } }
-    else { for (const a of [-L * .4, L * .05]) prism(c, P, fx, fy, [[a - .1, -Bw * .6], [a - .1, Bw * .6], [a + .1, Bw * .6], [a + .1, -Bw * .6]], zd, zd + 1.2, '#6f7680', RES_COL[sh.r] || '#8a8f99'); }
-    if (LIGHT.emK > .02) { const [wx, wy] = P(-L * .85, Bw * .8, zd + 3); dl(wx, wy, 7, '#fff0c8', .8); const [mx, my] = P(L * .9, 0, zd + 4); circ(c, mx, my, .5, '#fff'); dl(mx, my, 5, '#ffffff', .9); }
-  } else { // hover freighter
-    prism(c, P, fx, fy, [[-L * .6, -Bw * .6], [-L * .6, Bw * .6], [L * .2, Bw * .6], [L * .2, -Bw * .6]], zd, zd + 3, '#dfe7ee', '#f4f7fa');
-    const [gx, gy] = P(-L, 0, zd); dl(gx, gy, 6, '#9ff0ea', .8);
-  }
-  c.globalAlpha = 1;
-}
 
 /* ---------- fishing boats: out in the morning, home at dusk ---------- */
 function waterPath(a, b, maxN) { // plain BFS over open water
@@ -271,22 +219,6 @@ function boatPos(b) {
   if (b.st === 'moor') { const B = S.B[b.dock]; if (!B) return null; return [b.home % W - B.dir[0] * .22 + B.dir[1] * .12, ((b.home / W) | 0) - B.dir[1] * .22 + B.dir[0] * .12, 1, b.hx, b.hy, 0]; }
   if (b.st === 'fish') { const x = b.g % W, y = (b.g / W) | 0, a = b.ph * .12; return [x + Math.cos(a) * .18, y + Math.sin(a) * .18, 1, -Math.sin(a), Math.cos(a), 0]; }
   const p = pathPos(b, 0, false, false); return [p[0], p[1], 1, p[4], p[5], 1];
-}
-function drawBoat(c, b, x, y, fx, fy, moving, dl) {
-  const P = orient(x, y, fx, fy), steam = hasTech('steam'), bob = Math.sin(b.ph * 2.2) * .35;
-  y += bob;
-  const Q = orient(x, y, fx, fy);
-  ell(c, x, y + .5, 5, 2, 'rgba(20,40,60,.12)');
-  wake(c, Q, .2, moving);
-  prism(c, Q, fx, fy, HULL(.2, .07), 0, 1.6, steam ? '#4f6f86' : '#8a5a3c', steam ? '#d9d4cc' : '#c9a06a');
-  prism(c, Q, fx, fy, [[-.16, -.045], [-.16, .045], [-.05, .045], [-.05, -.045]], 1.6, 3.4, steam ? '#f2efe8' : '#a57c55', steam ? '#c0584f' : '#8a6446');
-  const m0 = Q(.06, 0, 1.6), m1 = Q(.06, 0, 8); line(c, m0[0], m0[1], m1[0], m1[1], '#5a4436', .45);
-  if (!steam) { const w = .09; poly(c, [Q(.06, 0, 2.6), Q(.06, 0, 7.6), Q(.18, 0, 2.8)], '#fbf4e2'); }
-  if (b.st === 'fish') { // the net goes over the side
-    const a = Q(.06, 0, 7), e = Q(.05, .28, 0); c.strokeStyle = 'rgba(70,60,50,.7)'; c.lineWidth = .3; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(e[0], e[1]); c.stroke();
-    ell(c, e[0], e[1], 1.6, .6, 'rgba(60,70,80,.35)');
-  }
-  const [lx, ly] = Q(-.1, 0, 4.2); dl(lx, ly, 4.5, '#ffc766', .85);
 }
 
 /* ---------- ferries: across the water where the way round is long ---------- */
@@ -349,34 +281,4 @@ function stepFerries(dt) {
 function ferryPos(o) {
   const f = o.f, ax = f.a % W, ay = (f.a / W) | 0, s = .74, e = f.len + .26, d = lerp(s, Math.max(s + .2, e), smooth(o.t));
   return [ax + f.dir[0] * d, ay + f.dir[1] * d, f.dir[0], f.dir[1], o.wait <= 0];
-}
-function drawFerry(c, o, x, y, fx, fy, moving, dl) {
-  y += Math.sin(o.ph * 1.8) * .3;
-  const P = orient(x, y, fx, fy), steam = hasTech('steam'), raft = !hasTech('wheel');
-  ell(c, x, y + .5, 6, 2.4, 'rgba(20,40,60,.12)');
-  wake(c, P, .2, moving);
-  if (raft) { prism(c, P, fx, fy, [[-.2, -.13], [-.2, .13], [.2, .13], [.2, -.13]], 0, 1.2, '#8a6446', '#b08a5e'); }
-  else { prism(c, P, fx, fy, [[-.24, -.13], [-.24, .13], [.24, .13], [.24, -.13]], 0, 1.8, steam ? '#e9e4da' : '#7b5238', steam ? '#c9c2b6' : '#b08a5e'); prism(c, P, fx, fy, [[-.08, -.08], [-.08, .08], [.08, .08], [.08, -.08]], 1.8, 4.4, steam ? '#f4f1ea' : '#a57c55', steam ? '#3f6e8c' : '#8a6446'); }
-  // a few passengers
-  for (const [a, b, col] of [[.14, -.06, '#c0584f'], [-.15, .05, '#3f6e8c'], [.15, .07, '#e0a43a']]) { const [px, py] = P(a, b, raft ? 1.2 : 1.8); c.fillStyle = col; c.fillRect(px - .6, py - 2.6, 1.2, 2.6); circ(c, px, py - 3, .55, '#e8c4a0'); }
-  const [lx, ly] = P(0, 0, raft ? 3 : 5); dl(lx, ly, 5, '#ffc766', .85);
-}
-// a landing stage on the bank (static layer)
-function drawLanding(c, i, cx, cy, d) {
-  const [dx, dy] = d;
-  box(c, cx, cy, dx * .38, dy * .38, dx ? .12 : .16, dy ? .12 : .16, -1.5, 2, '#9b7657');
-  const [px, py] = pt(cx, cy, dx * .3 + dy * .14, dy * .3 + dx * .14, 0); line(c, px, py, px, py - 6, '#6b5040', .6);
-  circ(c, px, py - 6.3, .7, LT.lit ? '#ffd27a' : '#c9a67a'); emit(px, py - 6, 6, LT.lampC, .8); emit(px, py, 9, LT.lampC, .25, 1);
-}
-
-/* ---------- lighthouse beams (drawn with the night light) ---------- */
-const BEAMS = [];
-function drawBeams(c) {
-  for (const [x, y, a] of BEAMS) {
-    const ex = Math.cos(a), ey = Math.sin(a), sx = (ex - ey) * 16, sy = (ex + ey) * 8, n = Math.hypot(sx, sy) || 1, ux = sx / n, uy = sy / n, L = 190, sp = .09;
-    const g = c.createLinearGradient(x, y, x + ux * L, y + uy * L); g.addColorStop(0, 'rgba(255,240,196,.5)'); g.addColorStop(1, 'rgba(255,240,196,0)');
-    c.fillStyle = g; c.beginPath(); c.moveTo(x, y); c.lineTo(x + (ux - uy * sp) * L, y + (uy + ux * sp) * L); c.lineTo(x + (ux + uy * sp) * L, y + (uy - ux * sp) * L); c.closePath(); c.fill();
-    drawGlow(c, x, y, 9, '#fff3cf', .9);
-  }
-  BEAMS.length = 0;
 }

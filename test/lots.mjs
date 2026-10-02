@@ -8,7 +8,7 @@ const errs = []; p.on('pageerror', e => errs.push(e.message + ' ' + (e.stack || 
 let fails = 0;
 const ok = (c, what, extra = '') => { console.log(`${c ? 'ok  ' : 'FAIL'} ${what}${extra ? ' · ' + extra : ''}`); if (!c) fails++; };
 // seed 999 has open sea by its towns
-await p.goto(ROOT + 'seedfall.html?seed=' + (process.env.SEED || 999) + '&fresh&nointro' + (SHOTS ? '' : '&2d')); await p.waitForTimeout(700);
+await p.goto(ROOT + 'seedfall.html?seed=' + (process.env.SEED || 999) + '&fresh&nointro' + (SHOTS ? '' : '&headless')); await p.waitForTimeout(700);
 
 const check = () => p.evaluate(() => {
   const big = Object.values(S.B).filter(B => fpBig(B)); let bad = 0, stray = 0;

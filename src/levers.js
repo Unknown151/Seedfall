@@ -130,48 +130,14 @@ function customsList() {
   return out;
 }
 
-/* ---------- map labels for named places ---------- */
-function drawLabels(c) {
-  if (!S.names || !S.names.length) return;
-  const za = sstep(3.2, 1.6, CAM.z) * .9 + .1;
-  c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.font = `italic 600 ${CAM.z > 2 ? 15 : 13}px Georgia,"Palatino Linotype",serif`;
-  const night = LIGHT.nightK;
-  for (const f of S.names) {
-    const x = f.i % W, y = (f.i / W) | 0, [wx, wy] = gridToWorld(x, y, M.water[f.i] ? SEAZ : surfZ(f.i));
-    const [sx, sy] = w2s(wx, wy - (f.k === 'peak' ? 14 : 0));
-    if (sx < -100 || sy < -40 || sx > VW + 100 || sy > VH + 40) continue;
-    const t = f.k === 'peak' ? '▲ ' + f.n : f.n;
-    c.globalAlpha = za;
-    c.lineWidth = 3.5; c.strokeStyle = night > .5 ? 'rgba(10,14,34,.55)' : 'rgba(40,50,70,.35)'; c.strokeText(t, sx, sy);
-    c.fillStyle = night > .5 ? 'rgba(230,236,255,.85)' : f.k === 'river' || f.k === 'sea' ? 'rgba(236,250,255,.95)' : 'rgba(255,250,240,.95)'; c.fillText(t, sx, sy);
+
+/* ---------- sky lanterns: after dark, where the custom holds, the towns let paper lanterns go ---------- */
+function stepLanterns(dt) {
+  const w = leverW('lanterns'), e = GL3.eye; if (!w || !e || FAST || (LIGHT.emK || 0) <= .35 || S.wx && (S.wx.rain > .3 || S.wx.storm > .2)) return;
+  for (const T of towns()) {
+    if (!chance(dt * Math.sqrt(T.pop) * .012 * w) || Math.hypot(T.x - e[0], T.y - e[2]) > 50) continue;
+    const x = T.x + rf(-2.5, 2.5), y = T.y + rf(-2.5, 2.5), col = lever('lights') === 'colourful' ? pick(['#ff9ad0', '#9ad8ff', '#ffe27a', '#c9a8ff']) : pick(['#ffb45e', '#ffc46e', '#ff9f4f']);
+    part3(x, gGround(x, y) + .2, y, rf(.05, .15), rf(.2, .35), rf(.03, .1), rf(30, 55), col, .9, .1, { glow: 1, wob: rf(0, TAU) });
   }
-  c.globalAlpha = 1; c.textAlign = 'left';
 }
 
-/* ---------- sky lanterns ---------- */
-function stepLanterns(dt) {
-  const L = DYN.lanterns || (DYN.lanterns = []);
-  const w = leverW('lanterns');
-  if (w && LIGHT.emK > .35 && !(S.wx && (S.wx.rain > .3 || S.wx.storm > .2))) {
-    for (const T of towns()) {
-      if (!chance(dt * Math.sqrt(T.pop) * .012 * w)) continue;
-      const fx = T.x + rf(-2.5, 2.5), fy = T.y + rf(-2.5, 2.5), i = idx(clamp(Math.round(fx), 0, W - 1), clamp(Math.round(fy), 0, H - 1));
-      const [wx, wy] = gridToWorld(fx, fy, surfZ(i) + 4);
-      if (!inView(wx, wy, 300)) continue;
-      L.push({ x: wx, y: wy, vx: rf(2, 5), vy: -rf(5, 9), t: 0, life: rf(30, 55), ph: rnd() * TAU, col: lever('lights') === 'colourful' ? pick(['#ff9ad0', '#9ad8ff', '#ffe27a', '#c9a8ff']) : pick(['#ffb45e', '#ffc46e', '#ff9f4f']) });
-    }
-  }
-  for (const l of L) { l.t += dt; l.x += (l.vx + Math.sin(l.t * .4 + l.ph) * 2) * dt; l.y += l.vy * dt; }
-  DYN.lanterns = L.filter(l => l.t < l.life);
-}
-function drawLanterns(c) {
-  const L = DYN.lanterns; if (!L || !L.length) return;
-  c.globalCompositeOperation = 'lighter';
-  for (const l of L) {
-    const a = Math.min(1, l.t / 2, (l.life - l.t) / 6) * (.75 + .25 * Math.sin(l.t * 3 + l.ph)) * Math.max(.3, LIGHT.emK);
-    drawGlow(c, l.x, l.y, 7, l.col, a * .8);
-    c.globalAlpha = a; c.fillStyle = '#fff1d0'; c.fillRect(l.x - .7, l.y - 1, 1.4, 1.8);
-  }
-  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
-}

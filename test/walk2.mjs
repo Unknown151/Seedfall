@@ -2,7 +2,7 @@ import { launch, ROOT, HTTP } from './env.mjs';
 const b = await launch();
 const p = await b.newPage({viewport:{width:1920,height:1080}});
 const errs=[]; p.on('pageerror', e=>errs.push('PAGEERR '+e.message+' '+(e.stack||'').split('\n').slice(0,4).join(' | ')));
-await p.goto(ROOT+'seedfall.html?seed=777&fresh&nointro&dev');
+await p.goto(ROOT+'seedfall.html?seed=777&fresh&nointro&dev&headless'); // (walking doesn't need drawing, and headless frames come at full speed)
 await p.waitForTimeout(800);
 await p.evaluate(()=>{ SF.ff(1500); S.settings.captions=false; });
 // outside counts by time of day

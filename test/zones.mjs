@@ -31,8 +31,7 @@ ok(r.joined > 0 && r.asym === 0, 'rowhouses keep their terraces', `${r.joined} j
 // the zone view and the tooltips
 await p.keyboard.press('z'); await p.waitForTimeout(300);
 ok(await p.evaluate(() => UI.zones === true), 'Z shows the zone view');
-await p.evaluate(() => { SF.weather('clear', 9999); SF.hour(13); const T = towns().sort((a, b) => b.pop - a.pop)[0]; const [wx, wy] = gridToWorld(T.x, T.y, 0); CAM.x = CAM.tx = wx; CAM.y = CAM.ty = wy; CAM.z = CAM.tz = 2; CAM.manualUntil = DYN.t + 999; });
-await p.waitForTimeout(2200); await p.screenshot({ path: 'zones_view.png' });
+if (!(await p.evaluate(() => typeof HEADLESS !== 'undefined' && HEADLESS))) { await p.evaluate(() => { SF.weather('clear', 9999); SF.hour(13); const T = towns().sort((a, b) => b.pop - a.pop)[0]; Object.assign(GL3.cam, { tx: T.x, tz: T.y, ty: surfZ(idx(T.x, T.y)) * ZS, zoom: 5, pitch: .9, auto: false }); }); await p.waitForTimeout(2200); await p.screenshot({ path: 'zones_view.png' }); }
 await p.keyboard.press('z');
 ok(await p.evaluate(() => UI.zones === false), 'Z again hides it');
 const tip = await p.evaluate(() => { const B = Object.values(S.B).find(B => B.type === 'house' && B.prog >= 1 && houseJoin(B) && M.zone[idx(B.x, B.y)]); return B ? tipFor(idx(B.x, B.y)).replace(/<[^>]+>/g, ' ') : ''; });

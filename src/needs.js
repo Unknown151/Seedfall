@@ -254,19 +254,10 @@ function springAt(i) {
   return SPRINGS.set.has(i);
 }
 const nearSpring = (x, y) => { for (const [dx, dy] of N4) { const nx = x + dx, ny = y + dy; if (inb(nx, ny) && springAt(idx(nx, ny))) return true; } return false; };
-function drawSpring(c, i, cx, cy) {
-  const P = (u, v) => pt(cx, cy, u, v, .3);
-  for (let k = 0; k < 9; k++) { const a = k / 9 * TAU, [sx, sy] = P(Math.cos(a) * .3, Math.sin(a) * .3); ell(c, sx, sy, 2.2, 1.3, topC(shade('#b7afa4', LT.fT))); }
-  const [px, py] = P(0, 0); ell(c, px, py, .27 * 22.6, .27 * 11.3, topC(shade('#62c9c4', LT.fG)));
-  ell(c, px - 1.5, py - .8, .12 * 22.6, .1 * 11.3, 'rgba(255,255,255,.35)');
-  emit(px, py, 9, '#9ff0ea', .35);
-}
-function springSteam(dt) {
-  for (const o of S.springs || []) {
-    if (!chance(dt * .9)) continue;
-    const [cx, cy] = gridToWorld(o.x, o.y, landZ(idx(o.x, o.y))); if (!inView(cx, cy, 120)) continue;
-    addPart(cx + rf(-5, 5), cy - 1, rf(-2, 2), rf(-7, -4), rf(3, 5), '#f4f7f7', .4, 'mist', 2.2);
-  }
+function glSpring(i) { // a hot spring: a ring of stones round a steaming teal pool (the steam rises in fx3d.js)
+  for (let k = 0; k < 9; k++) { const a = k / 9 * TAU; glBlob(Math.cos(a) * .3, Math.sin(a) * .3, .06, .5, .7, '#b7afa4', M_STONE); }
+  const C = gcol('#62c9c4'), O = gw(0, 0, .5); GLB.mat = 0; GLB.ctr = gw(0, 0, -10);
+  for (let k = 0; k < 12; k++) { const a = k / 12 * TAU, b = (k + 1) / 12 * TAU; gtri(O, gw(Math.cos(a) * .27, Math.sin(a) * .27, .5), gw(Math.cos(b) * .27, Math.sin(b) * .27, .5), C, -1); } // (water: it ripples and catches the sun)
 }
 const FINDS = ['a Maker tool of green glass that still hums faintly', 'a seed-shaped stone carved with the falling glyph', 'a mosaic of a forest, seen from high above',
   'a buried garden terrace, its steps still perfectly level', 'a flute that plays only one very sad note', 'a star chart pieced together from forty shards',

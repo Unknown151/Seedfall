@@ -4,32 +4,10 @@ const $ = id => document.getElementById(id);
 
 function bindUI() {
   addEventListener('keydown', onKey);
-  const v = $('view');
-  addEventListener('mousemove', e => {
+  addEventListener('mousemove', e => { // (dragging, the wheel and clicks on the view itself are gl.js's)
     UI.lastMove = performance.now(); document.body.classList.add('active'); document.body.classList.remove('nocursor');
     UI.mouse.x = e.clientX; UI.mouse.y = e.clientY;
-    if (UI.drag) {
-      const dx = e.clientX - UI.drag.x, dy = e.clientY - UI.drag.y;
-      if (Math.abs(dx) + Math.abs(dy) > 3) UI.drag.moved = true;
-      CAM.tx = UI.drag.cx - dx / CAM.z; CAM.ty = UI.drag.cy - dy / CAM.z; CAM.x = CAM.tx; CAM.y = CAM.ty;
-      CAM.manualUntil = DYN.t + 90;
-    }
   });
-  v.addEventListener('mousedown', e => { if (e.button !== 0) return; UI.drag = { x: e.clientX, y: e.clientY, cx: CAM.x, cy: CAM.y, moved: false }; });
-  addEventListener('mouseup', e => {
-    const d = UI.drag; UI.drag = null;
-    if (d && !d.moved && e.target === v) onMapClick(e.clientX, e.clientY);
-  });
-  v.addEventListener('wheel', e => {
-    e.preventDefault();
-    const [wx, wy] = s2w(e.clientX, e.clientY);
-    const nz = clamp(CAM.tz * Math.pow(1.0015, -e.deltaY), minZoom(), 4);
-    CAM.tz = nz; CAM.z = nz;
-    const [wx2, wy2] = s2w(e.clientX, e.clientY);
-    CAM.x += wx - wx2; CAM.y += wy - wy2; CAM.tx = CAM.x; CAM.ty = CAM.y;
-    CAM.manualUntil = DYN.t + 90;
-  }, { passive: false });
-  v.addEventListener('mouseleave', () => { $('tip').style.opacity = 0; DYN.hover = -1; });
   document.querySelectorAll('.tool[data-tool]').forEach(b => {
     b.addEventListener('click', () => selectTool(b.dataset.tool));
     b.addEventListener('mouseenter', () => { const k = b.dataset.tool, [n, d] = TOOL_INFO[k]; const t = $('tip2'); t.textContent = `${n}: ${d} · ${COST[k]} ✨${toolReady(k) ? '' : ` (you have ${Math.floor(S.rev)})`}`; t.style.opacity = 1; });
@@ -44,11 +22,11 @@ function bindUI() {
     if (e.target.closest('[data-voiceset]')) { openAISettings(); return; }
     if (e.target.closest('[data-back]')) { UI.personSel = null; renderPanelBody(true); return; }
     const fo = e.target.closest('[data-follow]');
-    if (fo) { CAM.followPid = +fo.dataset.follow; CAM.followUntil = DYN.t + 45; CAM.manualUntil = 0; const fw = DYN.walkers.find(w => w.pid === CAM.followPid); if (fw && fw.st === 'in') fw.until = Math.min(fw.until, DYN.t + 1.5); toast('Following them around for a bit.'); return; }
+    if (fo) { toast(camFollow(+fo.dataset.follow) ? 'Following them around for a bit.' : 'They’re indoors just now. Try again in a moment.'); return; }
     const pe = e.target.closest('[data-pid]');
     if (pe) { UI.panelHover = null; $('tip').style.opacity = 0; UI.personSel = +pe.dataset.pid; renderPanelBody(true); $('pBody').scrollTop = 0; return; }
     const el = e.target.closest('[data-x]'); if (!el) return;
-    focusOn(+el.dataset.x, +el.dataset.y, 1.8, 30); CAM.manualUntil = 0;
+    camLook(+el.dataset.x, +el.dataset.y, 3);
   });
   $('pBody').addEventListener('mouseover', e => {
     const pe = e.target.closest('[data-pid]'); if (!pe) return;
@@ -112,48 +90,14 @@ function onKey(e) {
     else if ($('speak').classList.contains('show')) $('speak').classList.remove('show');
     else if (UI.panel) togglePanel();
   }
-  else if (k === 'Home' || k === '0') { CAM.manualUntil = 0; CAM.focusUntil = 0; CAM.nextTour = 0; toast('Camera handed back.'); }
-  else if (k === '+' || k === '=') { CAM.tz = clamp(CAM.tz * 1.25, minZoom(), 4); CAM.manualUntil = DYN.t + 90; }
-  else if (k === '-') { CAM.tz = clamp(CAM.tz / 1.25, minZoom(), 4); CAM.manualUntil = DYN.t + 90; }
+  else if (k === 'Home' || k === '0') { if (GL3.gl) { GL3.cam.auto = true; GL3.film = true; GL3.follow = GL3.userFollow = null; GL3.lastIn = 0; } toast('Camera handed back to the film camera.'); }
+  else if (k === '+' || k === '=') { if (GL3.gl) { GL3.cam.zoom = clamp(GL3.cam.zoom / 1.25, 1.2, 44); glTouch(); } }
+  else if (k === '-') { if (GL3.gl) { GL3.cam.zoom = clamp(GL3.cam.zoom * 1.25, 1.2, 44); glTouch(); } }
   else if (k === 'D' && e.shiftKey) toggleDebug();
 }
 let toastT = 0;
 function toast(t) { const el = $('toast'); el.textContent = t; el.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => el.style.opacity = 0, 3500); }
 
-function pickTile(sx, sy) {
-  const [wx, wy] = s2w(sx, sy);
-  for (let s = W + H - 2; s >= 0; s--) {
-    const xa = Math.max(0, s - H + 1), xb = Math.min(W - 1, s);
-    for (let x = xa; x <= xb; x++) {
-      const i = idx(x, s - x);
-      const X = (x - (s - x)) * TW2 + OX, Y = (s) * TH2 + OY - surfZ(i);
-      if (Math.abs(wx - X) / 16 + Math.abs(wy - (Y + 8)) / 8 <= 1) return i;
-      const b = M.bld[i];
-      if (b && S.B[b] && !FLAT_TYPES[S.B[b].type] && Math.abs(wx - X) < 12 && wy < Y + 10 && wy > Y + 8 - objH(i)) return i;
-    }
-  }
-  return -1;
-}
-function onMapClick(sx, sy) {
-  const i = pickTile(sx, sy);
-  if (i < 0 && !pickNotable(sx, sy)) return;
-  const x = i % W, y = (i / W) | 0;
-  if (UI.tool) {
-    if (i < 0) return;
-    const k = UI.tool;
-    if (useTool(k, x, y)) {
-      UI.tool = null; document.body.classList.remove('targeting');
-      document.querySelectorAll('.tool[data-tool]').forEach(b => b.classList.remove('sel'));
-      renderTools(); UIDIRTY.chron = true;
-      toast(`${TOOL_INFO[k][0]} sent. The colonists noticed.`);
-    }
-    return;
-  }
-  const w = pickNotable(sx, sy);
-  if (w) { openPerson(w.pid); CAM.followPid = w.pid; CAM.followUntil = DYN.t + 30; CAM.manualUntil = 0; return; }
-  const T = ownerOf(x, y);
-  if (T && dist(x, y, T.x, T.y) <= townRadius(T) + 1) { focusOn(x, y, 2, 40); CAM.manualUntil = DYN.t + 40; }
-}
 function tipFor(i) {
   const x = i % W, y = (i / W) | 0;
   const T = ownerOf(x, y); const inT = T && dist(x, y, T.x, T.y) <= townRadius(T) + 1.5;
@@ -248,11 +192,6 @@ function renderTownsTab() {
   if (S.accord) h += `<p style="font-size:12px;color:var(--ink2)">Bound by the ${esc(S.accord)} Accord.</p>`;
   return h;
 }
-function pickNotable(sx, sy) {
-  let best = null, bd = 1e9; const r = Math.max(9, CAM.z * 3.4);
-  for (const w of DYN.walkers) { if (!w.pid || w.sx == null) continue; const d = Math.hypot(w.sx - sx, w.sy - sy); if (d < r && d < bd) { bd = d; best = w; } }
-  return best;
-}
 function showPersonTip(p, mx, my, fromPanel) {
   const tip = $('tip');
   tip.classList.add('wide');
@@ -267,26 +206,6 @@ function setTab(t) { UI.tab = t; document.querySelectorAll('.tab').forEach(x => 
 function openPerson(pid) {
   UI.personSel = pid; setTab('people');
   if (!UI.panel) togglePanel(); else renderPanelBody(true);
-}
-function updateTip() {
-  if (UI.panelHover) return;
-  const now = performance.now();
-  if (now - UI.lastPick < 90 || UI.mouse.x < 0) return;
-  UI.lastPick = now;
-  const tip = $('tip');
-  if (now - UI.lastMove > 2500 || UI.drag || document.querySelector('.modal.show')) { tip.style.opacity = 0; DYN.hover = UI.tool ? DYN.hover : -1; return; }
-  const el = document.elementFromPoint(UI.mouse.x, UI.mouse.y);
-  if (el !== CV) { tip.style.opacity = 0; DYN.hoverPid = null; return; }
-  const w = UI.tool ? null : pickNotable(UI.mouse.x, UI.mouse.y);
-  if (w && S.P[w.pid]) { DYN.hover = -1; DYN.hoverPid = w.pid; showPersonTip(S.P[w.pid], UI.mouse.x, UI.mouse.y); UI.tipTile = -1; return; }
-  DYN.hoverPid = null; tip.classList.remove('wide');
-  const i = pickTile(UI.mouse.x, UI.mouse.y);
-  DYN.hover = i;
-  if (i < 0) { tip.style.opacity = 0; return; }
-  if (i !== UI.tipTile) { tip.innerHTML = tipFor(i); UI.tipTile = i; }
-  tip.style.left = Math.min(UI.mouse.x + 16, innerWidth - 290) + 'px';
-  tip.style.top = Math.min(UI.mouse.y + 18, innerHeight - 60) + 'px';
-  tip.style.opacity = 1;
 }
 
 function eraName() { return S.age ? S.age.name : ERAS[S.era].title; }

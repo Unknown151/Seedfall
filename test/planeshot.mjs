@@ -11,10 +11,10 @@ console.log('airfields', JSON.stringify(info));
 await p.evaluate(()=>{ const B=airfields()[0]; DYN.af[B.id]={ next: DYN.t, parked:1 }; });
 for (let k=0;k<7;k++) {
   await p.waitForTimeout(k===0?1500:2600);
-  const st = await p.evaluate(()=>{ const pl=DYN.planes.find(p=>p.from===airfields()[0].id)||DYN.planes[0]; if(!pl) return null; const [wx,wy]=gridToWorld(pl.x,pl.y,pl.z); CAM.tx=CAM.x=wx; CAM.ty=CAM.y=wy; CAM.tz=CAM.z=3.2; CAM.manualUntil=DYN.t+999; return pl.st+' z'+Math.round(pl.z)+' x'+pl.x.toFixed(2)+' y'+pl.y.toFixed(2)+' h'+pl.h.toFixed(2); });
+  const st = await p.evaluate(()=>{ const pl=DYN.planes.find(p=>p.from===airfields()[0].id)||DYN.planes[0]; if(!pl) return null; Object.assign(GL3.cam, { tx: pl.x, tz: pl.y, ty: (pl.z||0)*ZS, zoom: 3, auto: false }); GL3.follow = GL3.goto = null; return pl.st+' z'+Math.round(pl.z)+' x'+pl.x.toFixed(2)+' y'+pl.y.toFixed(2)+' h'+pl.h.toFixed(2); });
   console.log(k, st);
   await p.waitForTimeout(250);
-  await p.screenshot({path:`plane_${k}.png`, clip:{x:500,y:300,width:400,height:300}});
+  await p.screenshot({path:`plane_${k}.png`});
 }
 console.log('ERR', errs.slice(0,5).join('\n')||'none');
 await b.close();

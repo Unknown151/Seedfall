@@ -6,7 +6,7 @@ const b = await launch();
 let fails = 0; const ok = (c, what, extra = '') => { console.log(`${c ? 'ok  ' : 'FAIL'} ${what}${extra ? ' · ' + extra : ''}`); if (!c) fails++; };
 const errs = [];
 const p = await b.newPage(); p.on('pageerror', e => errs.push(e.message));
-await p.goto(ROOT + 'seedfall.html?seed=999&fresh&nointro&2d'); await p.waitForTimeout(500);
+await p.goto(ROOT + 'seedfall.html?seed=999&fresh&nointro&headless'); await p.waitForTimeout(500);
 
 // 1) they happen on their own, now and then, and end
 const r = await p.evaluate(() => { const seen = {}, ended = {}; EV.on('incident', d => (d.end ? ended : seen)[d.I.k] = ((d.end ? ended : seen)[d.I.k] || 0) + 1); SF.ff(800); return { seen, ended, live: (S.inc || []).length, lines: S.chron.filter(e => /Fire!|burning|caught fire|sheep|flock/i.test(e.t)).length }; });
