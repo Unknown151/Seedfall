@@ -5,12 +5,10 @@
 const FLAT_TYPES = { farm: 1, solar: 1, airfield: 1, park: 1, plaza: 1, pasture: 1 };
 function buildH(B) { return B.type === 'house' ? HOUSE_H[B.up != null ? B.up : B.tier] * .7 : (BT[B.type] ? BT[B.type].h * .55 : 20); }
 // see-through shapes need no help; these are solid: a quad and a triangle by tile-local corners [u, v, z]
-function tq(a, b, c, d, col, mat = 0, e = 0) { GLB.mat = mat; gquad(gw(...a), gw(...b), gw(...c), gw(...d), gcol(col), e); }
 function tt(a, b, c, col, mat = 0, e = 0) { GLB.mat = mat; gtri(gw(...a), gw(...b), gw(...c), gcol(col), e); }
 const mid = (...p) => { const n = p.length; return [p.reduce((s, q) => s + q[0], 0) / n, p.reduce((s, q) => s + q[1], 0) / n, p.reduce((s, q) => s + q[2], 0) / n]; };
 function ctr(u, v, z) { GLB.ctr = gw(u, v, z); } // (faces turn away from here)
 const glowAt = (u, v, z, r, col) => { GLB.mat = 0; glOBox(gw(u, v, z), [r, 0, 0], [0, 0, r], [0, r, 0], col, 3); }; // a light of its own colour: a beacon, a signal, a glowing stone
-function parkTree(u, v, h, z = 0) { glSmallTree(u, v, z, h, 1.1, ['#5f9a4d', '#6aa556', '#ee9fbe', '#7fae5e'][((h * 7) | 0) % 4]); }
 function sheepAt(u, v, s, left) { glSheep(GLB.x + u, GLB.y + v, GLB.base, s / 2.6, left ? Math.PI * .75 : -Math.PI * .25); }
 function domeFrame(u, v, r, z0, h, col, n = 8) { // a glasshouse dome: ribs and rings, open to see the garden inside
   const P = (a, t) => [u + Math.cos(a) * r * Math.cos(t), v + Math.sin(a) * r * Math.cos(t), z0 + h * Math.sin(t)];

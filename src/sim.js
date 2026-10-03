@@ -1114,7 +1114,10 @@ function milestones() {
 }
 
 /* ---------- the monthly tick ---------- */
-function simMonth() { return simRun(simMonth0); }
+let SIM_ERRS = 0;
+function simMonth() { // a bug in one month must never freeze the world (catch-up would hang on its card): report it and go on
+  try { return simRun(simMonth0); } catch (e) { if (++SIM_ERRS <= 5) setTimeout(() => { throw e; }); }
+}
 function simMonth0() {
   S.month++; S.year = S.month / 12;
   const newYear = S.month % 12 === 0;

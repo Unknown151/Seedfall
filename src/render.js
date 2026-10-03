@@ -207,4 +207,3 @@ function glYard(B, x, y) {
   const hh = hash2(x, y, 500); if (!row && hh > .3 && hh < .6) { const sw = GLB.wall; GLB.wall = M_LEAF; glBox(.45, 0, .03, .32, 0, 2.2, leafC('#4f8a45')); GLB.wall = sw; } // a clipped hedge
 }
 
-function lampC(x, y) { return LT.lampCs ? LT.lampCs[(hash2(x | 0, y | 0, 17) * LT.lampCs.length) | 0] : LT.lampC; }

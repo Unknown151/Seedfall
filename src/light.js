@@ -104,7 +104,6 @@ function mkLight(e) {
   return L;
 }
 // colour helpers that follow the current light
-function topC(col) { return LT.snow ? mix(col, SNOWC, q2(LT.snow * .82)) : col; }
 function leafC(col, f) { let c = LT.leaf[1] ? mix(col, LT.leaf[0], LT.leaf[1]) : col; c = shade(c, q2((f || 1) * LT.fG)); return c; }
 
 function lightTick(dt) {

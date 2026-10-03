@@ -46,7 +46,6 @@ function kTree(s, f, y, h, sc, col) { const C = kP(s, f, y); glSmallTree(C[0] - 
 function kFlowers(s, f, y, h) { const C = kP(s, f, y); glFlowersUV(C[0] - GLB.x, C[2] - GLB.y, (C[1] - GLB.base) / ZS, h); }
 function kTL(s, f) { const p = kP(s, f, 0); return [p[0] - GLB.x, p[2] - GLB.y]; } // tile-local (u, v)
 function kHW(hs, hf) { const A = KF.A, F = KF.F; return [Math.abs(A[0]) * hs + Math.abs(F[0]) * hf, Math.abs(A[2]) * hs + Math.abs(F[2]) * hf]; } // half-sizes along x and z
-function kAlongU() { return Math.abs(KF.A[0]) > .5; }
 
 /* ---------- the look of an age ---------- */
 const K_TRIM = '#efe9dc', K_STONE = '#cfc6b4', K_IRON = '#33363b', K_DARK = '#2c3440', K_WOOD = '#4a3426';

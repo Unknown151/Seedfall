@@ -73,6 +73,7 @@ function seaLinked(A, B) { const a = townHarbour(A), b = townHarbour(B); return 
 /* ---------- routes over open water, kept a little off the coast ---------- */
 const ROUTES = new Map();
 function seaRoute(a, b) {
+  if (ROUTES.S !== S) { ROUTES.clear(); ROUTES.S = S; } // another world's routes would cross its land
   const key = a + '-' + b;
   if (ROUTES.has(key)) return ROUTES.get(key);
   const coast = i => { const x = i % W, y = (i / W) | 0; for (const [dx, dy] of N8) { const nx = x + dx, ny = y + dy; if (inb(nx, ny) && M.water[idx(nx, ny)] !== 1) return 1; } return 0; };

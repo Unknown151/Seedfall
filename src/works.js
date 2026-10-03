@@ -13,7 +13,7 @@ const wkV = (f, a) => [f[0] * Math.sin(a), -Math.cos(a), f[2] * Math.sin(a)]; //
 const wkAdd = (p, d, k) => [p[0] + d[0] * k, p[1] + d[1] * k, p[2] + d[2] * k];
 const wkLift = (ph, a0, a1, up = .7) => ph < up ? a0 + (a1 - a0) * Math.sin(ph / up * Math.PI / 2) : a1 + (a0 - a1) * ((ph - up) / (1 - up)) ** 2; // a slow lift to a1, then a quick blow back to a0
 function wkFolk(B, n) { // how the people at a workplace look (the same every time: hashed from the building)
-  const k = B.id * 4 + n; let o = WKF.get(k);
+  const k = B.id * 4 + n; let o = WKF.get(k); if (!o && WKF.size > 2000) WKF.clear();
   if (!o) { const h = s => hash2(B.id | 0, n, s); o = { col: WK_COL[(h(1) * WK_COL.length) | 0], pants: PANTS[(h(2) * PANTS.length) | 0], hair: HAIR[(h(3) * HAIR.length) | 0], skin: SKIN[(h(4) * SKIN.length) | 0], hat: h(5) * .4, kid: false, ph: 0, kind: 'p', arms: null, pet: false }; WKF.set(k, o); if (WKF.size > 400) WKF.delete(WKF.keys().next().value); }
   return o;
 }

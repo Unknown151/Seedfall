@@ -91,7 +91,7 @@ async function folderFlush(txtFn) {
     const rowsNew = csvSize === 0 ? S.rows.slice() : S.rows.filter(r => r.n > S.csvWritten);
     if (chronNew.length) S.mdWritten = chronNew[chronNew.length - 1].n;
     if (rowsNew.length) S.csvWritten = rowsNew[rowsNew.length - 1].n;
-    const txt = txtFn();
+    const txt = FOLDER.txt = txtFn();
     if (chronNew.length || mdSize === 0) await appendText(dir, 'chronicle.md', (mdSize === 0 ? mdHeader() : '') + mdLines(chronNew));
     if (rowsNew.length) await appendText(dir, 'stats.csv', (csvSize === 0 ? CSV_HEAD : '') + csvLines(rowsNew));
     await writeText(dir, 'save.json', txt);
@@ -120,9 +120,11 @@ async function saveAll(force) {
   if (!S || S.flags.intro || SCRATCH || RESIZING) return; // (a resize is reloading the page: the world it leaves is already kept)
   if (CLOUD.conflict) return; // another device owns the world now: writing anything here would only clobber it
   S.savedAt = Date.now();
+  FOLDER.txt = null;
   if (FOLDER.ok) await folderFlush(() => JSON.stringify(serialize()));
-  if (force === true && CLOUD.job) await CLOUD.job; // an upload asked for on purpose waits for one in flight, never skips
-  const txt = JSON.stringify(serialize());
+  let ft = FOLDER.txt; FOLDER.txt = null; // (a late world is megabytes: serialise it once, not twice)
+  if (force === true && CLOUD.job) { await CLOUD.job; ft = null; } // an upload asked for on purpose waits for one in flight, never skips
+  const txt = ft || JSON.stringify(serialize());
   if (cloudDue(force) && !(await cloudPut(txt, S.playSec)) && CLOUD.conflict) return;
   await IDB.set('save', txt);
 }

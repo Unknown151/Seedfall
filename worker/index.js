@@ -45,7 +45,8 @@ export default {
 async function identify(request, env) {
   // Local development only: `npm run dev` passes DEV_USER on the command line (or put it in .dev.vars).
   // It is never in wrangler.jsonc, so a real deploy can't have it, and Access still guards the domain.
-  if (env.DEV_USER) return withId(env.DEV_USER);
+  // Only ever on this machine: a DEV_USER set on the live Worker by mistake must not become a way in.
+  if (env.DEV_USER && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(new URL(request.url).hostname)) return withId(env.DEV_USER);
   const token = request.headers.get('cf-access-jwt-assertion');
   if (!token || !env.TEAM_DOMAIN || !env.POLICY_AUD) throw new Error('no token');
   const claims = await verifyAccessJwt(token, env);
@@ -81,7 +82,7 @@ async function verifyAccessJwt(token, env) {
   const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64u(s), new TextEncoder().encode(h + '.' + p));
   if (!ok) throw new Error('signature');
   const now = Date.now() / 1000;
-  if (claims.exp && claims.exp < now - 30) throw new Error('expired');
+  if (!(claims.exp > now - 30)) throw new Error('expired'); // (a token without exp would never expire)
   if (claims.nbf && claims.nbf > now + 30) throw new Error('not yet');
   if (claims.iss !== env.TEAM_DOMAIN) throw new Error('issuer');
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];

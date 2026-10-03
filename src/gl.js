@@ -305,7 +305,7 @@ function glBuildRows(k, near, r0, r1, v, lamps, c0 = 0, c1 = GCH) {
       { const Bw = M.bld[i] && S.B[M.bld[i]]; GLB.wall = Bw ? glWallMat(Bw) : M_PLANK; GLB.B = Bw || null; GLB.smk = lamps.smk || (lamps.smk = []); } // walls by what the building is made of; street furniture is wooden
       try { drawTileObjects(i, x, y); } catch (e) { if (QS.has('dev')) console.error(e); }
       const B = M.bld[i] && S.B[M.bld[i]];
-      if (B && !B.hid && FLAT_TYPES[B.type]) { GLB.flat = B.type === 'farm' ? 'farm' : B.type === 'park' || B.type === 'pasture' ? 'green' : B.type === 'plaza' || B.type === 'airfield' ? 'paved' : ''; try { drawBuilding(B, i); } catch (e) { } GLB.flat = ''; }
+      if (B && !B.hid && FLAT_TYPES[B.type]) { GLB.flat = B.type === 'farm' ? 'farm' : B.type === 'park' || B.type === 'pasture' ? 'green' : B.type === 'plaza' || B.type === 'airfield' ? 'paved' : ''; try { drawBuilding(B, i); } catch (e) { if (QS.has('dev')) console.error(e); } GLB.flat = ''; }
     }
   } finally { GLB = null; LT = svLT; }
 }
@@ -756,6 +756,10 @@ function glInit() {
   if (!gl) { const m = $('nogl'); if (m) m.classList.add('show'); return false; } // (no WebGL2 in this browser: a note says so; the world still grows)
   document.body.insertBefore(c, document.body.firstChild);
   GL3.c = c; GL3.gl = gl; GL3.on = true;
+  // a driver update, a GPU reset or waking from sleep can take the context away; on a monitor all day that will happen.
+  // Stop drawing (the world keeps growing), and once it's back, save and reload: the same as pressing F5.
+  c.addEventListener('webglcontextlost', e => { e.preventDefault(); GL3.on = false; GL3.lost = true; });
+  c.addEventListener('webglcontextrestored', async () => { if (SCRATCH) { toast('The graphics card reset. Reload to see the world again.'); return; } try { await saveAll(true); } catch (e) { } location.reload(); });
   GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sky = glProg(gl, GL_KVS, GL_KFS); GL3.prc = glProg(gl, GL_KVS, GL_PFS2);
   GL3.smp = glProg(gl, GL_SMVS, GL_SMFS); GL3.smB = gl.createBuffer(); GL3.ptMax = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 64; glFxInit(gl);
   try { GL3.post = { pr: glProg(gl, GL_KVS, GL_BFS), msF: gl.createFramebuffer(), msC: gl.createRenderbuffer(), msD: gl.createRenderbuffer(), ns: (GL3.lo = glSoft(gl) || QS.has('lo')) ? 0 : Math.min(4, gl.getParameter(gl.MAX_SAMPLES)), hdr: !!gl.getExtension('EXT_color_buffer_float'), lv: [], w: 0, h: 0 }; } catch (e) { GL3.post = null; }
@@ -843,7 +847,7 @@ function glCap(t, sub) {
   let e = $('glCap');
   if (!t) { if (e) e.style.opacity = 0; return; }
   if (!e) { e = document.createElement('div'); e.id = 'glCap'; e.style.cssText = 'position:fixed;left:50%;bottom:34px;transform:translateX(-50%);max-width:min(640px,80vw);z-index:4;padding:9px 18px;border-radius:14px;background:rgba(20,22,30,.5);backdrop-filter:blur(6px);color:#fff;font:15px/1.4 Georgia,"Times New Roman",serif;text-align:center;text-shadow:0 1px 3px rgba(0,0,0,.4);transition:opacity 1.2s;opacity:0;pointer-events:none'; document.body.appendChild(e); }
-  e.innerHTML = t + (sub ? `<div style="font:12px/1.4 'Segoe UI',system-ui,sans-serif;opacity:.75;margin-top:2px">${sub}</div>` : ''); requestAnimationFrame(() => { e.style.opacity = 1; });
+  e.innerHTML = esc(t) + (sub ? `<div style="font:12px/1.4 'Segoe UI',system-ui,sans-serif;opacity:.75;margin-top:2px">${esc(sub)}</div>` : ''); // names can come from the voice or the player: never markup requestAnimationFrame(() => { e.style.opacity = 1; });
 }
 function glShot() { // choose what to look at next
   const T0 = towns(); if (!T0.length) return null;
