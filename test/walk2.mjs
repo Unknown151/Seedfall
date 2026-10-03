@@ -17,7 +17,7 @@ let stuck = 0, samples = 0;
 for (let k = 0; k < 12; k++) {
   await p.waitForTimeout(5000);
   const r = await p.evaluate(()=>{ let st = 0, n = 0, badTile = 0;
-    for (const w of DYN.walkers) { if (w.st !== 'go') { __track.delete(w); continue; } n++; const pp = walkerPos(w); const prev = __track.get(w); if (prev && Math.hypot(prev[0]-pp[0], prev[1]-pp[1]) < .05) st++; __track.set(w, pp);
+    for (const w of DYN.walkers) { if (w.st !== 'go' || w.xw) { __track.delete(w); continue; } // (waiting at a level crossing for a train isn't stuck) n++; const pp = walkerPos(w); const prev = __track.get(w); if (prev && Math.hypot(prev[0]-pp[0], prev[1]-pp[1]) < .05) st++; __track.set(w, pp);
       const i = idx(clamp(Math.round(pp[0]),0,W-1), clamp(Math.round(pp[1]),0,H-1)); const B = M.bld[i] && S.B[M.bld[i]]; if (B && !OUTDOOR[B.type] && i !== w.destTile && i !== w.path[0] && B.prog >= 1) badTile++; }
     const idleBad = DYN.walkers.filter(w => w.st === 'idle' && M.bld[w.tile] && S.B[M.bld[w.tile]] && !OUTDOOR[S.B[M.bld[w.tile]].type]).length;
     return { n, st, badTile, idleBad, y: S.year | 0, nav: NAV.calls }; });

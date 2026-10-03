@@ -201,7 +201,8 @@ function stepWalker(w, dt) {
   }
   // walking a path
   const n = w.path.length, k0 = Math.floor(w.s);
-  if (k0 + 1 < n && w.s - k0 > .3 && M.rail[w.path[k0 + 1]] && railBusy(w.path[k0 + 1])) { w.mv = 0; return; } // a train's coming: wait at the crossing
+  if (k0 + 1 < n && w.s - k0 > .3 && M.rail[w.path[k0 + 1]] && railBusy(w.path[k0 + 1])) { w.xw = 1; return; } // a train's coming: wait at the crossing
+  w.xw = 0;
   const step = dt * w.spd * (M.road[w.path[Math.min(n - 1, k0 + 1)]] ? 1 : .85);
   w.s += step; w.ph += step * 19;
   const k = Math.floor(w.s);

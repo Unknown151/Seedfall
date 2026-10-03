@@ -119,7 +119,8 @@ function stepTrains(dt) {
       if (rem - d <= 1e-4) { tr.dir = -tr.dir; tr.v = 0; tr.wait = rf(8, 15); }
     }
     tr.s = tr.dir > 0 ? tr.lo + len : tr.lo; // (its head, for the film camera)
-    for (let s = Math.floor(tr.lo - 1.3); s <= Math.ceil(tr.lo + len + 1.3); s++) if (s >= 0 && s <= L) busy.add(P[s]);
+    const ah = tr.wait > 0 ? 0 : 1.6, s0 = tr.dir > 0 ? tr.lo - .3 : tr.lo - ah, s1 = tr.dir > 0 ? tr.lo + len + ah : tr.lo + len + .3; // under it, and the way it's going (a train standing at the platform holds nobody up)
+    for (let s = Math.round(s0); s <= Math.round(s1); s++) if (s >= 0 && s <= L) busy.add(P[s]);
     if (era === 0 && tr.v > .05 && GL3.eye) { const p = railPos(P, tr.s - tr.dir * .1); if (Math.hypot(p[0] - GL3.eye[0], p[2] - GL3.eye[2]) < 45 && chance(dt * (2 + tr.v * 9))) SMOKE3(p[0] + rf(-.02, .02), p[1] + .4, p[2] + rf(-.02, .02), '#ece8e2', .5, .14); } // steam from the chimney
   }
 }
