@@ -178,8 +178,8 @@ function glCar(kind, c, f, r, hl, tr, far, k) {
   if (kind === 'tender') { box(-hl, hl, .1, .055, .085, '#222326'); wheels([-.1, .1], .045, '#9c2f24'); box(-hl, hl, .098, .085, .25, liv[0]); box(-hl + .03, hl - .03, .085, .25, .27, '#18191b'); return; }
   if (kind === 'coach') { // carriages: panelled sides, a row of windows, a curved roof, bogies at each end
     if (!far) for (const s of [-hl + .12, hl - .12]) { box(s - .07, s + .07, .08, .03, .06, '#2a2a2c'); wheels([s - .045, s + .045], .03, '#2a2a2c'); }
-    box(-hl, hl, .1, .06, .27, liv[1]); if (!far) box(-hl, hl, .102, .2, .215, '#d9c48f'); windows(-hl + .06, hl - .06, .14, .225, 5);
-    GLB.mat = 0; const rc = gcol('#4a4a4e'); GLB.ctr = P(0, 0, .2); gquad(P(-hl, -.1, .27), P(hl, -.1, .27), P(hl, -.05, .3), P(-hl, -.05, .3), rc); gquad(P(-hl, -.05, .3), P(hl, -.05, .3), P(hl, .05, .3), P(-hl, .05, .3), rc); gquad(P(-hl, .05, .3), P(hl, .05, .3), P(hl, .1, .27), P(-hl, .1, .27), rc);
+    const el = railEra() === 1; box(-hl, hl, .1, .06, el ? .3 : .27, el ? '#c8553d' : liv[1]); if (!far) box(-hl, hl, .102, el ? .15 : .2, el ? .24 : .215, el ? '#efe6d2' : '#d9c48f'); // (an electric unit's coaches match its cabs) windows(-hl + .06, hl - .06, el ? .16 : .14, el ? .235 : .225, 5);
+    GLB.mat = 0; const rc = gcol(el ? '#9aa0a6' : '#4a4a4e'), ry = el ? .03 : 0; GLB.ctr = P(0, 0, .2); gquad(P(-hl, -.1, .27 + ry), P(hl, -.1, .27 + ry), P(hl, -.05, .3 + ry), P(-hl, -.05, .3 + ry), rc); gquad(P(-hl, -.05, .3 + ry), P(hl, -.05, .3 + ry), P(hl, .05, .3 + ry), P(-hl, .05, .3 + ry), rc); gquad(P(-hl, .05, .3 + ry), P(hl, .05, .3 + ry), P(hl, .1, .27 + ry), P(-hl, .1, .27 + ry), rc);
     if (!far) for (const s of [-1, 1]) box(s * hl - .01, s * hl + .01, .06, .1, .24, '#2a2a2c'); return; // the gangway at each end
   }
   if (kind === 'cab') { // an electric unit's cab car: a raked nose with a wide windscreen, a pantograph up to the wire

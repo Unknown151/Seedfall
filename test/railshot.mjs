@@ -17,9 +17,9 @@ for (const yr of years) {
       const pickT = shot === 'curve' ? tiles.find(turn) : shot === 'xing' ? RAILX.xs[0] : shot === 'bridge' ? tiles.find(i => M.water[i]) : null;
       const tr = DYN.trains.find(t => t.r.path) || null; if (!tr) return null; const P = tr.r.path, L = P.length - 1, len = trainCars(tr).len;
       let i = pickT != null ? pickT : P[Math.min(L - 2, (L / 2) | 0)], k = P.indexOf(i);
-      if (k < 0) { const r = S.rails.find(r => r.path && r.path.includes(i)); const t2 = DYN.trains.find(t => t.r === r); if (!t2) return null; Object.assign(tr, {}); k = r.path.indexOf(i); window._tr = t2; } else window._tr = tr;
+      if (k < 0) { const r = S.rails.find(r => r.path && r.path.includes(i)); const t2 = DYN.trains.find(t => t.r === r); if (!t2) return null; k = r.path.indexOf(i); window._tr = t2; } else window._tr = tr;
       const T = window._tr; T.lo = clamp(k - (shot === 'xing' ? len + .8 : len / 2), .5, T.r.path.length - 1.5 - len); T.wait = 9999; T.v = 0; T.dir = 1;
-      const c = GL3.cam, q = railPos(T.r.path, k); c.tx = q[0]; c.tz = q[2]; c.ty = q[1] + .2; c.zoom = shot === 'train' ? 1.6 : 2.0; c.pitch = .42; c.yaw = Math.atan2(q[4], q[3]) + .9;
+      const c = GL3.cam, q = railPos(T.r.path, k); c.tx = q[0]; c.tz = q[2]; c.ty = q[1] + .2; c.zoom = shot === 'train' ? 2.2 : 2.6; c.pitch = .78; c.yaw = Math.atan2(q[4], q[3]) + .9;
       for (let j = 0; j < GNC * GNC; j++) { const cx = (j % GNC) * GCH + 4, cz = ((j / GNC) | 0) * GCH + 4; if (Math.hypot(cx - q[0], cz - q[2]) < 8) { const r = glBuildChunk(j, true); glAO(r.v); glUpload(GL3.chunks[j], r.v, true); } }
       if (shot === 'xing') stepTrains(.016); // the barriers see the train
       return [i % W, (i / W) | 0];
