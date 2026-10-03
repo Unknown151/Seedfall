@@ -864,7 +864,7 @@ function glShot() { // choose what to look at next
   if (sail.length) opts.push([3, () => { const sh = pick1(sail), B = S.B[sh.to], T = B && S.T[B.sid]; return { at: () => { const q = shipPos(sh); return q ? [q[0], SEAZ * ZS, q[1]] : null; }, zoom: rf(2.2, 3), pitch: rf(.2, .32), cap: '⛵ A ship coming in' + (T ? ' to ' + T.name : ''), dur: 26 }; }]);
   const ws = DYN.walkers.filter(w => w.pid && S.P[w.pid] && w.st !== 'in' && w.st !== 'idle' && walkerPos(w));
   if (ws.length) opts.push([3, () => { const w = pick1(ws), P = S.P[w.pid], T = S.T[P.sid]; return { follow: w, at: () => { const q = walkerPos(w); return q ? [q[0], q[2] * ZS, q[1]] : null; }, zoom: rf(1.4, 2), pitch: rf(.3, .42), cap: P.name, sub: [P.role, T && T.name].filter(Boolean).join(' · ') }; }]);
-  if (DYN.trains.length) opts.push([1.5, () => { const tr = pick1(DYN.trains); return { at: () => { const pa = tr.r.path, s2 = clamp(tr.s, 0, pa.length - 1), a = pa[Math.floor(s2)]; return a == null ? null : [a % W, z(a % W, (a / W) | 0), (a / W) | 0]; }, zoom: rf(2.8, 4), pitch: rf(.3, .45), cap: '🚂 The train' }; }]);
+  if (DYN.trains.length) opts.push([1.5, () => { const tr = pick1(DYN.trains); return { at: () => { const p = trainPos(tr); return p ? [p[0], p[1], p[2]] : null; }, zoom: rf(2.2, 3.2), pitch: rf(.3, .45), cap: '🚂 The train' }; }]);
   const big = Object.values(S.B).filter(B => fpBig(B) && B.prog >= 1);
   if (big.length) opts.push([2, () => { const B = pick1(big), T = S.T[B.sid], [x, y] = glLot(B); return { at: () => [x, z(x, y), y], zoom: rf(2, 3), pitch: rf(.35, .55), cap: (B.name || (BT[B.type] ? BT[B.type].n : B.type)) + (T ? ' · ' + T.name : '') }; }]);
   opts.push([2, () => { const T = pick1(T0.slice().sort((a, b) => b.pop - a.pop).slice(0, 4)); return { at: () => [T.x, z(T.x, T.y), T.y], zoom: clamp(townRadius(T) * .8 + 3, 5, 14), pitch: rf(.4, .75), cap: T.name, sub: Math.round(T.pop).toLocaleString('en-GB') + ' people' }; }]);
@@ -1085,16 +1085,7 @@ function glTraffic() {
     if (!hasTech('wheel')) gBox([c[0], y - .01, c[2]], V3s(f, .12), V3s(r, .08), .02, '#8a6a4c', M_PLANK);
     else { const y1 = hull(c, f, r, .16, .07, .04, '#ece6da', '#9aa0a6'); gBox(at(c, f, r, 0, 0, y1), V3s(f, .06), V3s(r, .05), .045, '#3f6e8c'); }
   }
-  const mag = hasTech('maglev'), elec = hasTech('electric');
-  for (const tr of DYN.trains) for (let k = 0; k < 3; k++) { // trains: three cars on the rails
-    const s = clamp(tr.s - tr.dir * k * .75, 0, tr.r.path.length - 1), i0 = Math.floor(s), i1 = Math.min(tr.r.path.length - 1, i0 + 1), fr = s - i0, a = tr.r.path[i0], b = tr.r.path[i1];
-    const fx = lerp(a % W, b % W, fr), fy = lerp((a / W) | 0, (b / W) | 0, fr), z = lerp(M.water[a] ? landZ(a) + 3 : surfZ(a), M.water[b] ? landZ(b) + 3 : surfZ(b), fr) * ZS;
-    const dx = (b % W) - (a % W), dy = ((b / W) | 0) - ((a / W) | 0), h = Math.atan2(dy, dx), [f, r] = H3(h);
-    const col = mag ? '#f2f5f8' : elec ? (k === 0 ? '#c8553d' : '#e9d9b8') : (k === 0 ? '#3d3f47' : '#8a3f37'), c = [fx, z + (mag ? .04 : .02), fy];
-    gBox(c, V3s(f, .34), V3s(r, .075), .11, col); gWins([c[0], c[1], c[2]], f, r, .3, c[1] + .03, 1, 5, .05, k * 7 + i0);
-    if (!mag && !elec && k === 0) gBox(at(c, f, r, .2, 0, c[1] + .11), [.02, 0, 0], [0, 0, .02], .06, '#2a2a2a'); // the engine's stack
-    GLB.mat = 0; if (k === 0 && GL3.litNow) for (const sg of [1, -1]) glOBox(at(c, f, r, .35 * tr.dir, sg * .04, c[1] + .05), [.006, 0, 0], [0, 0, .006], [0, .006, 0], '#fff4d6', 2);
-  }
+  glTrains(); // the trains and the level crossings' barriers (rail.js)
   const planes = DYN.planes.slice(); for (const B of airfields()) { const a = DYN.af[B.id]; if (a && a.parked && a.pp) planes.push(a.pp); }
   for (const pl of planes) { // planes: fuselage, wings and tail, on the apron or in the air
     const k = pl.kind || planeKind(), [f, r] = H3(pl.h || 0), c = [pl.x, (pl.z || 0) * ZS + .03, pl.y], sz = k === 'prop' ? .7 : k === 'jet' ? 1 : 1.15;

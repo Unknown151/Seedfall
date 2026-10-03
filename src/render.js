@@ -74,7 +74,8 @@ function drawTileObjects(i, x, y) {
   if (M.ruin[i]) tileRuin(i, x, y);
   if (!B && !bid && springAt(i)) glSpring(i);
   if (!w && S.ferries && S.ferries.length) { const fl = ferryLandings().get(i); if (fl) tileLanding(fl); }
-  if (M.road[i] && !w && !bid) tileVerge(i, x, y);
+  if (M.road[i] && !w && !bid && !M.rail[i]) tileVerge(i, x, y);
+  if (M.rail[i] && !bid) glRailTile(i, x, y); // the railway (rail.js)
   if (B && fpBig(B)) { if (i === fpFront(B) && !FLAT_TYPES[B.type]) drawBuilding(B, i); } // a big lot is built once, from its front tile (its model works in world units: gl.js GL_BIG)
   else if (B && !FLAT_TYPES[B.type]) { drawBuilding(B, i); if (B.type === 'house' && B.prog >= 1) glYard(B, x, y); }
   else if (!B && !w && !M.tree[i] && (M.bio[i] === BIO.ROCK || M.bio[i] === BIO.HIGH) && hash2(x, y, 11) < 0.3 && !M.road[i]) tileRocks(x, y);

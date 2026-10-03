@@ -45,7 +45,7 @@ function syncWalkers() {
   // trains
   for (const r of S.rails) {
     if (!r.path || DYN.trains.some(tr => tr.r === r)) continue;
-    DYN.trains.push({ r, s: 0, dir: 1, wait: rf(0, 6) });
+    DYN.trains.push({ r, s: .5, lo: .5, v: 0, dir: 1, wait: rf(0, 6) });
   }
   DYN.trains = DYN.trains.filter(tr => S.rails.includes(tr.r));
   // herds in the wild
@@ -122,14 +122,7 @@ function updateDyn(dt) {
   }
   stepAgents(dt);
   stepBoats(dt); stepShips(dt); stepFerries(dt); stepPlanes(dt);
-  for (const tr of DYN.trains) {
-    if (tr.wait > 0) { tr.wait -= dt; continue; }
-    const sp = hasTech('maglev') ? 3.2 : hasTech('electric') ? 2 : 1.3;
-    tr.s += tr.dir * sp * dt;
-    const L = tr.r.path.length - 1;
-    if (tr.s >= L) { tr.s = L; tr.dir = -1; tr.wait = rf(4, 9); }
-    if (tr.s <= 0) { tr.s = 0; tr.dir = 1; tr.wait = rf(4, 9); }
-  }
+  stepTrains(dt); // (rail.js)
   for (const h of DYN.herds) {
     h.age += dt;
     for (const m of h.members) { if (m.pause > 0) { m.pause -= dt; continue; } stepAgent(m, dt, a => herdNext(a, h)); if (chance(dt * .15)) m.pause = rf(2, 7); }
