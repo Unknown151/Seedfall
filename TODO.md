@@ -89,8 +89,9 @@ only, or a few invited emails.
 - Done: detailed native models for nearly every type, from the kit (kit.js): every house tier (homes.js), the public
   buildings and the big landmark lots (civic.js), the workplaces (industry.js), the shops, greens, modern works and the
   monuments (modern.js).
-- Next: the same for what's left on the older art (the harbour's warehouses and quays, the shipyard, farms and their
-  farmhouses, the reshaping styles' houses: round, organic, tiered, tall, low), and more own-colour glows at night.
+- Done: what was left on the older art: houses in every style (round, organic, tiered, tall, low; dome, cone and pyramid
+  roofs), farms (crops by kind, hedgerows, gates, barns), the harbour's quayside and harbourmaster, the turbine's tower.
+- Next: more own-colour glows at night.
 - Done: incidents (incidents.js): a house fire, sheep loose in the market, a wedding procession, a river flood, a
   runaway cabbage cart and a whale on the beach.
 - Done: many more voice levers, all from one table (`LEVERS`): a season that stays, the sky's colour or an aurora, house

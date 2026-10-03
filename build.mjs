@@ -4,6 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ORDER = ['util', 'data', 'world', 'render', 'buildings', 'light', 'sim', 'streets', 'econ', 'needs', 'zones', 'incidents', 'people', 'ai', 'levers', 'prayers', 'faith', 'dyn', 'agents', 'sea', 'air', 'gl', 'works', 'kit', 'house', 'homes', 'civic', 'industry', 'modern', 'fx3d', 'ui', 'persist'];
+const left = fs.readdirSync(path.join(here, 'src')).filter(f => f.endsWith('.js') && f !== 'main.js' && !ORDER.includes(f.slice(0, -3)));
+if (left.length) { console.error('NOT IN ORDER (would never ship):', left.join(', ')); process.exit(1); }
 let out = fs.readFileSync(path.join(here, 'src/head.html'), 'utf8');
 for (const f of ORDER) out += fs.readFileSync(path.join(here, 'src', f + '.js'), 'utf8') + '\n';
 out += fs.readFileSync(path.join(here, 'src/main.js'), 'utf8');
@@ -14,7 +16,7 @@ const n = {}; for (const m of js.matchAll(/^\s*function\s+([A-Za-z0-9_$]+)\s*\(/
 const dup = Object.keys(n).filter(k => n[k] > 1);
 if (dup.length) { console.error('DUPLICATE FUNCTIONS', dup.join(', ')); process.exit(1); }
 // hard rules from CLAUDE.md, checked here so a bad build never deploys
-const bad = js.match(/\beval\s*\(|new\s+Function\b|\batob\s*\(|\bbtoa\s*\(|fromCharCode/);
+const bad = js.match(/\beval\s*\(|new\s+Function\b|(?<![\w.$])Function\s*\(|\batob\s*\(|\bbtoa\s*\(|fromCharCode|set(?:Timeout|Interval)\(\s*['"`]/);
 if (bad) { console.error('FORBIDDEN IN SHIPPED CODE', bad[0]); process.exit(1); }
 const ids = src => [...src.matchAll(/'(claude-[\w.-]+)'/g)].map(m => m[1]).sort().join();
 const wk = fs.readFileSync(path.join(here, 'worker/index.js'), 'utf8').match(/const MODELS = \[([^\]]*)\]/);

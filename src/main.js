@@ -76,8 +76,8 @@ function runYears(yrs, progress, done) {
   const step = () => {
     const t = performance.now();
     FAST = true;
-    while (CATCH.done < n && performance.now() - t < 40) { simMonth(); CATCH.done++; }
-    FAST = false; FXQ.length = 0;
+    try { while (CATCH.done < n && performance.now() - t < 40) { simMonth(); CATCH.done++; } } finally { FAST = false; }
+    FXQ.length = 0;
     if (CATCH.done < n) { progress(yr()); return setTimeout(step, 0); }
     CATCH = null; S.lastLive = Date.now();
     syncWalkers(); faithRecalc();

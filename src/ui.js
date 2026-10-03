@@ -110,7 +110,7 @@ function tipFor(i) {
     if (B.type === 'house' && B.prog >= 1 && houseJoin(B)) name += B.tier === 5 ? ' (part of a block)' : ' (in a terrace)';
     if (B.type === 'farm') name = `Fields of ${CROPS[(S.T[B.sid] || { crop: 0 }).crop].n}`;
     if (B.type === 'plaza') name = `${(S.T[B.sid] || {}).name || 'Town'} square`;
-    h = `<b>${name}</b>${S.T[B.sid] && B.type !== 'plaza' ? ' · ' + S.T[B.sid].name : ''}<br><small>`;
+    h = `<b>${esc(name)}</b>${S.T[B.sid] && B.type !== 'plaza' ? ' · ' + esc(S.T[B.sid].name) : ''}<br><small>`;
     if (B.type === 'pod') h += `Landed in Year 0. Nobody would dream of moving it.${S.T[B.sid] && S.T[B.sid].res && S.T[B.sid].id === 1 && !Object.values(S.B).some(o => o.type === 'plaza' && o.sid === 1) ? '<br>' + stockLine(S.T[B.sid]) : ''}`;
     else if (B.prog < 1) {
       const T = S.T[B.sid], c = B.cost || {}, lack = T && T.res ? Object.keys(c).find(r => T.res[r] < c[r] * .05) : null;
@@ -137,7 +137,7 @@ function tipFor(i) {
     if (M.rail[i]) extra.push('railway');
     if (M.wild[i] === 2) extra.push('starfall crater');
     if (M.wild[i] === 3 && !M.tree[i]) extra.push('tree stumps');
-    if (inT) extra.push('near ' + T.name);
+    if (inT) extra.push('near ' + esc(T.name));
     if (extra.length) h += `<br><small>${extra.join(' · ')}</small>`;
   }
   return h;
@@ -234,7 +234,7 @@ function renderPanel(force) {
   $('sBld').textContent = fmtInt(Object.keys(S.B).length);
   const r = $('research');
   if (S.tech.cur < TECHS.length) { const t = TECHS[S.tech.cur]; const f = clamp(S.tech.pts / techCost(S.tech.cur), 0, 1); r.innerHTML = `Working on <b>${t.name}</b><div class="bar"><i style="width:${(f * 100).toFixed(1)}%"></i></div>`; }
-  else r.innerHTML = S.age ? `${S.age.name} · ${yr() - S.age.start} years in · building in the ${S.styles[S.styleIdx].name} style` : 'Every idea in the Archive has been found.';
+  else r.innerHTML = S.age ? `${esc(S.age.name)} · ${yr() - S.age.start} years in · building in the ${esc(S.styles[S.styleIdx].name)} style` : 'Every idea in the Archive has been found.';
   drawSpark();
   renderFolderStatus();
   if (force) renderPanelBody(true);

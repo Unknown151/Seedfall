@@ -33,36 +33,11 @@ let DS = null, DM = null;
 function dsRound() { return DS && (DS.shape === 'round' || DS.shape === 'organic'); }
 const box = (u0, v0, hw, hd, z0, h, col, top) => glBox(u0, v0, hw, hd, z0, h, col, top);
 const flat = (u0, v0, hw, hd, z, col) => dsRound() && Math.abs(hw - hd) < .12 ? disc(u0, v0, Math.max(hw, hd), z, col) : glFlat(u0, v0, hw, hd, z, col);
-const cylWindows = (u0, v0, r, z0, h, floors, n, col) => glCylWindows(u0, v0, r, z0, h, floors, n, col);
-const windows = (u0, v0, hw, hd, z0, h, floors, cols, col) => dsRound() ? glCylWindows(u0, v0, Math.max(hw, hd) * 1.08, z0, h, floors, Math.min(cols + 1, 5), col) : glWindows(u0, v0, hw, hd, z0, h, floors, cols, col);
-const door = (u0, v0, hd, w, h, col) => glDoor(u0, v0, dsRound() ? hd * 1.08 : hd, w, h, col);
-const cyl = (u, v, r, z0, h, col, top, n) => glCylAt(u, v, r, z0, h, col, top, n);
-const cone = (u, v, z0, r, h, col, n) => gCone(u, v, r, z0, h, col, n);
-const dome = (u, v, r, z0, h, col) => glDomeAt(u, v, r, z0, h, col);
 const ball = (u, v, r, zc, rz, col, mat = 0) => glBlob(u, v, r, zc, rz, col, mat);
 function disc(u, v, r, z, col, e = 0) { const C = gcol(col), O = gw(u, v, z + .25); GLB.mat = 0; GLB.ctr = gw(u, v, z - 20); for (let k = 0; k < 16; k++) { const a = k / 16 * TAU, b = (k + 1) / 16 * TAU; gtri(O, gw(u + Math.cos(a) * r, v + Math.sin(a) * r, z + .25), gw(u + Math.cos(b) * r, v + Math.sin(b) * r, z + .25), C, e); } }
 function ring(u, v, r, w, z, col, a0 = 0, a1 = TAU, n = 24, e = 0, mat = 0) { const C = gcol(col); GLB.mat = mat; GLB.ctr = gw(u, v, z - 20); for (let k = 0; k < n; k++) { const a = a0 + (a1 - a0) * k / n, b = a0 + (a1 - a0) * (k + 1) / n, P = (an, rr) => gw(u + Math.cos(an) * rr, v + Math.sin(an) * rr, z + .3); gquad(P(a, r - w), P(b, r - w), P(b, r), P(a, r), C, e); } } // a band laid flat (on the ground, round a tower)
 const beam = (u0, v0, z0, u1, v1, z1, w, col, mat = 0, e = 0) => gBeam(gw(u0, v0, z0), gw(u1, v1, z1), w, col, mat, e); // a square beam between two tile-local points
 const lamp = (u, v, z, r, col = '#fff3d0') => { GLB.mat = 0; glOBox(gw(u, v, z), [r, 0, 0], [0, 0, r], [0, r, 0], col, 2); }; // something that glows after dark (a lamp, a window, a stone)
-function dsRoof(u0, v0, hw, hd, z, rh, col) { // the style's own roof, when it has one
-  const round = dsRound(), k = DS.roofK || (DS.shape === 'round' ? 'cone' : DS.shape === 'organic' ? 'dome' : DS.shape === 'square' ? 'flat' : null);
-  if (!k) return false;
-  const r = Math.max(hw, hd) * (round ? 1.08 : 1);
-  if (round && (k === 'cone' || k === 'pyramid' || k === 'gable')) { cone(u0, v0, z, r * 1.12, rh * 1.2 + 2, col); return true; }
-  if (z < 3 || rh > 12) return false; // spires, huts and glass pyramids keep their form
-  if (k === 'dome') { dome(u0, v0, r * (round ? 1 : 1.12), z, rh + r * 7, col); return true; }
-  if (k === 'flat' || k === 'garden') {
-    box(u0, v0, hw + .02, hd + .02, z, 1.3, shade(col, 1.04));
-    if (k === 'garden') { flat(u0, v0, hw - .02, hd - .02, z + 1.35, '#7cc47f'); parkTree(u0 + hw * .25, v0 - hd * .2, hash2(GLB.x, GLB.y, 77), z + 1.3); }
-    return true;
-  }
-  const sv = DS; DS = null;
-  if (k === 'gable') roofGable(u0, v0, hw, hd, z, rh, col, col, hw >= hd); else if (k === 'pyramid') roofPyr(u0, v0, hw, hd, z, rh, col); else if (k === 'cone') cone(u0, v0, z, Math.max(hw, hd) * 1.25, rh * 1.3 + 2, col);
-  DS = sv; return true;
-}
-function roofGable(u0, v0, hw, hd, z, rh, col, wall, alongU) { if (!(DS && dsRoof(u0, v0, hw, hd, z, rh, col))) glGable(u0, v0, hw, hd, z, rh, col, wall, alongU); }
-function roofPyr(u0, v0, hw, hd, z, rh, col) { if (!(DS && dsRoof(u0, v0, hw, hd, z, rh, col))) glPyr(u0, v0, hw, hd, z, rh, col); }
-const roofMansard = (u0, v0, hw, hd, z, rh, col) => glMansard(u0, v0, hw, hd, z, rh, col);
 
 /* ---------- terrain ---------- */
 const STRATA = ['#a77a60', '#bb8f70', '#94705f', '#ad8671', '#86665b', '#9a7666'];
@@ -218,7 +193,7 @@ function bridgeZ(i) {
 
 // the 3D garden: each free corner of the plot gets a bush, a flower bed, a tree or a clump of grass, and some plots a hedge
 function glYard(B, x, y) {
-  if (B.tier <= 3 && hFits(B) && B.prog >= 1) return; // (the first homes, cottages and townhouses bring their own gardens: homes.js)
+  if (B.tier <= 3 && B.prog >= 1) return; // (the first homes, cottages and townhouses bring their own gardens: homes.js)
   const row = houseJoin(B), big = B.tier > 3;
   if (!row && B.tier >= 1 && B.tier <= 3 && B.prog >= 1) glYardBits(B, x, y);
   for (const [u, v, k] of [[-.42, -.42, 0], [-.42, .42, 1], [.42, .42, 2], [.42, -.42, 3]]) {
@@ -232,4 +207,3 @@ function glYard(B, x, y) {
   const hh = hash2(x, y, 500); if (!row && hh > .3 && hh < .6) { const sw = GLB.wall; GLB.wall = M_LEAF; glBox(.45, 0, .03, .32, 0, 2.2, leafC('#4f8a45')); GLB.wall = sw; } // a clipped hedge
 }
 
-function lampC(x, y) { return LT.lampCs ? LT.lampCs[(hash2(x | 0, y | 0, 17) * LT.lampCs.length) | 0] : LT.lampC; }

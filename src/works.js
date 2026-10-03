@@ -13,7 +13,7 @@ const wkV = (f, a) => [f[0] * Math.sin(a), -Math.cos(a), f[2] * Math.sin(a)]; //
 const wkAdd = (p, d, k) => [p[0] + d[0] * k, p[1] + d[1] * k, p[2] + d[2] * k];
 const wkLift = (ph, a0, a1, up = .7) => ph < up ? a0 + (a1 - a0) * Math.sin(ph / up * Math.PI / 2) : a1 + (a0 - a1) * ((ph - up) / (1 - up)) ** 2; // a slow lift to a1, then a quick blow back to a0
 function wkFolk(B, n) { // how the people at a workplace look (the same every time: hashed from the building)
-  const k = B.id * 4 + n; let o = WKF.get(k);
+  const k = B.id * 4 + n; let o = WKF.get(k); if (!o && WKF.size > 2000) WKF.clear();
   if (!o) { const h = s => hash2(B.id | 0, n, s); o = { col: WK_COL[(h(1) * WK_COL.length) | 0], pants: PANTS[(h(2) * PANTS.length) | 0], hair: HAIR[(h(3) * HAIR.length) | 0], skin: SKIN[(h(4) * SKIN.length) | 0], hat: h(5) * .4, kid: false, ph: 0, kind: 'p', arms: null, pet: false }; WKF.set(k, o); if (WKF.size > 400) WKF.delete(WKF.keys().next().value); }
   return o;
 }
@@ -85,7 +85,8 @@ function glDryFrame(u0, v0) { // the weaver's frame: two posts and a rail (the c
 function glTurbine(B) { // a tall white tower on its pad and the nacelle on top (the blades turn: GLW.turbine)
   const X = GLB.x, Z = GLB.y, y = GLB.base;
   gBox([X, y, Z], [.13, 0, 0], [0, 0, .13], .02, '#cfcac4', M_STONE);
-  GLB.wall = 0; glCylAt(0, 0, .045, 0, 28, '#f2f3f5', '#f2f3f5', 10); glCylAt(0, 0, .034, 28, 27, '#f2f3f5', '#f2f3f5', 10);
+  GLB.wall = 0; kSet(X, Z, [1, 0, 0], [0, 0, 1], B.id); kCone(0, 0, .02, .05, 55 * ZS - .02, '#f2f3f5', 14, 0, .03); kCyl(0, 0, 55 * ZS - .02, .032, .02, '#e2e4e8', 0, 12); // a tapering tower
+  if (KF.lod) for (const yy of [.6, 1.4, 2.1]) kCyl(0, 0, yy, .05 - yy / (55 * ZS) * .02 + .002, .008, '#dfe2e6', 0, 12, 0); // its section joints
   gBox([X + .03, y + 55 * ZS, Z], [.08, 0, 0], [0, 0, .035], 3.2 * ZS, '#e7e9ec');
   kSet(X, Z, [1, 0, 0], [0, 0, 1], B.id); kDoor(0, .044, .018, .075, '#c9ced4', { ty: 'plank', y: .02 }); // a door at its foot, and the kiosk the power goes out through
   kBox(.16, .08, 0, .035, .025, .055, '#d6dade', M_PLASTER); if (KF.lod) { kBox(.16, .106, .005, .02, .002, .035, '#9aa3ad'); kBox(.16, .106, .04, .006, .002, .006, '#e0a43a'); }

@@ -118,7 +118,6 @@ function cast(role, T, wfn, o = {}) {
   return addPerson(role, T ? T.id : (biggestTown() || { id: 1 }).id, o.newAge != null ? o.newAge : ri(o.minAge || 20, o.maxAge || 55));
 }
 
-function relName(id) { const p = S.P[id]; return p ? p.name : null; }
 function lineageLabel(p, all) {
   if (p.fl == null || p.fl === 0) return p.fl === 0 ? 'The Founder' : '';
   if (p.fl > 5 && !all) return '';

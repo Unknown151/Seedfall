@@ -155,13 +155,6 @@ function placeName(L) {
   }
   return nameWord(L, 2);
 }
-function personName(L) {
-  let first = cap(tidy(syl(L) + pick(L.given)));
-  if (first.length > 8) first = first.slice(0, 7);
-  let last = cap(tidy(pick(L.on) + pick(L.vo) + pick(L.co) + pick(L.fam)));
-  if (last.length > 11) last = nameWord(L, 2);
-  return first + ' ' + last;
-}
 
 /* ---------- misc ---------- */
 function fmtInt(n) { n = Math.round(n); return n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : n.toLocaleString('en-US'); }
