@@ -277,6 +277,19 @@ QUARTERS, TERRACES AND REBUILDING
   town hall, library, school, theatre and the rest each look the part, down
   to the clock on the tower.
 
+RAILWAYS
+  With Railways, towns that have a station are joined by a line. It crosses
+  the streets rather than running down them, and cuts across the fields;
+  now and then a cottage in the way has to come down. The track is ballast,
+  timber sleepers and two rails, curving round the corners, climbing on an
+  embankment and crossing rivers on an iron truss bridge. Where it crosses a
+  street there are crossbucks and barriers: they come down while a train
+  goes by, and the folk and carts wait. The first trains are steam engines
+  with a tender and three coaches, easing in and out of the stations. With
+  Electricity come concrete sleepers, overhead wires and electric trains with
+  a cab at each end, and with Maglev a concrete guideway on columns and long
+  white trains that float along it.
+
 BOATS, SHIPS AND PLANES
   Fishing boats leave their piers in the morning, fish all day (you can see
   the nets go over the side) and come home at dusk, with a lantern lit.

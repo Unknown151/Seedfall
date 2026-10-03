@@ -54,7 +54,7 @@ function newState(seed) { S = { rs: (seed * 2654435761) >>> 0 }; return simRun((
 function newState0(seed) {
   const g = genWorld(seed), rs = S.rs;
   S = {
-    v: 1, roadV: 2, size: W, rs, seed, created: Date.now(), savedAt: 0, playSec: 0,
+    v: 1, roadV: 2, railV: 2, size: W, rs, seed, created: Date.now(), savedAt: 0, playSec: 0,
     year: 0, month: 0, map: g.M, B: {}, nextB: 1, T: {}, nextT: 1, P: {}, nextP: 1,
     tech: { done: {}, cur: 0, pts: 0 }, era: 0, age: null, ageN: 0, ageUsed: {},
     styles: [Object.assign({}, STYLES0[0])], styleIdx: 0,
@@ -332,13 +332,28 @@ function roadCost(i, j) {
   if (de > 1 && M.water[i] === 0) return 1e9;
   return (M.road[j] ? 0.35 : 1.2) + de * 1.5 + (M.tree[j] ? 0.8 : 0) + (M.rail[j] ? 1 : 0) + (springAt(j) ? 8 : 0);
 }
+// a railway crosses streets but doesn't run down them: it cuts across the fields, and clears a few old cottages if it must
+let RAIL_TO = -1; // the station a line is being laid to (it may not run through anyone else's)
+const railYield = B => B.prog >= 1 && !fpBig(B) && (B.type === 'farm' || B.type === 'pasture' || (B.type === 'house' && B.tier <= 3));
 function railCost(i, j) {
-  if (M.bld[j]) { const B = S.B[M.bld[j]]; return B && B.type === 'station' ? 1 : 1e9; }
+  if (M.bld[j]) { const B = S.B[M.bld[j]]; if (!B) return 1e9; if (B.type === 'station') return j === RAIL_TO ? 1 : 1e9; return railYield(B) ? (B.type === 'house' ? 9 : 2.5) : 1e9; }
   if (M.ruin[j] || M.water[j] === 1) return 1e9;
   if (M.water[j] === 2) return 6;
   const de = Math.abs(M.elev[j] - M.elev[i]);
   if (de > 1) return 1e9;
-  return (M.rail[j] ? 0.3 : 1.3) + de * 2 + (M.road[j] ? 0.6 : 0);
+  return (M.rail[j] ? 0.3 : 1.3) + de * 2 + (M.road[j] ? 5 : 0) + (springAt(j) ? 8 : 0);
+}
+function layRail(path) { // the line goes down; fields and cottages in its way give way (returns how many homes went)
+  let homes = 0;
+  for (let k = 1; k < path.length - 1; k++) { const i = path[k], B = M.bld[i] && S.B[M.bld[i]];
+    if (B) { if (B.type === 'station' || !railYield(B)) continue; if (B.type === 'house') homes++; removeBuilding(B); }
+    M.rail[i] = 1; M.tree[i] = 0; M.wild[i] = 0; markDirty(i); }
+  S.railGen = (S.railGen || 0) + 1; return homes;
+}
+function replanRails() { // older worlds laid their lines down the streets: lay them again the way they're laid now
+  S.railV = 2; delete S.railReplan;
+  for (const r of S.rails || []) if (r.path) for (let k = 1; k < r.path.length - 1; k++) { const i = r.path[k]; if (M.rail[i]) { M.rail[i] = 0; markDirty(i); } }
+  for (const r of S.rails || []) if (r.path) { RAIL_TO = r.path[r.path.length - 1]; const p = astar(r.path[0], RAIL_TO, railCost); if (p) r.path = p; layRail(r.path); }
 }
 function planIntertownRoads() {
   if (!hasTech('wheel')) return;
@@ -378,12 +393,12 @@ function planRails() {
     for (const O of st) { if (O === T || has(T.id, O.id)) continue; const d = dist(T.x, T.y, O.x, O.y); if (d < bd) { bd = d; best = O; } }
     if (!best) continue;
     const sa = T.bl.map(id => S.B[id]).find(B => B && B.type === 'station'), sb = best.bl.map(id => S.B[id]).find(B => B && B.type === 'station');
-    const path = astar(idx(sa.x, sa.y), idx(sb.x, sb.y), railCost);
+    RAIL_TO = idx(sb.x, sb.y); const path = astar(idx(sa.x, sa.y), RAIL_TO, railCost);
     if (!path) { S.rails.push({ a: T.id, b: best.id, path: null }); continue; }
-    for (const i of path) { if (M.bld[i]) continue; M.rail[i] = 1; M.tree[i] = 0; M.wild[i] = 0; markDirty(i); }
+    const homes = layRail(path);
     S.rails.push({ a: T.id, b: best.id, path });
     const first = S.rails.filter(r => r.path).length === 1;
-    chron('🚂', first ? `The first train runs from ${T.name} to ${best.name}. Half the valley turns out to wave at it.` : `The railway reaches ${T.name} from ${best.name}.`, { T, k: first ? 'major' : '' });
+    chron('🚂', (first ? `The first train runs from ${T.name} to ${best.name}. Half the valley turns out to wave at it.` : `The railway reaches ${T.name} from ${best.name}.`) + (homes ? ` ${homes === 1 ? 'A cottage' : homes + ' cottages'} on the way had to come down; the families got new houses and a free ride.` : ''), { T, k: first ? 'major' : '' });
     return;
   }
 }
@@ -1118,6 +1133,7 @@ function simMonth() { // a bug in one month must never freeze the world (catch-u
   try { return simRun(simMonth0); } catch (e) { if (++SIM_ERRS <= 5) setTimeout(() => { throw e; }); }
 }
 function simMonth0() {
+  if (S.railReplan) replanRails();
   S.month++; S.year = S.month / 12;
   const newYear = S.month % 12 === 0;
   stepIncidents();

@@ -7,15 +7,15 @@
 
 const RAILX = { S: null, n: -1, m: null, xs: null };
 function railMap() { // tile -> its pieces [[prev, next], ...] (two lines can share a tile)
-  const rs = S.rails || [];
-  if (RAILX.S === S && RAILX.n === rs.length) return RAILX.m;
+  const rs = S.rails || [], gen = rs.length + (S.railGen || 0) * 1000;
+  if (RAILX.S === S && RAILX.n === gen) return RAILX.m;
   const m = new Map(), xs = [];
   for (const r of rs) if (r.path) for (let k = 1; k < r.path.length - 1; k++) {
     const i = r.path[k], a = r.path[k - 1], b = r.path[k + 1]; let L = m.get(i); if (!L) m.set(i, L = []);
     if (!L.some(([p, q]) => (p === a && q === b) || (p === b && q === a))) L.push([a, b]);
   }
   for (const i of m.keys()) if (M.road[i] && !M.water[i]) xs.push(i);
-  RAILX.S = S; RAILX.n = rs.length; RAILX.m = m; RAILX.xs = xs; return m;
+  RAILX.S = S; RAILX.n = gen; RAILX.m = m; RAILX.xs = xs; return m;
 }
 const railEra = () => hasTech('maglev') ? 2 : hasTech('electric') ? 1 : 0;
 EV.on('tech', d => { if (d.t && (d.t.id === 'electric' || d.t.id === 'maglev')) for (const i of railMap().keys()) markDirty(i); }); // the track changes with the age
