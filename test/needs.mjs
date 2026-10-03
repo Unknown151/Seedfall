@@ -5,7 +5,7 @@ const p = await b.newPage({ viewport: { width: 1600, height: 900 } });
 const errs = []; p.on('pageerror', e => errs.push(e.message + ' ' + (e.stack || '').split('\n').slice(0, 3).join(' | ')));
 let fails = 0;
 const ok = (c, what, extra = '') => { console.log(`${c ? 'ok  ' : 'FAIL'} ${what}${extra ? ' · ' + extra : ''}`); if (!c) fails++; };
-await p.goto(ROOT + 'seedfall.html?seed=4242&fresh&nointro&2d'); await p.waitForTimeout(600); // (the sim and the panels; 3D is glpick's)
+await p.goto(ROOT + 'seedfall.html?seed=4242&fresh&nointro&headless'); await p.waitForTimeout(600); // (the sim and the panels: nothing needs drawing)
 
 let r = await p.evaluate(() => { SF.ff(700); refreshNeeds(true); return { needs: towns().map(T => needsOf(T)), towers: anycount('watertower'), wells: anycount('well'), pastures: anycount('pasture'), weavers: anycount('weaver'), glass: anycount('glassworks') + anycount('sandpit'),
   flow: towns().reduce((a, T) => [a[0] + (T.flow.cloth || 0), a[1] + (T.flow.glass || 0)], [0, 0]) }; });

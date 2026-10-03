@@ -16,9 +16,18 @@
 html,body{margin:0;height:100%;overflow:hidden;background:#cfe3e6;
   font-family:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;color:var(--ink);
   -webkit-font-smoothing:antialiased;user-select:none}
-#view{position:fixed;inset:0;width:100vw;height:100vh;display:block;touch-action:none}
 body.nocursor, body.nocursor *{cursor:none!important}
-body.targeting #view{cursor:crosshair}
+body.targeting #gl3{cursor:crosshair}
+/* words over the 3D view: the names of places, and captions over what just happened */
+.plabel{position:absolute;left:0;top:0;white-space:nowrap;font:italic 600 14px Georgia,"Palatino Linotype",serif;color:rgba(255,250,240,.95);text-shadow:0 0 3px rgba(40,50,70,.6),0 0 8px rgba(40,50,70,.35);will-change:transform}
+.plabel.water{color:rgba(236,250,255,.95)}
+.plabel.night{color:rgba(230,236,255,.85);text-shadow:0 0 4px rgba(10,14,34,.8)}
+.fcap{position:absolute;left:0;top:0;white-space:nowrap;padding:5px 13px 5px 9px;border-radius:13px;background:rgba(255,251,244,.84);box-shadow:0 2px 10px rgba(60,40,60,.18);font-size:12.5px;font-weight:500;color:#2b2833;will-change:transform}
+.fcap i{font-style:normal;margin-right:6px}
+.fcap.major{background:rgba(255,251,244,.95);font-size:13.5px;font-weight:600;color:#b85a33}
+.fcap::after{content:'';position:absolute;left:50%;bottom:-6px;margin-left:-5px;border:5px solid transparent;border-top-color:inherit;border-top:6px solid rgba(255,251,244,.88);border-bottom:0}
+#nogl{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);max-width:420px;padding:18px 22px;border-radius:16px;background:rgba(255,251,244,.95);box-shadow:0 6px 30px rgba(40,40,70,.2);display:none;z-index:30;text-align:center;font-size:14px}
+#nogl.show{display:block}
 button{font:inherit;color:inherit;cursor:pointer}
 
 /* HUD */
@@ -274,7 +283,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
 </style>
 </head>
 <body>
-<canvas id="view"></canvas>
+<div id="nogl"><b>Seedfall needs WebGL 2</b><br>This browser can’t draw the 3D valley. Edge, Chrome or Firefox will. Your world keeps growing (and saving) in the meantime.</div>
 
 <div id="hud"><div id="hudName"></div><div id="hudLine"></div>
   <div id="hudRev" title="Reverence: the colonists' faith in the Watcher. It gathers while the world is on screen; nudges and words cost it."><span class="rv-l">✨ <b id="revNum">0</b><em>/<span id="revMax">0</span></em> <small id="revRate"></small></span><i><b id="revBar"></b></i></div>
@@ -354,7 +363,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
 
 <div class="modal" id="help"><div class="card">
   <h2>How to watch a world</h2>
-  <p>Seedfall runs itself. Leave it on a screen and check in now and then. The camera wanders on its own; drag or scroll to look around and it drifts back after a while.</p>
+  <p>Seedfall runs itself. Leave it on a screen and check in now and then. The film camera wanders on its own; drag to turn, scroll to zoom, click a person to follow them, and it carries on by itself a minute after you let go.</p>
   <div class="keys">
     <span><kbd>C</kbd></span><span>Chronicle, towns, people, lore</span>
     <span><kbd>1</kbd>–<kbd>5</kbd></span><span>Nudges: rain, supply pod, inspire, starfall, bloom. Then click the world. Each costs ✨ Reverence, which gathers while the world is on screen.</span>
@@ -366,7 +375,8 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
     <span><kbd>Z</kbd></span><span>Zone view: the quarters each town has drawn for itself (market, homes, works, greens)</span>
     <span><kbd>Shift</kbd>+<kbd>D</kbd></span><span>Debug: leap 10, 20, 50 or 100 years ahead, to see slow changes play out</span>
     <span><kbd>Space</kbd></span><span>Pause / resume</span>
-    <span><kbd>Home</kbd></span><span>Hand the camera back</span>
+    <span><kbd>R</kbd> <kbd>N</kbd> <kbd>T</kbd> <kbd>P</kbd></span><span>Film camera on or off, time of day, next town, perspective or isometric lens</span>
+    <span><kbd>Home</kbd></span><span>Hand the camera back to the film camera</span>
     <span><kbd>Esc</kbd></span><span>Cancel / close</span>
   </div>
   <p class="fine">Day and night, weather and shadows are set under Sky in the chronicle panel. The world pauses whenever this tab isn't visible (minimised, other tab, PC locked). When you come back it catches up on the time you were gone, up to 8 hours, and tells you what you missed. It picks up where it left off. Festivals, new eras, shrines and answered prayers all add to Reverence.</p>

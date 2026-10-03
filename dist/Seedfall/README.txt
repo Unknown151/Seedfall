@@ -250,6 +250,13 @@ QUARTERS, TERRACES AND REBUILDING
   gardens, a wash of colour of their own, and flat roofs with tanks, domes and
   awnings. Townhouses, rowhouses and flats on the same street join up into
   terraces and blocks, and the towers each have a shape and a tint of glass.
+  Come in close and everything is built properly: windows set in their
+  frames with sills and lintels (casements, then sashes, then steel and
+  glass), doors in their doorcases with fanlights and hoods, roofs with
+  ridges, gutters and chimney pots. Cottages have gardens with a path and a
+  gate, townhouses are timber-framed and jettied while the old styles last,
+  flats grow iron balconies and mansards, and the town hall, library, school,
+  theatre and the rest each look the part, down to the clock on the tower.
 
 BOATS, SHIPS AND PLANES
   Fishing boats leave their piers in the morning, fish all day (you can see
@@ -315,7 +322,8 @@ THE 3D VIEW
   quoins and striped shop awnings for the artisans; and tall mansard blocks
   with iron cresting for the engineers. Chimneys smoke (more in winter), and
   so do the works.
-  On a PC with no 3D support, Seedfall falls back to the flat 2D view.
+  Seedfall needs WebGL 2 (any recent Edge, Chrome or Firefox). Without it a note
+  says so, and the world keeps growing and saving all the same.
 
 KEYS
   C        chronicle, towns, people, lore
@@ -323,11 +331,11 @@ KEYS
            each costs Reverence)
   6        speak to your people
   F        fullscreen
-  Z        zone view: the quarters each town has drawn for itself (2D)
+  Z        zone view: the quarters each town has drawn for itself, tinted on the ground
   R        3D: the film camera on or off (on by default)
   N        3D: step through the times of day (and back to live)
   T        3D: fly to the next town
-  P        3D: perspective or the flat isometric lens
+  P        3D: perspective or the isometric lens
   Space    pause
   Shift+D  debug card: leap 10, 20, 50 or 100 years ahead (the world really
            moves on and is saved; handy for seeing slow changes play out)

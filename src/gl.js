@@ -1,14 +1,12 @@
-/* ============================== the world in real 3D (WebGL2): the default view; ?2d or the switch gives the flat one ============================== */
-// Opened with ?gl, the world is drawn as real 3D geometry instead of the 2D isometric canvas. The sim, UI and saves
-// are untouched. The building art is reused as it is: while a chunk is being built (GLB set), the drawing
-// primitives in render.js (box, cyl, cone, dome, roofs, windows, doors, flat) emit triangles instead of painting,
-// and the purely 2D strokes (lines, circles, polygons) are skipped. Terrain, water, roads, trees, lamps and people
+/* ============================== the world in real 3D (WebGL2) ============================== */
+// The world is drawn as real 3D geometry with WebGL2. While a chunk is being built (GLB set), the building art's
+// primitives in render.js (box, cyl, cone, dome, roofs, windows, doors, flat) emit triangles; types with a native model
+// (GL_MODEL, GL_BIG) are built straight in world units. Terrain, water, roads, trees, lamps and people
 // are built here. Lighting is per pixel, every frame: the sun (or moon) with a shadow map, sky and ground ambient,
 // lit windows at night, and street lamps as real point lights.
 const GL3 = { on: false, c: null, gl: null, chunks: [], dirty: new Set(), cam: { yaw: Math.PI / 4, pitch: .62, zoom: 14, tx: 32, ty: 0, tz: 32, auto: true, persp: true }, lamps: [], hr: [null, 13, 18.6, 20.4, 23.5], hi: 0, drag: null, town: 0, t: 0 };
-const GPID = 1 << 20, GCH = 8, GNC = W / GCH, ZS = 1 / 22; // chunk size in tiles; pixels of height to tile units
+const GPID = 1 << 20, GCH = 8, GNC = W / GCH, ZS = 1 / 22; // chunk size in tiles; height units (22 to a tile) to tiles
 let GLB = null; // the chunk being built: { v: floats, x, y, base (tile), tops: [[sx, sy, z]] }
-const GSTUB = new Proxy({}, { get: (t, k) => k in t ? t[k] : () => GRAD0, set: (t, k, v) => { t[k] = v; return true; } }), GRAD0 = { addColorStop() { } };
 
 /* ---------- colours ---------- */
 const GCOL = new Map();
@@ -31,10 +29,8 @@ function gtri(a, b, c, col, e = 0) {
   const n = [nx, ny, nz]; gv(a, n, col, e); gv(b, n, col, e); gv(c, n, col, e);
 }
 function gquad(a, b, c, d, col, e = 0) { gtri(a, b, c, col, e); gtri(a, c, d, col, e); }
-// tile-local (u, v, z in pixels) to world; the screen offset of cx/cy (some art nudges it) moves along the ground
-function gw(u, v, z, cx = 0, cy = 0) { const su = cx / 16, sv = cy / 8; return [GLB.x + u + (su + sv) / 2, GLB.base + z * ZS, GLB.y + v + (sv - su) / 2]; }
-// a screen point (relative to the tile centre) back to u, v, assuming it's on the ground
-function gunscreen(X, Y) { const a = X / 16, b = Y / 8; return [(a + b) / 2, (b - a) / 2]; }
+// tile-local to world: u, v in tiles from the middle of the tile (or lot) being built, z in height units (22 to a tile)
+function gw(u, v, z) { return [GLB.x + u, GLB.base + z * ZS, GLB.y + v]; }
 /* ---------- close-up detail (the near version of a chunk only: GLB.lod) ---------- */
 const rgbS1 = c => 'rgb(' + Math.round(c[0] * 255) + ',' + Math.round(c[1] * 255) + ',' + Math.round(c[2] * 255) + ')', tintS = (c, k, t = [1, 1, 1]) => rgbS1([c[0] + (t[0] - c[0]) * k, c[1] + (t[1] - c[1]) * k, c[2] + (t[2] - c[2]) * k]);
 const SHUT = ['#3f6b4f', '#3f5f8a', '#8a3f37', '#6b5a4a', '#2f4f5f'];
@@ -54,16 +50,15 @@ function glWinDetail(Wc, a, n, ww, wh, wall, seed, floor = 0) { // around one wi
   }
   GLB.mat = m;
 }
-function glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top) {
-  if (dsRound()) { const [X, Y] = pt(cx, cy, u0, v0, 0); return glCyl(X, Y, Math.max(hw, hd) * 1.08, z0, h, col, top); }
-  const c = gcol(col), ct = top ? gcol(top) : c, P = (u, v, z) => gw(u0 + u, v0 + v, z, cx, cy), z1 = z0 + h; GLB.ctr = P(0, 0, z0 + h / 2);
+function glBox(u0, v0, hw, hd, z0, h, col, top) {
+  if (dsRound()) return glCylAt(u0, v0, Math.max(hw, hd) * 1.08, z0, h, col, top); // (round styles build round)
+  const c = gcol(col), ct = top ? gcol(top) : c, P = (u, v, z) => gw(u0 + u, v0 + v, z), z1 = z0 + h; GLB.ctr = P(0, 0, z0 + h / 2);
   if (GLB.wall && h >= 6) GLB.wallC = c; // (the trim of its windows and doors is tinted from it)
   GLB.mat = GLB.wall && z1 > 6 ? M_TAR : 0; gquad(P(-hw, -hd, z1), P(-hw, hd, z1), P(hw, hd, z1), P(hw, -hd, z1), ct); GLB.mat = GLB.wall || 0;
   gquad(P(-hw, hd, z0), P(hw, hd, z0), P(hw, hd, z1), P(-hw, hd, z1), c);
   gquad(P(hw, hd, z0), P(hw, -hd, z0), P(hw, -hd, z1), P(hw, hd, z1), c);
   gquad(P(hw, -hd, z0), P(-hw, -hd, z0), P(-hw, -hd, z1), P(hw, -hd, z1), c);
   gquad(P(-hw, -hd, z0), P(-hw, hd, z0), P(-hw, hd, z1), P(-hw, -hd, z1), c);
-  const [sx, sy] = pt(cx, cy, u0, v0, 0); GLB.tops.push([sx, sy, z1]);
   if (GLB.lod && GLB.wall === M_GLASS && h >= 16 && hw >= .1 && hd >= .1) { // curtain wall: mullions up the glass and a band at every floor
     const m = GLB.mat, C = P(0, 0, z0), fc = tintS(c, .55, [.85, .87, .9]), Hh = h * ZS / 2, cy = C[1] + Hh; GLB.mat = 0;
     for (const [n, a, half, off] of [[[0, 0, 1], [1, 0, 0], hw, hd], [[0, 0, -1], [1, 0, 0], hw, hd], [[1, 0, 0], [0, 0, 1], hd, hw], [[-1, 0, 0], [0, 0, 1], hd, hw]]) {
@@ -81,10 +76,10 @@ function glBox(cx, cy, u0, v0, hw, hd, z0, h, col, top) {
     GLB.mat = m;
   }
 }
-function glFlat(cx, cy, u0, v0, hw, hd, z, col) {
+function glFlat(u0, v0, hw, hd, z, col) {
   GLB.mat = GLB.flat === 'farm' ? (col === '#bd8f68' ? M_SOIL : M_CROP) : GLB.flat === 'green' ? M_GRASS : GLB.flat === 'paved' ? M_STONE : 0;
-  if (GLB.mat === M_CROP && hd < .1 || GLB.mat === M_CROP && hw < .1) { const sv = GLB.wall; GLB.wall = M_CROP; glBox(cx, cy, u0, v0, hw < .1 ? hw * .75 : hw, hd < .1 ? hd * .75 : hd, 0, z + .9, col); GLB.wall = sv; return; } // a crop row stands up
-  const c = gcol(col), P = (u, v) => gw(u0 + u, v0 + v, z + .25, cx, cy); GLB.ctr = gw(u0, v0, z - 20, cx, cy);
+  if (GLB.mat === M_CROP && hd < .1 || GLB.mat === M_CROP && hw < .1) { const sv = GLB.wall; GLB.wall = M_CROP; glBox(u0, v0, hw < .1 ? hw * .75 : hw, hd < .1 ? hd * .75 : hd, 0, z + .9, col); GLB.wall = sv; return; } // a crop row stands up
+  const c = gcol(col), P = (u, v) => gw(u0 + u, v0 + v, z + .25); GLB.ctr = gw(u0, v0, z - 20);
   gquad(P(-hw, -hd), P(-hw, hd), P(hw, hd), P(hw, -hd), c);
 }
 function glCylAt(u, v, r, z0, h, col, top, n = 12) {
@@ -92,22 +87,14 @@ function glCylAt(u, v, r, z0, h, col, top, n = 12) {
   for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; GLB.mat = GLB.wall || 0; gquad(P(a, z0), P(b, z0), P(b, z0 + h), P(a, z0 + h), c); GLB.mat = 0; gtri(C, P(b, z0 + h), P(a, z0 + h), ct); }
   if (GLB.lod && GLB.wall && h > 8 && r > .07) { GLB.lod = false; const bc = tintS(c, .4); glCylAt(u, v, r * 1.05, z0 + h - 1.1, 1.1, bc, bc, n); GLB.lod = true; } // a band round the top of a tower
 }
-function glCyl(X, Y, r, z0, h, col, top) { const [u, v] = gunscreen(X, Y); glCylAt(u, v, r, z0, h, col, top); GLB.tops.push([X, Y, z0 + h]); }
-function glCone(X, Y, r, h, col) {
-  let zb = 0; // a cone is often drawn lifted onto whatever it tops: find that
-  for (const [sx, sy, z] of GLB.tops) if (Math.abs(sx - X) < .7 && Math.abs(sy - z - Y) < 1.6) { zb = z; Y = sy; break; }
-  const [u, v] = gunscreen(X, Y), c = gcol(col), n = 12, A = gw(u, v, zb + h); GLB.ctr = gw(u, v, zb - 1); GLB.mat = roofMat(c);
-  for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gtri(gw(u + Math.cos(a) * r, v + Math.sin(a) * r, zb), gw(u + Math.cos(b) * r, v + Math.sin(b) * r, zb), A, c); }
-}
-function glDome(X, Y, r, z0, h, col) { const [u, v] = gunscreen(X, Y); glDomeAt(u, v, r, z0, h, col); }
 function glDomeAt(u, v, r, z0, h, col, e = 0, mat = 0) {
   GLB.ctr = gw(u, v, z0); GLB.mat = mat; const c = gcol(col), n = 12, m = 4, P = (a, t) => gw(u + Math.cos(a) * r * Math.cos(t), v + Math.sin(a) * r * Math.cos(t), z0 + h * Math.sin(t));
   for (let j = 0; j < m; j++) { const t0 = j / m * Math.PI / 2, t1 = (j + 1) / m * Math.PI / 2; for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gquad(P(a, t0), P(b, t0), P(b, t1), P(a, t1), c, e); } }
 }
 function glBall(u, v, r, zc, rz, col, e = 0, mat = 0) { glDomeAt(u, v, r, zc, rz, col, e, mat); glDomeAt(u, v, r, zc, -rz, col, e, mat); }
-function glGable(cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
+function glGable(u0, v0, hw, hd, z, rh, col, wall, alongU) {
   // the eaves hang out past the walls and drop a little, so the roof meets the top of the wall with no gap
-  const c = gcol(col), cw = gcol(wall), o = .05, g = .02, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy); GLB.ctr = P(0, 0, z - 1);
+  const c = gcol(col), cw = gcol(wall), o = .05, g = .02, P = (u, v, zz) => gw(u0 + u, v0 + v, zz); GLB.ctr = P(0, 0, z - 1);
   const rm = roofMat(c), wm = GLB.wall || 0, sq = gquad, tr = gtri, gq = (...a) => { GLB.mat = rm; sq(...a); }, gt = (...a) => { GLB.mat = wm; tr(...a); };
   if (GLB.lod && hw > .06 && hd > .06) { // a ridge cap and gutters along the eaves
     const cap = tintS(c, .3, [.18, .17, .17]), L = alongU ? [[-hw - g, 0], [hw + g, 0]] : [[0, -hd - g], [0, hd + g]], ze = alongU ? z - rh * o / hd : z - rh * o / hw;
@@ -129,24 +116,24 @@ function glGable(cx, cy, u0, v0, hw, hd, z, rh, col, wall, alongU) {
   if (GLB.B && z >= 6 && GLB.wall !== M_GLASS) glGableDress(P, hw, hd, z, rh, c, cw, alongU, rm);
 }
 function roofMat(c) { return c[0] > .6 && c[1] > .5 && c[2] < .5 && c[0] - c[2] > .25 && c[1] - c[2] > .15 ? M_THATCH : c[0] > c[2] + .1 && c[0] > c[1] ? M_ROOF : M_SLATE; } // straw-coloured roofs are thatched, red and brown ones tiled, grey and blue ones slated
-function glPyr(cx, cy, u0, v0, hw, hd, z, rh, col) {
-  const c = gcol(col), o = .04, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy), T = P(0, 0, z + rh); GLB.ctr = P(0, 0, z - 1); GLB.mat = roofMat(c);
+function glPyr(u0, v0, hw, hd, z, rh, col) {
+  const c = gcol(col), o = .04, P = (u, v, zz) => gw(u0 + u, v0 + v, zz), T = P(0, 0, z + rh); GLB.ctr = P(0, 0, z - 1); GLB.mat = roofMat(c);
   const ze = z - rh * o / Math.max(.05, Math.min(hw, hd)), A = P(-hw - o, -hd - o, ze), B = P(hw + o, -hd - o, ze), C = P(hw + o, hd + o, ze), D = P(-hw - o, hd + o, ze); // eaves drop to meet the walls
   gtri(B, A, T, c); gtri(A, D, T, c); gtri(D, C, T, c); gtri(C, B, T, c);
   if (GLB.lod && rh > 4) { GLB.mat = 0; glOBox([T[0], T[1] + .012, T[2]], [.011, 0, 0], [0, 0, .011], [0, .03, 0], '#8c8f94'); } // a finial
   if (GLB.B && GLB.wall !== M_GLASS && rh >= 5 && hw >= .15 && hd >= .15 && z >= 6 && hash2(GLB.x, GLB.y, 917) < .7) { const [col, mat] = glStackCol(), Q = P(hw * .4, -hd * .35, z - 1); glChimney(Q[0], Q[1], Q[2], .035, .035, gw(0, 0, z + rh * .7 + 3.6)[1], col, mat); }
 }
 // windows on all four walls (the camera can go round now); em in (0, 1) = a window, lit when em < the night's lit fraction
-function glWindows(cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col) {
+function glWindows(u0, v0, hw, hd, z0, h, floors, cols, col) {
   const c = gcol(col), fh = h / floors, e = .006;
-  if (GLB.lod && GLB.B && GL_PROPER(GLB.wall) && floors >= 3 && z0 < 1 && hw >= .15 && hd >= .15 && glOld()) glFacade(gw(u0, v0, 0, cx, cy), hw, hd, z0, h, floors, cols, GLB.wallC || [.8, .75, .68]);
-  GLB.ctr = gw(u0, v0, z0 + h / 2, cx, cy);
+  if (GLB.lod && GLB.B && GL_PROPER(GLB.wall) && floors >= 3 && z0 < 1 && hw >= .15 && hd >= .15 && glOld()) glFacade(gw(u0, v0, 0), hw, hd, z0, h, floors, cols, GLB.wallC || [.8, .75, .68]);
+  GLB.ctr = gw(u0, v0, z0 + h / 2);
   for (let f = 0; f < floors; f++) {
     const zb = z0 + f * fh + fh * .32, wh = fh * .42;
     for (let k = 0; k < cols; k++) {
       const t = (k + .5) / cols, wu = hw * 2 / cols * .42, wv = hd * 2 / cols * .42, u = -hw + t * hw * 2, v = -hd + t * hd * 2;
       const em = (i) => .03 + .94 * hash2((GLB.x * 7 + k * 13 + i) | 0, (GLB.y * 5 + f * 31 + (zb | 0)) | 0, 71);
-      const P = (uu, vv, zz) => gw(u0 + uu, v0 + vv, zz, cx, cy);
+      const P = (uu, vv, zz) => gw(u0 + uu, v0 + vv, zz);
       gquad(P(u - wu / 2, hd + e, zb), P(u + wu / 2, hd + e, zb), P(u + wu / 2, hd + e, zb + wh), P(u - wu / 2, hd + e, zb + wh), c, em(1));
       gquad(P(u + wu / 2, -hd - e, zb), P(u - wu / 2, -hd - e, zb), P(u - wu / 2, -hd - e, zb + wh), P(u + wu / 2, -hd - e, zb + wh), c, em(2));
       gquad(P(hw + e, v + wv / 2, zb), P(hw + e, v - wv / 2, zb), P(hw + e, v - wv / 2, zb + wh), P(hw + e, v + wv / 2, zb + wh), c, em(3));
@@ -157,12 +144,12 @@ function glWindows(cx, cy, u0, v0, hw, hd, z0, h, floors, cols, col) {
     }
   }
 }
-function glCylWindows(cx, cy, u0, v0, r, z0, h, floors, n, col) {
-  const c = gcol(col), fh = h / floors, rr = r + .01; GLB.ctr = gw(u0, v0, z0 + h / 2, cx, cy);
-  for (let f = 0; f < floors; f++) { const zb = z0 + f * fh + fh * .32, wh = fh * .42; for (let k = 0; k < n * 2; k++) { const a = k / (n * 2) * TAU, b = a + TAU / (n * 2) * .45; gquad(gw(u0 + Math.cos(a) * rr, v0 + Math.sin(a) * rr, zb, cx, cy), gw(u0 + Math.cos(b) * rr, v0 + Math.sin(b) * rr, zb, cx, cy), gw(u0 + Math.cos(b) * rr, v0 + Math.sin(b) * rr, zb + wh, cx, cy), gw(u0 + Math.cos(a) * rr, v0 + Math.sin(a) * rr, zb + wh, cx, cy), c, .03 + .94 * hash2(GLB.x * 3 + k, GLB.y * 7 + f, 71)); } }
+function glCylWindows(u0, v0, r, z0, h, floors, n, col) {
+  const c = gcol(col), fh = h / floors, rr = r + .01; GLB.ctr = gw(u0, v0, z0 + h / 2);
+  for (let f = 0; f < floors; f++) { const zb = z0 + f * fh + fh * .32, wh = fh * .42; for (let k = 0; k < n * 2; k++) { const a = k / (n * 2) * TAU, b = a + TAU / (n * 2) * .45; gquad(gw(u0 + Math.cos(a) * rr, v0 + Math.sin(a) * rr, zb), gw(u0 + Math.cos(b) * rr, v0 + Math.sin(b) * rr, zb), gw(u0 + Math.cos(b) * rr, v0 + Math.sin(b) * rr, zb + wh), gw(u0 + Math.cos(a) * rr, v0 + Math.sin(a) * rr, zb + wh), c, .03 + .94 * hash2(GLB.x * 3 + k, GLB.y * 7 + f, 71)); } }
 }
-function glDoor(cx, cy, u0, v0, hd, w, h, col) {
-  const P = (u, zz) => gw(u0 + u, v0 + hd + .007, zz, cx, cy); GLB.ctr = gw(u0, v0, h / 2, cx, cy);
+function glDoor(u0, v0, hd, w, h, col) {
+  const P = (u, zz) => gw(u0 + u, v0 + hd + .007, zz); GLB.ctr = gw(u0, v0, h / 2);
   gquad(P(-w / 2, 0), P(w / 2, 0), P(w / 2, h), P(-w / 2, h), gcol(col), .5);
   if (GLB.lod) { // a frame, a step and a little hood over it
     const m = GLB.mat, C = P(0, 0), wall = GLB.wallC || [.8, .75, .68]; GLB.mat = M_STONE;
@@ -210,8 +197,8 @@ function glDormer(F, out, side, h, depth, rc, wc, seed) { // F: the foot of its 
   GLB.mat = m;
 }
 // a mansard: steep lower slopes with dormers, a shallow top, iron cresting and a row of chimney stacks (the engineers' blocks)
-function glMansard(cx, cy, u0, v0, hw, hd, z, rh, col) {
-  const c = gcol(col), rm = roofMat(c), o = .03, P = (u, v, zz) => gw(u0 + u, v0 + v, zz, cx, cy), zb = z + rh * .72, iw = hw * .8, id = hd * .8; GLB.ctr = P(0, 0, z - 1);
+function glMansard(u0, v0, hw, hd, z, rh, col) {
+  const c = gcol(col), rm = roofMat(c), o = .03, P = (u, v, zz) => gw(u0 + u, v0 + v, zz), zb = z + rh * .72, iw = hw * .8, id = hd * .8; GLB.ctr = P(0, 0, z - 1);
   const E = [P(-hw - o, -hd - o, z - .4), P(hw + o, -hd - o, z - .4), P(hw + o, hd + o, z - .4), P(-hw - o, hd + o, z - .4)], I = [P(-iw, -id, zb), P(iw, -id, zb), P(iw, id, zb), P(-iw, id, zb)], T = P(0, 0, z + rh);
   GLB.mat = rm; for (let k = 0; k < 4; k++) { const j = (k + 1) % 4; gquad(E[k], E[j], I[j], I[k], c); gtri(I[k], I[j], T, gcol(tintS(c, .12, [.2, .2, .22]))); }
   const wc = GLB.wallC || [.86, .82, .74];
@@ -258,8 +245,8 @@ function glWinBox(at, a, n, ww, wh, seed) {
   GLB.mat = m;
 }
 // a striped canvas awning over a shopfront
-function glAwning(cx, cy, u0, v0, hw, hd, accent, U) {
-  const P = (u, v, z) => gw(u0 + u, v0 + v, z, cx, cy); GLB.ctr = P(0, 0, 3); GLB.mat = M_PLANK;
+function glAwning(u0, v0, hw, hd, accent, U) {
+  const P = (u, v, z) => gw(u0 + u, v0 + v, z); GLB.ctr = P(0, 0, 3); GLB.mat = M_PLANK;
   const L = (U ? hw : hd) * .9, n = Math.max(3, Math.round(L * 2 / .045)), stripe = gcol(accent), cream = [.95, .92, .86];
   for (let k = 0; k < n; k++) {
     const a = -L + k / n * L * 2, b = -L + (k + 1) / n * L * 2, col = k % 2 ? cream : stripe;
@@ -337,7 +324,7 @@ function glPack(v) {
     const o = k * 28, f = o >> 2, e = v[s + 9]; F[f] = v[s]; F[f + 1] = v[s + 1]; F[f + 2] = v[s + 2]; if (v[s + 1] < y0) y0 = v[s + 1]; if (v[s + 1] > y1) y1 = v[s + 1];
     I8[o + 12] = n8(v[s + 3]); I8[o + 13] = n8(v[s + 4]); I8[o + 14] = n8(v[s + 5]);
     U8[o + 16] = c8(v[s + 6]); U8[o + 17] = c8(v[s + 7]); U8[o + 18] = c8(v[s + 8]);
-    U8[o + 19] = e < -.5 ? 0 : e === 0 ? 1 : e >= 1.5 ? 255 : Math.min(254, 2 + Math.round(e * 250)); // (-1 water, 0, a window's (0, 1), 2 a lamp)
+    U8[o + 19] = e < -.5 ? 0 : e === 0 ? 1 : e >= 2.5 ? 254 : e >= 1.5 ? 255 : Math.min(252, 2 + Math.round(e * 250)); // (-1 water, 0, a window's (0, 1), 2 a lamp, 3 a glow of its own colour)
     F[f + 5] = v[s + 10]; U8[o + 24] = v[s + 11]; U8[o + 25] = c8(v[s + 12]);
   }
   return { buf, n, y0, y1 };
@@ -359,11 +346,11 @@ function glBuildChunk(k, near = false) { const v = [], lamps = []; glBuildRows(k
 // some rows of a chunk (the detailed version is built a row or two a frame, so it never stalls the view)
 function glBuildRows(k, near, r0, r1, v, lamps, c0 = 0, c1 = GCH) {
   const cx0 = (k % GNC) * GCH, cy0 = ((k / GNC) | 0) * GCH;
-  const svLT = LT, svEM = EMQ; LT = GLT_FLAT(); EMQ = null;
+  const svLT = LT; LT = GLT_FLAT();
   try {
     for (let y = cy0 + r0; y < cy0 + r1; y++) for (let x = cx0 + c0; x < cx0 + c1; x++) {
       const i = idx(x, y), h = GT(i);
-      GLB = { v, x, y, base: surfZ(i) * ZS, tops: [], id: i + 1, wall: 0, mat: 0, lod: near, ctr: null, wallC: null, flat: '', ao: 1, B: null, smk: null }; // (every field up front: one shape keeps the primitives fast)
+      GLB = { v, x, y, base: surfZ(i) * ZS, id: i + 1, wall: 0, mat: 0, lod: near, ctr: null, wallC: null, flat: '', ao: 1, B: null, smk: null }; // (every field up front: one shape keeps the primitives fast)
       const bio = M.bio[i], gmat = M.water[i] ? 0 : bio === BIO.MEADOW || bio === BIO.LUSH ? M_GRASS : bio === BIO.ROCK || bio === BIO.SNOW ? M_STONE : bio === BIO.SAND ? M_SAND : M_EARTH;
       // ground
       const top = gcol(topColor(i)), sc = gcol(sideCol(i));
@@ -382,13 +369,13 @@ function glBuildRows(k, near, r0, r1, v, lamps, c0 = 0, c1 = GCH) {
         GLB.mat = 0; glBoxW(x + .36, y - .36, .025, b, 9.5 * ZS, '#4c4f58'); glBoxW(x + .36, y - .36, .05, b + 9.5 * ZS, 1.2 * ZS, '#fff3d0', 2); lamps.push(L);
       }
       if (M.tree[i] && !M.bld[i]) glTrees(i, x, y);
-      // what stands on the tile, drawn by the same art as the 2D view
+      // what stands on the tile (render.js)
       { const Bw = M.bld[i] && S.B[M.bld[i]]; GLB.wall = Bw ? glWallMat(Bw) : M_PLANK; GLB.B = Bw || null; GLB.smk = lamps.smk || (lamps.smk = []); } // walls by what the building is made of; street furniture is wooden
-      try { drawTileObjects(GSTUB, i, x, y, 0, 0); } catch (e) { }
+      try { drawTileObjects(i, x, y); } catch (e) { if (QS.has('dev')) console.error(e); }
       const B = M.bld[i] && S.B[M.bld[i]];
-      if (B && !B.hid && FLAT_TYPES[B.type]) { GLB.flat = B.type === 'farm' ? 'farm' : B.type === 'park' || B.type === 'pasture' ? 'green' : B.type === 'plaza' || B.type === 'airfield' ? 'paved' : ''; try { drawBuilding(GSTUB, B, 0, 0, i); } catch (e) { } GLB.flat = ''; }
+      if (B && !B.hid && FLAT_TYPES[B.type]) { GLB.flat = B.type === 'farm' ? 'farm' : B.type === 'park' || B.type === 'pasture' ? 'green' : B.type === 'plaza' || B.type === 'airfield' ? 'paved' : ''; try { drawBuilding(B, i); } catch (e) { } GLB.flat = ''; }
     }
-  } finally { GLB = null; LT = svLT; EMQ = svEM; }
+  } finally { GLB = null; LT = svLT; }
 }
 let GLT_N = null;
 function GLT_FLAT() { // the light the colours are picked under: none at all (the shader does the lighting)
@@ -426,26 +413,24 @@ function glTrees(i, x, y) {
   }
   GLB.base = surfZ(i) * ZS;
 }
-/* ---------- foliage and small life: the 2D streetscape's tufts, flowers, bushes and trees, in 3D ---------- */
+/* ---------- foliage and small life: tufts, flowers, bushes and trees ---------- */
 // small things drawn at a screen point; a negative cy with no cx is art lifting them onto a roof
-function glAt(X, Y) { for (const [sx, sy, z] of GLB.tops) if (Math.abs(sx - X) < .7 && Math.abs(sy - z - Y) < 1.6) return [...gunscreen(sx, sy), z]; return [...gunscreen(X, Y), 0]; }
 function glBlob(u, v, r, zc, rz, col, mat = M_LEAF) { // a low-poly ball (bushes, flowers, sheep)
   const c = gcol(col), n = 7, P = (a, t) => gw(u + Math.cos(a) * r * Math.cos(t), v + Math.sin(a) * r * Math.cos(t), zc + rz * Math.sin(t)); GLB.ctr = gw(u, v, zc); GLB.mat = mat;
   for (let j = -2; j < 2; j++) { const t0 = j / 2 * Math.PI / 2, t1 = (j + 1) / 2 * Math.PI / 2; for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gquad(P(a, t0), P(b, t0), P(b, t1), P(a, t1), c); } }
 }
-function glTuft(X, Y, col) { // a clump of grass blades
-  const [u, v, z] = glAt(X, Y), c = gcol(mix(col, '#3f6f35', .35)), h0 = hash2((u * 97) | 0, (v * 89) | 0, 7); GLB.mat = 0; GLB.ctr = gw(u, v, z - 5);
+function glTuftUV(u, v, z, col) { // a clump of grass blades
+  const c = gcol(mix(col, '#3f6f35', .35)), h0 = hash2((u * 97) | 0, (v * 89) | 0, 7); GLB.mat = 0; GLB.ctr = gw(u, v, z - 5);
   for (let k = 0; k < 6; k++) { const a = (h0 + k / 6) * TAU, du = Math.cos(a) * .012, dv = Math.sin(a) * .012, ou = Math.cos(a * 3) * .03, ov = Math.sin(a * 3) * .03; gtri(gw(u + ou - dv, v + ov + du, z), gw(u + ou + dv, v + ov - du, z), gw(u + ou * 1.8, v + ov * 1.8, z + 1.2 + (k % 3) * .35), c); }
 }
-function glFlowers(X, Y, h) { // a clump of stems and blooms
-  const [u, v, z] = glAt(X, Y); GLB.mat = 0;
+function glFlowersUV(u, v, z, h) { // a clump of stems and blooms
+  GLB.mat = 0;
   for (let k = 0; k < 3; k++) { const du = (k - 1) * .05, dv = ((k % 2) - .5) * .05; glBoxW(GLB.x + u + du, GLB.y + v + dv, .006, GLB.base + z * ZS, 1.4 * ZS, '#4f8a45'); glBlob(u + du, v + dv, .022, z + 1.6, .6, FLOWERS[(((h * 17) | 0) + k) % FLOWERS.length], 0); }
 }
 function glSmallTree(u, v, z, h, s, col) { // street, garden and park trees: a trunk and a leafy crown
   GLB.mat = M_BARK; glBoxW(GLB.x + u, GLB.y + v, .022 * s, GLB.base + z * ZS, 5 * s * ZS, '#6b5040');
   glBlob(u, v, .15 * s, z + 7 * s, 3.4 * s, leafC(col)); glBlob(u + .05 * s, v - .04 * s, .1 * s, z + 9 * s, 2.4 * s, leafC(col));
 }
-function glTreeAt(cx, cy, u, v, h, s, col) { const lift = cy < 0 && !cx ? -cy : 0, [su, sv] = lift ? [0, 0] : gunscreen(cx, cy); glSmallTree(u + su, v + sv, lift, h, s, col); }
 // the First Pod: a silver capsule lying where it came down, half sunk and tipped, greening over the centuries
 function glPod(B) {
   const a = -.55, d = [Math.cos(a), .14, Math.sin(a)], dl = Math.hypot(d[0], d[1], d[2]), D = V3(d, 1 / dl), side = [-Math.sin(a), 0, Math.cos(a)], up = [side[1] * D[2] - side[2] * D[1], side[2] * D[0] - side[0] * D[2], side[0] * D[1] - side[1] * D[0]]; // (side × along: pointing up, so the porthole and the moss are on top)
@@ -512,15 +497,16 @@ function glHarbour(B) {
   }
   for (let k = 0; k < L; k++) {
     const s = -L / 2 + k + .5, h = hash2(B.x + k, B.y, 5);
-    // a warehouse at the back of each berth
-    const wh = (boxes ? 13 : steel ? 11 : 9) * ZS, wall = boxes ? '#98a2ab' : brick ? '#b8684f' : '#c8a77a';
-    const sv = GLB.wall; GLB.wall = boxes ? M_PLASTER : brick ? M_BRICK : M_PLANK;
-    gBox(P(s, -.24), V3s(A3, .4), V3s(D3, .2), wh, wall, GLB.wall);
-    if (boxes) gBox(P(s, -.24, y + wh), V3s(A3, .41), V3s(D3, .21), .012, '#6b737c', M_TAR);
-    else gRoof(P(s, -.24), V3s(A3, .4), V3s(D3, .2), y + wh, 4.5 * ZS, steel ? '#5d6670' : '#a0523c', wall);
-    gWins(P(s, -.03), A3, D3, .36, y + .03, boxes ? 3 : 2, 4, wh / (boxes ? 3.4 : 2.4), B.x * 3 + k);
-    GLB.mat = 0; glOBox(P(s + .22, -.035, y + wh * .3), V3s(A3, .07), V3s(D3, .004), [0, wh * .3, 0], '#4a3a30'); // the big door
-    GLB.wall = sv;
+    // a warehouse at the back of each berth (kit.js): loading doors up its front under a hoist, windows, a gable or a flat roof
+    const wh = (boxes ? 13 : steel ? 11 : 9) * ZS, wall = boxes ? '#98a2ab' : brick ? '#b8684f' : '#c8a77a', wm = boxes ? M_PLASTER : brick ? M_BRICK : M_PLANK, c = P(s, -.24), fl = boxes ? 3 : 2, fh = (wh - .02) / fl;
+    kSet(c[0], c[2], A3, D3, B.id * 7 + k); KF.y0 = y;
+    kPlinth(-.4, .4, -.2, .2, .02, '#a39a8c'); kBox(0, 0, .02, .4, .2, wh - .02, wall, wm);
+    kWins(-.4, .4, .2, .02, fh, fl, 5, { ty: boxes ? 'modern' : 'sash', hk: .48, arch: brick && !boxes ? 'seg' : null, wall, back: 1 }, q => q === 3, 0);
+    kWins(-.4, .4, -.2, .02, fh, fl, 4, { back: 1 }, null, 20);
+    kBox(.24, .2, .02, .055, .006, Math.min(.18, fh * .85), '#4a3a30', M_PLANK); // the big door
+    for (let f = 1; f < fl; f++) kBox(.24, .2, .02 + f * fh + fh * .15, .04, .006, fh * .6, '#5a4a3c', M_PLANK); // loft doors above it
+    if (KF.lod) { kBeam([.24, .2, wh - .01], [.24, .3, wh - .01], .007, '#5a4a3c', M_PLANK); kBeam([.24, .29, wh - .01], [.24, .29, wh * .45], .0015, '#3a3028'); kBox(0, .204, wh - .05, .2, .003, .028, boxes ? '#2f3a44' : '#efe2c0'); } // the hoist, its rope; the company's name
+    if (boxes) kFlat(-.4, .4, -.2, .2, wh, wall, .03); else kGable(-.4, .4, -.2, .2, wh, 4.5 * ZS, steel ? '#5d6670' : '#a0523c', { wall, wm });
     // a crane at each berth
     if (boxes) { // gantry: four legs, a beam and a boom out over the ship
       const hc = .95, col = h < .5 ? '#d6703a' : '#3f6f9f';
@@ -539,116 +525,14 @@ function glHarbour(B) {
   for (const s of [-L / 2 + .06, L / 2 - .06]) { gBox(P(s, .4), [.01, 0, 0], [0, 0, .01], 9 * ZS, '#4c4f58'); gBox(P(s, .4, y + 9 * ZS), [.025, 0, 0], [0, 0, .025], .04, '#fff3d0', 0, 2); }
 }
 
-// landmarks on their bigger lots
-function glBigHall(B, st) { // a grand town hall: a long range with a portico and a tower
-  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t];
-  const stone = hasTech('masonry'), wall = stone ? '#d9cfbd' : st.wall, h = 20 * ZS; GLB.wall = stone ? M_STONE : M_PLASTER;
-  gBox(P(0, -.05), V3s(A3, .85), V3s(D3, .3), h, wall, GLB.wall); gRoof(P(0, -.05), V3s(A3, .85), V3s(D3, .3), y + h, 7 * ZS, st.roof, wall);
-  gWins(P(0, .25), A3, D3, .8, y + .04, 3, 9, h / 3.3, B.x * 5 + B.y);
-  gBox(P(0, .3), V3s(A3, .26), V3s(D3, .08), .02, '#cfc6b4', M_STONE); // steps
-  for (let k = 0; k < 6; k++) gBox(P(-.22 + k * .088, .34, y + .02), [.014, 0, 0], [0, 0, .014], 12 * ZS, '#eee8dc', M_STONE); // columns
-  gBox(P(0, .34, y + .02 + 12 * ZS), V3s(A3, .27), V3s(D3, .06), .03, '#e4ddcf', M_STONE);
-  gBox(P(0, -.05, y + h), [.1, 0, 0], [0, 0, .1], 22 * ZS, wall, GLB.wall); // the tower
-  gBox(P(0, .055, y + h + 13 * ZS), [.03, 0, 0], [0, 0, .004], .06, '#f4f0e0', 0, .5); // its clock face, lit at night
-  GLB.mat = M_SLATE; glDomeAt(P(0, -.05)[0] - GLB.x, P(0, -.05)[2] - GLB.y, .1, (h + 22 * ZS) / ZS, 7, hasTech('steam') ? '#6f8f84' : st.roof, 0, M_SLATE);
-  GLB.wall = 0;
-}
-function glBigMuseum(B, st) { // a classical museum: stone, a colonnade, a pediment, and later a glass roof
-  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t];
-  const h = 15 * ZS; GLB.wall = M_STONE;
-  gBox(P(0, 0, y), V3s(A3, .88), V3s(D3, .42), .04, '#cfc6b4', M_STONE); // plinth
-  gBox(P(0, -.06, y + .04), V3s(A3, .8), V3s(D3, .3), h, '#e2dccf', M_STONE);
-  for (let k = 0; k < 10; k++) gBox(P(-.72 + k * .16, .3, y + .04), [.016, 0, 0], [0, 0, .016], h - .02, '#f2eee4', M_STONE);
-  gBox(P(0, .12, y + .02 + h), V3s(A3, .84), V3s(D3, .24), .03, '#e8e2d6', M_STONE);
-  gRoof(P(0, .12), V3s(A3, .84), V3s(D3, .24), y + .05 + h, 5 * ZS, '#8d8a86', '#efe9dd');
-  if (hasTech('computing')) { GLB.mat = M_GLASS; const c = P(0, -.25, y + .04 + h); glBoxW(c[0], c[2], .16, c[1], 8 * ZS, '#9fc4d8', .5); } // a glass lantern on the roof
-  GLB.wall = 0;
-}
-function glBigTheatre(B, st) { // a fly tower behind a rounded auditorium, lights round the front at night
-  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t];
-  const wall = hasTech('brick') ? '#b8684f' : st.wall; GLB.wall = hasTech('brick') ? M_BRICK : M_PLASTER;
-  gBox(P(-.35, -.05), V3s(A3, .35), V3s(D3, .32), 26 * ZS, wall, GLB.wall); gRoof(P(-.35, -.05), V3s(D3, .32), V3s(A3, .35), y + 26 * ZS, 5 * ZS, st.roof, wall); // the fly tower
-  const c = P(.25, 0); GLB.mat = GLB.wall; glCylAt(c[0] - GLB.x, c[2] - GLB.y, .42, 0, 15, wall, st.roof); // the auditorium
-  GLB.mat = M_SLATE; glDomeAt(c[0] - GLB.x, c[2] - GLB.y, .42, 15, 6, st.roof, 0, M_SLATE);
-  for (let k = 0; k < 12; k++) { const t = (k / 11 - .5) * 2.2, p = [c[0] + Math.cos(t) * .43 * d[0] + Math.sin(t) * .43 * a[0], y + 11 * ZS, c[2] + Math.cos(t) * .43 * d[1] + Math.sin(t) * .43 * a[1]]; glOBox(p, [.012, 0, 0], [0, 0, .012], [0, .012, 0], '#ffe7a0', .5); } // marquee lights
-  GLB.wall = 0;
-}
-function glBigUniversity(B, st) { // four ranges round a green quad, and a clock tower over the gate
-  const [lx, lz] = glLot(B), y = GLB.base, stone = hasTech('masonry'), wall = hasTech('brick') && !stone ? '#b8684f' : '#d8c9a8', h = 18 * ZS; GLB.wall = stone ? M_STONE : M_BRICK;
-  const R = [[0, -.72, 1, 0, .88, .16], [0, .72, 1, 0, .88, .16], [-.72, 0, 0, 1, .56, .16], [.72, 0, 0, 1, .56, .16]]; // x, z, along x, along z, half length, half depth
-  for (const [ox, oz, ax, az, hl, hd] of R) {
-    const c = [lx + ox, y, lz + oz], f = [ax * hl, 0, az * hl], r = [az * hd, 0, ax * hd];
-    gBox(c, f, r, h, wall, GLB.wall); gRoof(c, f, r, y + h, 6 * ZS, st.roof, wall);
-    for (const sg of [1, -1]) gWins(V3a(c, V3s(r, sg)), [ax, 0, az], V3s(r, sg), hl * .9, y + .03, 3, Math.round(hl * 9), h / 3.3, (lx * 11 + ox * 7 + sg) | 0);
-  }
-  gBox([lx, y, lz], [.55, 0, 0], [0, 0, .55], .012, '#6f9a52', M_GRASS); // the quad
-  glSmallTree(lx - GLB.x - .25, lz - GLB.y + .2, 0, .4, 1.1, '#5f9a4d'); glSmallTree(lx - GLB.x + .28, lz - GLB.y - .22, 0, .7, 1, '#6aa556');
-  const tw = [lx, y, lz + .72]; gBox(tw, [.1, 0, 0], [0, 0, .1], 34 * ZS, wall, GLB.wall); // the tower
-  gBox([tw[0], y + 26 * ZS, tw[2] + .102], [.035, 0, 0], [0, 0, .002], .07, '#f4f0e0', 0, .5); // clock
-  gSpire([tw[0], y + 34 * ZS, tw[2]], .11, 12 * ZS, st.roof);
-  GLB.wall = 0;
-}
-function glBigStadium(B) { // a bowl of stands round a striped pitch, floodlights on masts
-  const [lx, lz] = glLot(B), y = GLB.base, n = 28, rx = .95, rz = .95, ix = .62, iz = .45, top = y + 9 * ZS;
-  const P = (t, fx, fz, yy) => [lx + Math.cos(t) * fx, yy, lz + Math.sin(t) * fz];
-  GLB.mat = M_STONE; const cw = gcol('#b0a898'), seats = [gcol(hasTech('motor') ? '#5b8fc4' : '#b3aa9b'), gcol(hasTech('motor') ? '#dd7466' : '#c4bcae'), gcol('#ece7dc')];
-  for (let tier = 0; tier < 3; tier++) { // three rings of seats, each a step higher and further out
-    const f0 = tier / 3, f1 = (tier + 1) / 3, fx0 = ix + (rx - ix) * f0, fx1 = ix + (rx - ix) * f1, fz0 = iz + (rz - iz) * f0, fz1 = iz + (rz - iz) * f1, y0 = y + .02 + (top - y) * f0, y1 = y + .02 + (top - y) * f1;
-    for (let k = 0; k < n; k++) { const t0 = k / n * TAU, t1 = (k + 1) / n * TAU;
-      GLB.ctr = [lx, y1 + 2, lz]; gquad(P(t0, fx0, fz0, y0), P(t1, fx0, fz0, y0), P(t1, fx1, fz1, y1), P(t0, fx1, fz1, y1), seats[tier]);
-      GLB.ctr = [lx, y - 2, lz]; gquad(P(t0, fx0, fz0, y0), P(t1, fx0, fz0, y0), P(t1, fx0, fz0, y0 - (y1 - y0) * .15), P(t0, fx0, fz0, y0 - (y1 - y0) * .15), cw); } // (the riser in front of each tier)
-  }
-  for (let k = 0; k < n; k++) { const t0 = k / n * TAU, t1 = (k + 1) / n * TAU; GLB.ctr = [lx, y, lz]; gquad(P(t0, rx, rz, y), P(t1, rx, rz, y), P(t1, rx, rz, top + .03), P(t0, rx, rz, top + .03), cw); } // the outer wall
-  if (hasTech('concrete')) for (let k = 0; k < n; k++) { const t0 = k / n * TAU, t1 = (k + 1) / n * TAU; if (Math.sin(t0) < .2) continue; GLB.ctr = [lx, top - 1, lz]; GLB.mat = 0; gquad(P(t0, rx, rz, top + .03), P(t1, rx, rz, top + .03), P(t1, rx * .8, rz * .8, top + .09), P(t0, rx * .8, rz * .8, top + .09), gcol('#e8ecf0')); } // a roof over the main stand
-  for (let k = 0; k < 6; k++) gBox([lx - ix * .8 + k * ix * .32, y, lz], [ix * .16, 0, 0], [0, 0, iz * .78], .012, k % 2 ? '#5f9a4d' : '#6aa556', M_GRASS); // the pitch
-  if (hasTech('electric')) for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = [lx + sx * .78, y, lz + sz * .78]; gBox(p, [.018, 0, 0], [0, 0, .018], 30 * ZS, '#8c9199'); gBox([p[0], y + 30 * ZS, p[2]], [.06, 0, 0], [0, 0, .02], .05, '#fff8e0', 0, 2); }
-}
-function glBigFusion(B) { // twin containment domes, a cooling ring and a blue glow
-  const [lx, lz] = glLot(B), y = GLB.base;
-  gBox([lx, y, lz], [.85, 0, 0], [0, 0, .85], .03, '#c4c9cf', M_STONE);
-  for (const sx of [-.42, .42]) { GLB.mat = M_PLASTER; glCylAt(lx + sx - GLB.x, lz - .15 - GLB.y, .3, 0, 8, '#e8edf2', '#e8edf2'); glDomeAt(lx + sx - GLB.x, lz - .15 - GLB.y, .3, 8, 12, '#eef2f6', 0, M_PLASTER); }
-  GLB.mat = 0; glCylAt(lx - GLB.x, lz + .45 - GLB.y, .26, 0, 3, '#7fe8e0', null); // the ring's glow
-  gBox([lx, y, lz + .45], [.3, 0, 0], [0, 0, .06], 4 * ZS, '#9aa3ad', M_PLASTER);
-  gBox([lx, y + 3 * ZS, lz + .45], [.02, 0, 0], [0, 0, .02], .02, '#7fe8e0', 0, 2);
-}
-function glBigStation(B, st) { // a station house with a clock, and a long platform under a canopy
-  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s2, t, yy = y) => [lx + a[0] * s2 + d[0] * t, yy, lz + a[1] * s2 + d[1] * t];
-  const glass = hasTech('concrete'), wall = hasTech('brick') ? '#b8684f' : st.wall, h = 14 * ZS; GLB.wall = hasTech('brick') ? M_BRICK : M_PLASTER;
-  gBox(P(-.35, .12), V3s(A3, .4), V3s(D3, .24), h, wall, GLB.wall); gRoof(P(-.35, .12), V3s(A3, .4), V3s(D3, .24), y + h, 6 * ZS, st.roof, wall);
-  gWins(P(-.35, .36), A3, D3, .34, y + .03, 2, 5, h / 2.4, B.x * 3 + B.y);
-  gBox(P(-.35, .37, y + h - .02), [.035, 0, 0], [0, 0, .035], .07, '#f4f0e0', 0, .5); // the clock
-  gBox(P(0, -.3), V3s(A3, .95), V3s(D3, .14), .035, '#bdb5a7', M_STONE); // the platform
-  for (let k = 0; k < 6; k++) gBeam(P(-.8 + k * .32, -.3, y + .035), P(-.8 + k * .32, -.3, y + 12 * ZS), .01, glass ? '#8c9199' : '#3d4a44');
-  if (glass) gBox(P(0, -.3, y + 12 * ZS), V3s(A3, .95), V3s(D3, .2), .012, '#bfe3f0', 0, 0); // glass canopy
-  else gRoof(P(0, -.3), V3s(A3, .95), V3s(D3, .2), y + 12 * ZS, 3 * ZS, '#5d6670', '#3d4a44');
-  for (let k = 0; k < 3; k++) gBox(P(-.6 + k * .5, -.28, y + .035), V3s(A3, .07), V3s(D3, .02), .02, '#6b5040', M_PLANK); // benches
-  GLB.wall = 0;
-}
-function glBigMarket(B, st) { // a cobbled market street of stalls under striped awnings, or later a glass market hall
-  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s2, t, yy = y) => [lx + a[0] * s2 + d[0] * t, yy, lz + a[1] * s2 + d[1] * t];
-  gBox(P(0, 0, y - .005), V3s(A3, .98), V3s(D3, .48), .02, '#a39a8c', M_COBBLE);
-  if (hasTech('concrete')) { // the market hall
-    GLB.wall = M_BRICK; gBox(P(0, 0), V3s(A3, .85), V3s(D3, .38), 11 * ZS, '#b8684f', M_BRICK);
-    gWins(P(0, .38), A3, D3, .8, y + .03, 1, 8, 9 * ZS, B.x * 5 + B.y);
-    GLB.wall = M_GLASS; const c0 = P(0, 0); GLB.mat = M_GLASS; glOBox([c0[0], y + 11 * ZS + .06, c0[2]], V3s(A3, .86), V3s(D3, .39), [0, .06, 0], '#9fc4d8', .5); GLB.wall = 0; return;
-  }
-  const cols = [['#c0584f', '#f2ece0'], ['#3f7fb0', '#f2ece0'], ['#4e9a6a', '#f2ece0'], ['#e0a43a', '#6b5040']], food = ['#c0392b', '#e0a43a', '#6aa556', '#8a5a9a', '#d8b86a'];
-  for (let r2 = 0; r2 < 2; r2++) for (let k = 0; k < 4; k++) { // two rows of stalls facing each other
-    const s2 = -.72 + k * .48, t = r2 ? .26 : -.26, c = cols[(k + r2 * 2 + B.id) % cols.length], out = r2 ? -1 : 1;
-    gBox(P(s2, t), V3s(A3, .17), V3s(D3, .08), 3.2 * ZS, '#8a6a4c', M_PLANK); // the table
-    for (let q = 0; q < 4; q++) gBox(P(s2 - .12 + q * .08, t, y + 3.2 * ZS), [.022, 0, 0], [0, 0, .022], .025, food[(k * 3 + q + r2) % food.length]); // what's for sale
-    for (const [sa, ta] of [[-.16, -.08], [.16, -.08], [-.16, .08], [.16, .08]]) gBeam(P(s2 + sa, t + ta), P(s2 + sa, t + ta, y + 9 * ZS), .005, '#5a4030');
-    for (let q = 0; q < 4; q++) { const sa = -.18 + q * .09; GLB.ctr = P(s2, t, y); GLB.mat = 0; gquad(P(s2 + sa, t - .1 * out, y + 9 * ZS), P(s2 + sa + .09, t - .1 * out, y + 9 * ZS), P(s2 + sa + .09, t + .14 * out, y + 7 * ZS), P(s2 + sa, t + .14 * out, y + 7 * ZS), gcol(c[q % 2])); } // the striped awning, sloping out over the lane
-  }
-}
-const GL_BIG = { station: glBigStation, market: glBigMarket, hall: glBigHall, museum: glBigMuseum, theatre: glBigTheatre, university: glBigUniversity, stadium: glBigStadium, fusion: glBigFusion };
+const GL_BIG = {}; // the landmarks on their bigger lots: civic.js (hall, museum, theatre, station, market, university), modern.js (stadium, fusion)
 
 /* ---------- building sites in 3D: rising walls (or the old house, being done up) in scaffolding, materials stacked by, a crane on tall ones ---------- */
-function glBuildSite(c, B, cx, cy, st, f, hh) {
-  const C0 = gw(0, 0, 0, cx, cy), x = C0[0], z = C0[2], y = GLB.base, steel = hasTech('concrete'), pole = steel ? '#8c939b' : '#a07f58', plank = steel ? '#b8a37a' : '#8f6f4c';
+function glBuildSite(B, st, f, hh) {
+  const C0 = gw(0, 0, 0), x = C0[0], z = C0[2], y = GLB.base, steel = hasTech('concrete'), pole = steel ? '#8c939b' : '#a07f58', plank = steel ? '#b8a37a' : '#8f6f4c';
   let top = 0, hw = .3;
-  if (B.type === 'house' && B.up != null && B.tier >= 1) { const sv = B.prog; B.prog = 1; try { drawHouse(c, B, cx, cy, st); } finally { B.prog = sv; } top = HOUSE_H[B.tier] * .7; hw = .38; } // the old house stays up while it's done up
-  else if (f >= .2) { const h = Math.max(2, hh * Math.min(1, (f - .2) / .8)); top = h; GLB.wall = GLB.B ? glWallMat(GLB.B) : M_PLASTER; box(c, cx, cy, 0, 0, .28, .28, 0, h, st.wall); hw = .3; } // walls going up
+  if (B.type === 'house' && B.up != null && B.tier >= 1) { const sv = B.prog; B.prog = 1; try { if (GL_MODEL.house(B, st) === false) drawHouse(B, st); } finally { B.prog = sv; } top = HOUSE_H[B.tier] * .7; hw = .38; } // the old house stays up while it's done up
+  else if (f >= .2) { const h = Math.max(2, hh * Math.min(1, (f - .2) / .8)); top = h; GLB.wall = GLB.B ? glWallMat(GLB.B) : M_PLASTER; box(0, 0, .28, .28, 0, h, st.wall); hw = .3; } // walls going up
   const H = Math.max(top + 3, f < .2 ? 3 : 0) * ZS, o = hw + .05, mat = steel ? 0 : M_PLANK;
   if (f >= .2 || top) {
     for (const [a, b] of [[-o, -o], [o, -o], [-o, o], [o, o], [0, o], [0, -o], [o, 0], [-o, 0]]) gBox([x + a, y, z + b], [.008, 0, 0], [0, 0, .008], H, pole, mat); // standards
@@ -669,51 +553,18 @@ function glBuildSite(c, B, cx, cy, st, f, hh) {
   GLB.wall = 0; GLB.mat = 0;
 }
 
-/* ---------- 3D-native models: buildings made straight in 3D (world units), not by running their 2D art ---------- */
+/* ---------- native models: buildings made straight in world units ---------- */
 // glModel(B) picks the model a building is drawn with in 3D: a landmark on a bigger lot (GL_BIG), else one from
-// GL_MODEL, else nothing and its 2D art runs through the primitives as before. New building art belongs here: move a type
+// GL_MODEL, else nothing and its older art (render.js primitives) builds it. New building art belongs here: move a type
 // over by adding GL_MODEL[type] = (B, st) => {...}. Helpers: gBox/gBeam/gRoof/gSpire/gWins (world units: x, y = height,
-// z), glCylAt/glDomeAt/glPyr/glDoor (tile-local u, v and pixel heights), gCone below; GLB.x/GLB.y is the tile, GLB.base
+// z), glCylAt/glDomeAt/glPyr/glDoor (tile-local u, v and heights in height units), gCone below; GLB.x/GLB.y is the tile, GLB.base
 // its ground, GLB.lod true for the close-up version (put small detail behind it).
 function glModel(B) { return fpBig(B) && GL_BIG[B.type] || GL_MODEL[B.type] || null; }
-function gCone(u, v, r, z0, h, col, n = 12) { // a cone standing on tile-local (u, v), from pixel height z0 up h
+function gCone(u, v, r, z0, h, col, n = 12) { // a cone standing on tile-local (u, v), from height z0 up h
   const c = gcol(col), A = gw(u, v, z0 + h); GLB.ctr = gw(u, v, z0 - 1); GLB.mat = roofMat(c);
   for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gtri(gw(u + Math.cos(a) * r, v + Math.sin(a) * r, z0), gw(u + Math.cos(b) * r, v + Math.sin(b) * r, z0), A, c); }
 }
-const GL_MODEL = {
-  well(B, st) { // a stone ring of water under a little roof, with a windlass and a bucket (a pump once the style turns modern)
-    const x = GLB.x, z = GLB.y, y = GLB.base;
-    if (B.style >= 4) { gBox([x, y, z], [.1, 0, 0], [0, 0, .1], 5 * ZS, '#8c96a3', M_STONE); gBeam([x + .1, y + 4 * ZS, z], [x + .22, y + 4 * ZS, z], .012, '#6c7683'); return; }
-    GLB.wall = M_STONE; glCylAt(0, 0, .15, 0, 3.5, '#bdb3a6', '#4f9cbc', 14); GLB.wall = 0;
-    for (const s of [-1, 1]) gBeam([x + s * .13, y + 3 * ZS, z], [x + s * .13, y + 9.2 * ZS, z], .012, '#7a5a44', M_PLANK);
-    gBeam([x - .15, y + 7.6 * ZS, z], [x + .15, y + 7.6 * ZS, z], .008, '#5f4636', M_PLANK); // the windlass
-    if (GLB.lod) { gBeam([x, y + 7.6 * ZS, z], [x, y + 5.4 * ZS, z], .002, '#c9b48a'); gBox([x, y + 4.6 * ZS, z], [.022, 0, 0], [0, 0, .022], 1.6 * ZS, '#6b5040', M_PLANK); } // its rope and bucket
-    gRoof([x, 0, z], [.19, 0, 0], [0, 0, .12], y + 9 * ZS, 3.2 * ZS, st.roof, st.wall);
-  },
-  granary(B, st) { // a round store up on staddle stones (so the rats can't climb in), with a steep roof and a ladder to its door
-    const x = GLB.x, z = GLB.y, y = GLB.base, wall = mix(st.wall, '#d9c29a', .4);
-    for (const [a, b] of [[-.12, -.12], [.12, -.12], [-.12, .12], [.12, .12]]) gBox([x + a, y, z + b], [.025, 0, 0], [0, 0, .025], 2.2 * ZS, '#a49c90', M_STONE);
-    GLB.wall = GLB.B ? glWallMat(GLB.B) : M_PLANK; glCylAt(0, 0, .2, 2.2, 10, wall, wall, 14); GLB.wall = 0;
-    gCone(0, 0, .26, 12.2, 8, st.roof);
-    gBox([x, y + 2.3 * ZS, z + .198], [.04, 0, 0], [0, 0, .008], 4.2 * ZS, '#5a4a40', M_PLANK); // its door, up off the ground
-    if (GLB.lod) for (const s of [-1, 1]) gBeam([x + s * .03, y, z + .34], [x + s * .03, y + 2.6 * ZS, z + .21], .004, '#6b5040', M_PLANK); // and the ladder
-  },
-  shrine(B, st) { // a stone plinth, a white pillar under a little pointed roof, and a candle burning before it
-    const x = GLB.x, z = GLB.y, y = GLB.base;
-    gBox([x, y, z], [.28, 0, 0], [0, 0, .28], 1.6 * ZS, '#d6cfc3', M_STONE);
-    GLB.wall = M_STONE; gBox([x, y + 1.6 * ZS, z], [.07, 0, 0], [0, 0, .07], 15 * ZS, '#e8e2d6', M_STONE); GLB.wall = 0;
-    glPyr(0, 0, 0, 0, .075, .075, 16.6, 4, st.accent);
-    gBox([x + .1, y + 1.6 * ZS, z + .22], [.012, 0, 0], [0, 0, .012], .9 * ZS, '#ffd27a', 0, 2); // the candle
-    if (GLB.lod) for (let k = 0; k < 3; k++) glBlob(-.16 + k * .1, .24, .03, 1.9, .9, FLOWER_C[(k + B.id) % FLOWER_C.length], 0); // flowers left on the plinth
-  },
-  watchstone(B, st) { // a tall pale obelisk with a gilded cap and a glowing teal stone set in its face
-    const x = GLB.x, z = GLB.y, y = GLB.base;
-    gBox([x, y, z], [.3, 0, 0], [0, 0, .3], 2 * ZS, '#d2cabd', M_STONE);
-    gBox([x, y + 2 * ZS, z], [.09, 0, 0], [0, 0, .09], 28 * ZS, '#e9e3d8', M_STONE);
-    gSpire([x, y + 30 * ZS, z], .095, 6 * ZS, '#d6b85a');
-    gBox([x, y + 23 * ZS, z + .092], [.03, 0, 0], [0, 0, .006], .03, '#5fd0c9', 0, 2);
-  }
-};
+const GL_MODEL = {}; // (filled in by homes.js, civic.js, industry.js and modern.js)
 function glSheep(X, Z, y0, s, ang, ph = -1) { // a woolly body, a black face and four legs, in world units; ph >= 0: walking
   const f = [Math.cos(ang), 0, Math.sin(ang)], r = [-Math.sin(ang), 0, Math.cos(ang)], u = X - GLB.x, v = Z - GLB.y, zz = (y0 - GLB.base) / ZS;
   for (const [a, b, q] of [[.03, .018, 0], [.03, -.018, Math.PI], [-.03, .018, Math.PI], [-.03, -.018, 0]]) glLimb([X + f[0] * a * s + r[0] * b * s, y0 + 1.1 * s * ZS, Z + f[2] * a * s + r[2] * b * s], f, r, ph >= 0 ? Math.sin(ph + q) * .45 : 0, 1.1 * s * ZS, .007 * s, '#3a3430');
@@ -768,12 +619,12 @@ void main(){
 const GL_VS = `#version 300 es
 layout(location=0) in vec3 aP; layout(location=1) in vec3 aN; layout(location=2) in vec3 aC; layout(location=3) in float aE; layout(location=4) in float aI; layout(location=5) in float aM; layout(location=6) in float aO;
 uniform mat4 uVP, uSVP; uniform float uPk; out vec3 vP, vN, vC; out float vE, vO; out vec4 vS; flat out float vI, vM;
-void main(){ vP=aP; vN=aN; vC=aC; vE = uPk>.5 ? (aE<.5 ? -1. : aE<1.5 ? 0. : aE>254.5 ? 2. : (aE-2.)/250.) : aE; // (chunks are packed into bytes)
+void main(){ vP=aP; vN=aN; vC=aC; vE = uPk>.5 ? (aE<.5 ? -1. : aE<1.5 ? 0. : aE>254.5 ? 2. : aE>253.5 ? 3. : (aE-2.)/250.) : aE; // (chunks are packed into bytes)
   vI=aI; vM=aM; vO=aO; vS=uSVP*vec4(aP+aN*.02,1.); gl_Position=uVP*vec4(aP,1.); }`;
 const GL_FS = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vP, vN, vC; in float vE, vO; in vec4 vS; flat in float vI, vM; out vec4 o;
-uniform highp sampler2DArray uTex; uniform vec3 uAvg[20]; uniform float uTS[20], uRaw[20];
+uniform highp sampler2DArray uTex; uniform vec3 uAvg[20]; uniform float uTS[20], uRaw[20], uBump[20];
 uniform float uHi, uFog0, uFogL; uniform vec3 uFogC; uniform vec3 uSun, uSunC, uSky, uGnd, uWin, uLamp, uEye; uniform float uLit, uShK, uT;
 uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64]; uniform vec4 uSea; uniform vec3 uWx; uniform float uLo; // autumn, winter, spring, snow on the ground; rain, cloud cover, lightning` + GL_SKY + `
 float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
@@ -787,6 +638,10 @@ void main(){
   if(m>0){ // triplanar: the ground and roofs take the texture from above, walls from the side they face
     vec3 a=abs(n); vec2 uv = a.y>.55 ? vP.xz : (a.x>a.z ? vec2(vP.z,-vP.y) : vec2(vP.x,-vP.y));
     vec3 t=texture(uTex, vec3(uv*uTS[m], float(m))).rgb;
+    if(uBump[m]>0.){ // relief from the texture itself: brighter is higher, so mortar, tile edges and plank seams sink in and catch the light
+      vec2 tc=uv*uTS[m]; const vec3 Y=vec3(.3,.59,.11); float e=1.5/256., l0=dot(t,Y), lx=dot(texture(uTex,vec3(tc+vec2(e,0.),float(m))).rgb,Y), ly=dot(texture(uTex,vec3(tc+vec2(0.,e),float(m))).rgb,Y);
+      vec3 Tg=a.y>.55||a.x<=a.z ? vec3(1.,0.,0.) : vec3(0.,0.,1.), Bg=a.y>.55 ? vec3(0.,0.,1.) : vec3(0.,-1.,0.);
+      n=normalize(n-(Tg*(lx-l0)+Bg*(ly-l0))*uBump[m]); }
     c=mix(c*t/uAvg[m], t, uRaw[m]);
   }
   // the season, painted live: autumn leaves turn, winter fades them, spring puts blossom in some trees, grass follows
@@ -822,7 +677,8 @@ void main(){
   lit+=c*pl*mix(.55,1.,ao);
   if(vE>0. && vE<1.){ if(vE<uLit){ lit=mix(lit, uWin*(.9+.2*fract(vE*37.)), .92); glow=.45; } }
   else if(vE>.45 && vE<.55 && uLit>0.){ lit=mix(lit,uWin,.8*min(1.,uLit*2.)); glow=.3; }
-  if(vE>1.5){ lit=mix(c, uLamp*1.4, uLit>0.?1.:0.); glow=uLit>0.?1.:0.; }
+  if(vE>2.5){ lit=c*(uLit>0. ? 1.7 : 1.15); glow=uLit>0. ? .9 : .15; } // (its own colour: a beacon, a signal, a glowing stone)
+  else if(vE>1.5){ lit=mix(c, uLamp*1.4, uLit>0.?1.:0.); glow=uLit>0.?1.:0.; }
   if(uHi>0. && abs(vI-uHi)<.5) lit=mix(lit*1.2, vec3(1.,.84,.5), .28+.08*sin(uT*5.)); // what the pointer is on glows softly
   if(uFogL>0.){ vec3 fv=normalize(vP-uEye); fv.y=max(fv.y,0.); float f=1.-exp(-max(0.,length(vP-uEye)-uFog0)/uFogL*1.3); float d=length(vP-uEye)-uFog0; lit=mix(lit, untone(skyCol(normalize(fv))), min(f, mix(.62,1.,smoothstep(uFogL*1.2,uFogL*4.,d)))); glow*=1.-f; } // the far side of the valley fades into the haze, the colour of the sky behind it
   lit=1.-exp(-lit*1.45); // a soft tone curve that keeps the colour
@@ -948,11 +804,11 @@ function m4look(e, t, up) {
 function glInit() {
   const c = document.createElement('canvas'); c.id = 'gl3'; c.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;display:block;touch-action:none';
   const gl = c.getContext('webgl2', { antialias: false, alpha: false }); // (smoothing comes from the multisampled view below)
-  if (!gl) { toast('This browser has no WebGL2, so the 3D view can’t run here. Here’s the 2D one.'); return false; }
-  $('view').style.display = 'none'; document.body.insertBefore(c, $('view'));
+  if (!gl) { const m = $('nogl'); if (m) m.classList.add('show'); return false; } // (no WebGL2 in this browser: a note says so; the world still grows)
+  document.body.insertBefore(c, document.body.firstChild);
   GL3.c = c; GL3.gl = gl; GL3.on = true;
   GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sky = glProg(gl, GL_KVS, GL_KFS); GL3.prc = glProg(gl, GL_KVS, GL_PFS2);
-  GL3.smp = glProg(gl, GL_SMVS, GL_SMFS); GL3.smB = gl.createBuffer(); GL3.ptMax = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 64;
+  GL3.smp = glProg(gl, GL_SMVS, GL_SMFS); GL3.smB = gl.createBuffer(); GL3.ptMax = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 64; glFxInit(gl);
   try { GL3.post = { pr: glProg(gl, GL_KVS, GL_BFS), msF: gl.createFramebuffer(), msC: gl.createRenderbuffer(), msD: gl.createRenderbuffer(), ns: (GL3.lo = glSoft(gl) || QS.has('lo')) ? 0 : Math.min(4, gl.getParameter(gl.MAX_SAMPLES)), hdr: !!gl.getExtension('EXT_color_buffer_float'), lv: [], w: 0, h: 0 }; } catch (e) { GL3.post = null; }
   GL3.sh = glProg(gl, GL_SVS, GL_SFS); GL3.pk = glProg(gl, GL_PVS, GL_PFS);
   { const t0 = performance.now(), T = glTextures(); GL3.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex);
@@ -1046,6 +902,7 @@ function glShot() { // choose what to look at next
   const pick1 = a => a[(Math.random() * a.length) | 0];
   const major = news.filter(e => e.k === 'major' || e.k === 'era'), ev = major.length ? major[major.length - 1] : news.length && chance(.7) ? pick1(news) : null;
   const z = (x, y) => surfZ(idx(clamp(Math.round(x), 0, W - 1), clamp(Math.round(y), 0, H - 1))) * ZS;
+  const hn = GL3.hint; GL3.hint = null; if (hn && GL3.t - hn.t < 20) return { at: () => [hn.x, z(hn.x, hn.y), hn.y], zoom: hn.zoom, pitch: rf(.3, .45), cap: hn.cap, dur: 22, hint: true }; // something the world asked us to look at
   const inc = (S.inc || []).find(I => !GL3.incSeen.has(I.id)) || ((S.inc || []).length && chance(.5) ? pick1(S.inc) : null); // an incident beats everything, and gets a second look now and then
   if (inc) { GL3.incSeen.add(inc.id); const T = S.T[inc.sid]; return { at: () => { const v = INCV.get(inc.id), x = v && v.fx != null ? v.fx : inc.x, y = v && v.fx != null ? v.fz : inc.y; return [x, z(x, y), y]; }, zoom: rf(2.2, 3), pitch: rf(.3, .42), cap: (INC_CAP[inc.k] || '') + (T ? ' in ' + T.name : ''), dur: 30 }; }
   if (ev) return { at: () => [ev.tx, z(ev.tx, ev.ty), ev.ty], zoom: rf(2.6, 4), pitch: rf(.34, .5), cap: ev.ic + ' ' + ev.t, sub: 'Year ' + Math.floor(ev.yr) };
@@ -1070,7 +927,7 @@ function glDirector(dt) {
   if (idle < (GL3.userFollow && GL3.follow === GL3.userFollow ? FILM_IDLE * 3 : FILM_IDLE) && GL3.lastIn) return; // (someone you chose to follow gets longer)
   GL3.userFollow = null;
   let sh = GL3.shot;
-  if (!sh || (GL3.t - sh.t0) > (sh.dur || 30)) {
+  if (!sh || (GL3.t - sh.t0) > (sh.dur || 30) || GL3.hint && !sh.hint) { // (a hint from the world cuts in)
     try { sh = glShot(); } catch (e) { sh = null; }
     if (!sh) return;
     sh.t0 = GL3.t; sh.dur = sh.dur || rf(20, 34); sh.spin = (Math.random() < .5 ? -1 : 1) * rf(.025, .05);
@@ -1087,8 +944,6 @@ function glDirector(dt) {
 }
 function glFrame(dt) {
   const gl = GL3.gl, c = GL3.c, cam = GL3.cam; GL3.t += dt; GL3.dt = dt; GL3.ft = performance.now(); // (when this frame began: a slow frame mustn't make the pointer look idle)
-  LIGHT.sun = sunNow(); if (!LIGHT.season || (LIGHT.seasonT -= dt) <= 0) { LIGHT.season = LIGHT.forceSeason || seasonNow(); LIGHT.seasonT = 300; }
-  stepWeather(dt); DIRTY.length = 0;
   const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
   // rebuild what changed, a few chunks a frame
@@ -1126,7 +981,7 @@ function glFrame(dt) {
   const lit = el > 6 ? 0 : clamp((6 - el) / 12, 0, .75);
   // cameras
   const aspect = w / h, zz = cam.zoom; let pit = cam.pitch, dir = [Math.cos(pit) * Math.sin(cam.yaw), Math.sin(pit), Math.cos(pit) * Math.cos(cam.yaw)];
-  // perspective: a 38° lens backed off so the zoom still means "how much ground fits"; isometric: the flat lens of the 2D view
+  // perspective: a 38° lens backed off so the zoom still means "how much ground fits"; isometric: an orthographic lens
   if (cam.persp) { const d0 = zz / Math.tan(19 * DEG); pit = Math.max(pit, Math.asin(Math.min(.95, 2.2 / d0))); dir[0] = Math.cos(pit) * Math.sin(cam.yaw); dir[1] = Math.sin(pit); dir[2] = Math.cos(pit) * Math.cos(cam.yaw); } // stay above the rooftops
   const fov = 38 * DEG, dist = cam.persp ? zz / Math.tan(fov / 2) : 90, tgt = [cam.tx, cam.ty, cam.tz]; let eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
   if (cam.persp) for (let k = 0; k < 24; k++) { // tall buildings: tip the camera up until neither it nor the middle of its view line is inside one
@@ -1180,7 +1035,7 @@ function glFrame(dt) {
   gl.uniform3fv(U.uWin, gcol((LIGHT.cur && LIGHT.cur.winC || ['#ffd07a'])[0])); gl.uniform3fv(U.uLamp, [1.25, .86, .5]);
   gl.uniform1f(U.uLit, lit); gl.uniform1f(U.uShK, shK); gl.uniform1f(U.uT, GL3.t);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, GL3.shT); gl.uniform1i(U.uSh, 0);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex); gl.uniform1i(U.uTex, 1); gl.uniform3fv(U.uAvg, GL3.texAvg); gl.uniform1fv(U.uTS, TX.SCALE); gl.uniform1fv(U.uRaw, TX.RAW); gl.activeTexture(gl.TEXTURE0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex); gl.uniform1i(U.uTex, 1); gl.uniform3fv(U.uAvg, GL3.texAvg); gl.uniform1fv(U.uTS, TX.SCALE); gl.uniform1fv(U.uRaw, TX.RAW); gl.uniform1fv(U.uBump, TX.BUMP); gl.activeTexture(gl.TEXTURE0);
   gl.uniform1i(U.uNL, lamps.length); if (lamps.length) gl.uniform3fv(U.uLP, new Float32Array(lamps.flat()));
   gl.uniform1f(U.uHi, GL3.hover || 0);
   // the season and the weather: snow lies where it has fallen, rain wets things, fog closes in, lightning flashes
@@ -1191,6 +1046,7 @@ function glFrame(dt) {
   gl.uniform1f(U.uFog0, (dist + zz * .6) * (1 - .85 * fog)); gl.uniform1f(U.uFogL, cam.persp ? 55 * (1 - .8 * fog) : 0);
   drawAll(true);
   glSmoke(gl, dt, FR, VP, h / 2 * (cam.persp ? 1 / Math.tan(fov / 2) : 1 / zz), day, tgt);
+  glFx(gl, VP, h / 2 * (cam.persp ? 1 / Math.tan(fov / 2) : 1 / zz), day); // particles, beams, overlays (fx3d.js)
   if ((wxs.rain || 0) > .05 || (wxs.snow || 0) > .05) { // rain or snow falling across the view
     const Q = GL3.prc; for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
     gl.useProgram(Q.p); gl.uniform1f(Q.u.uT, GL3.t); gl.uniform1f(Q.u.uRain, wxs.rain || 0); gl.uniform1f(Q.u.uSnow, wxs.snow || 0); gl.uniform1f(Q.u.uAsp, aspect); gl.uniform1f(Q.u.uYaw, cam.yaw);
@@ -1217,9 +1073,9 @@ function glFrame(dt) {
     GL3.hover = px[0] + px[1] * 256 + px[2] * 65536; GL3.hoverT = performance.now();
     if (GL3.tapAt) { const t = GL3.tapAt; GL3.tapAt = null; UI.lastMove = performance.now(); GL3.touched = true; if (UI.tool || GL3.hover >= GPID) glClick(t[0], t[1]); } // a tap: show what's there (a person or a nudge acts too)
   }
-  glTip();
+  glTip(); glOverlay(VP);
 }
-// the tooltip for whatever the pointer is on: the same cards as the 2D view
+// the tooltip for whatever the pointer is on
 function glTip() {
   const tip = $('tip'), id = GL3.hover || 0, now = GL3.ft || performance.now();
   if (!id || GL3.drag && GL3.drag[4] || now - UI.lastMove > (GL3.touched ? 6000 : 2500) || document.querySelector('.modal.show') || document.elementFromPoint(UI.mouse.x, UI.mouse.y) !== GL3.c) { tip.style.opacity = 0; DYN.hover = -1; return; }
@@ -1376,40 +1232,33 @@ function glVehicle(c, X, Z, y0, h, moving) {
   glOBox(B(0, 0, y0 + .09 + hov), V3(f, .07), V3(r, .04), [0, .02, 0], '#f4f6f8'); glOBox(B(0, 0, y0 + .065 + hov), V3(f, .05), V3(r, .03), [0, .004, 0], '#7fe8e0', 2);
 }
 function glPeople() {
-  const v = GL3.fb || (GL3.fb = new GLFBuf()); v.length = 0; GLB = { v, x: 0, y: 0, base: 0, tops: [], id: 0, wall: 0, mat: 0, lod: false, ctr: null, wallC: null, flat: '', ao: 1, B: null, smk: null }; GL3.carry = [];
+  const v = GL3.fb || (GL3.fb = new GLFBuf()); v.length = 0; GLB = { v, x: 0, y: 0, base: 0, id: 0, wall: 0, mat: 0, lod: false, ctr: null, wallC: null, flat: '', ao: 1, B: null, smk: null }; GL3.carry = [];
   const night = LIGHT.emK > .02; GL3.litNow = night;
   try {
     for (let k = 0; k < DYN.walkers.length; k++) {
       const w = DYN.walkers[k], p = walkerPos(w); if (!p || p[3] < .3) continue; GLB.id = w.pid ? GPID + k : 0; // a person you can point at
       const X = p[0], Z = p[1], y0 = p[2] * ZS; GLB.ao = .35 + .65 * aoAt(X, y0 + .15, Z, 0, 1, 0); // darker down an alley
       glPerson(w, X, Z, y0, glHeading(w, p[4], p[5]), !!p[6], night && w.ln < (S.era === 0 ? .6 : .12));
+      if (w.pid) glMark(w, X, Z, y0); // (the people you know: a diamond over them)
     }
+    glPrayerCandles();
     GLB.id = 0; GLB.ao = 1;
     for (const hd of DYN.herds) for (const m of hd.members) { const [fx, fy, z] = agentPos(m), bx = m.b % W - m.a % W, by = ((m.b / W) | 0) - ((m.a / W) | 0); glSheep(fx, fy, z * ZS, (m.size || 1) * (m.baby ? .6 : 1), glHeading(m, bx, by), m.pause > 0 ? -1 : DYN.t * 3 + (m.a % 7)); }
     GLB.id = 0; GLB.ao = 1; glIncidents(GL3.dt || .016);
     GLB.id = 0; GLB.ao = 1; try { glWorks(); } catch (e) { if (QS.has('dev')) console.error(e); }
+    GLB.id = 0; GLB.ao = 1; try { glFxDyn(); } catch (e) { if (QS.has('dev')) console.error(e); }
     GLB.id = 0; GLB.ao = 1; try { glTraffic(); } catch (e) { if (QS.has('dev')) console.error(e); }
     for (const c of DYN.vehicles) { const p = vehiclePos(c); if (!p) continue; GLB.ao = .35 + .65 * aoAt(p[0], p[2] * ZS + .15, p[1], 0, 1, 0); glVehicle(c, p[0], p[1], p[2] * ZS, glHeading(c, p[4], p[5]), true); }
   } catch (e) { if (QS.has('dev')) console.error(e); } finally { GLB = null; }
   return v.a.subarray(0, v.length);
 }
 
-/* ---------- switching between the 2D and 3D views (3D by default) ---------- */
-const GL_DEFAULT = true; // new worlds and new browsers open in 3D (the choice is remembered)
-function glWanted() { if (QS.has('2d')) return false; try { if (localStorage.getItem('sf2d') === '1') return false; } catch (e) { } return true; } // always 3D (2D stays as the fallback for ?2d and browsers without WebGL2)
-function glToggle() {
-  const want = !GL3.on; try { localStorage.setItem('sf3d', want ? '1' : '0'); } catch (e) { }
-  if (want) { if (!GL3.gl) glInit(); else { GL3.on = true; GL3.c.style.display = 'block'; $('view').style.display = 'none'; for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); } }
-  else { ensure2D(); GL3.on = false; GL3.c.style.display = 'none'; $('view').style.display = 'block'; const h = $('glHint'); if (h) h.remove(); $('tip').style.opacity = 0; renderAll(); relightNow(); }
-  glBtn();
-}
-function glBtn() { const b = $('glBtn'); if (b) b.remove(); } // (the 2D/3D switch is gone)
-
 /* ---------- textures, painted in code at start-up (no image files): one layer each in a texture array ---------- */
 // Materials: 0 none, 1 grass, 2 brick, 3 roof tiles, 4 bark, 5 leaves, 6 plaster, 7 stone, 8 planks, 9 cobbles, 10 asphalt, 11 earth.
 // The shader lays them on by world position (triplanar), so nothing needs unwrapping. RAW is how much of the texture's own
 // colour replaces the art's colour (grass and bark look real; plaster keeps the building's own colour and only gains grain).
-const TX = { N: 256, L: 20, SCALE: [1, .5, 1.8, 1.6, 3.5, 2.2, 1.2, 1.4, 2, 1.6, .7, .6, 1.8, 1, 2.2, .6, 1.2, 1.4, 2.6, 1.6], RAW: [0, .85, .55, .4, .9, .7, 0, .35, .45, .55, .7, .7, .3, .75, .35, .7, .5, .25, .7, .6] };
+const TX = { N: 256, L: 20, SCALE: [1, .5, 1.8, 1.6, 3.5, 2.2, 1.2, 1.4, 2, 1.6, .7, .6, 1.8, 1, 2.2, .6, 1.2, 1.4, 2.6, 1.6], RAW: [0, .85, .55, .4, .9, .7, 0, .35, .45, .55, .7, .7, .3, .75, .35, .7, .5, .25, .7, .6],
+  BUMP: [0, 1, 3.2, 3, 3, .8, .6, 2.6, 2.2, 3.2, .6, 1, 2.6, 1.2, .8, .6, .4, 0, .8, 2.6] }; // (how strongly each texture's own light and dark becomes relief)
 const M_NEEDLE = 18, M_THATCH = 19; // (pine needles: the leaf texture, but they stay green all winter)
 const M_SOIL = 13, M_CROP = 14, M_SAND = 15, M_TAR = 16, M_GLASS = 17, M_SLATE = 12, M_GRASS = 1, M_BRICK = 2, M_ROOF = 3, M_BARK = 4, M_LEAF = 5, M_PLASTER = 6, M_STONE = 7, M_PLANK = 8, M_COBBLE = 9, M_ASPHALT = 10, M_EARTH = 11;
 function glTextures() {

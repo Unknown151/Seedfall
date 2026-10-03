@@ -10,7 +10,7 @@ import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 
 const here = path.dirname(fileURLToPath(import.meta.url)), root = path.resolve(here, '..');
-const PORT = +(process.env.CLOUD_PORT || 8787), BASE = `http://127.0.0.1:${PORT}/`;
+const PORT = +(process.env.CLOUD_PORT || 8787), BASE = `http://127.0.0.1:${PORT}/`, PAGE = (q = '') => BASE + (q ? q + '&headless' : '?headless'); // (the pages run headless: nothing needs drawing)
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'seedfall-cloud-'));
 let fails = 0;
 const ok = (cond, what, extra = '') => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}${extra ? ' · ' + extra : ''}`); if (!cond) fails++; };
@@ -58,10 +58,10 @@ const server = async () => { // what the cloud holds right now
 const b = await launch();
 const errs = [];
 const ctxs = [];
-const newCtx = async () => { const c = await b.newContext({ viewport: { width: 1600, height: 900 } }); await c.addInitScript(() => { try { localStorage.setItem('sf2d', '1'); } catch (e) { } }); ctxs.push(c); return c; }; // (the 2D view: this is about saves and the voice, and headless 3D is too slow for the timings)
+const newCtx = async () => { const c = await b.newContext({ viewport: { width: 1600, height: 900 } }); ctxs.push(c); return c; }; // (saves and the voice: the pages run headless)
 const watch = (p, name) => { p.on('pageerror', e => errs.push(`${name}: ${e.message}`)); return p; };
 const ready = p => p.waitForFunction(() => typeof RUNNING !== 'undefined' && RUNNING && S && !S.flags.intro, null, { timeout: 60000 });
-const open = async (ctx, name, q = '') => { const p = watch(await ctx.newPage(), name); await p.goto(BASE + q); await ready(p); return p; };
+const open = async (ctx, name, q = '') => { const p = watch(await ctx.newPage(), name); await p.goto(PAGE(q)); await ready(p); return p; };
 const st = p => p.evaluate(() => ({ seed: S.seed, yr: yr(), planet: S.planet, conflict: CLOUD.conflict, out: CLOUD.out, rev: CLOUD.rev, err: CLOUD.err, foot: $('ftext').textContent, banner: $('banner').classList.contains('show') ? $('banner').textContent : '' }));
 const localSaved = p => p.evaluate(async () => { const s = parseSave(await IDB.get('save')); return s ? s.state.savedAt : 0; });
 
@@ -70,7 +70,7 @@ try {
   {
     const c = await newCtx(), p = watch(await c.newPage(), 'file');
     const api = []; p.on('request', r => { if (r.url().includes('/api/')) api.push(r.url()); });
-    await p.goto(ROOT + 'seedfall.html?seed=31337&fresh&nointro'); await ready(p);
+    await p.goto(ROOT + 'seedfall.html?seed=31337&fresh&nointro&headless'); await ready(p);
     await p.evaluate(() => SF.ff(120));
     ok(await p.evaluate(() => !CLOUD.on) && !api.length, 'file:// has no cloud mode');
     fs.writeFileSync(path.join(tmp, 'save.json'), await p.evaluate(() => JSON.stringify(serialize()))); // the world to bring over
@@ -80,7 +80,7 @@ try {
   // 1) first visit, empty cloud: the welcome card offers to load a save.json from disk, which then uploads
   {
     const c = await newCtx(), p = watch(await c.newPage(), 'welcome');
-    await p.goto(BASE); await p.waitForSelector('#welcome.show');
+    await p.goto(PAGE()); await p.waitForSelector('#welcome.show');
     ok(await p.textContent('#wFolder') === 'Load a save.json…', 'welcome offers to load a save.json', await p.textContent('#wFine'));
     await p.screenshot({ path: path.join(here, 'cloud_welcome.png') });
     const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.click('#wFolder')]);
@@ -134,7 +134,7 @@ try {
   await A.evaluate(async () => { SF.ff(8); CLOUD.lastTry = Date.now(); await saveAll(); }); // IndexedDB only
   const yLocal = (await st(A)).yr;
   ok((await server()).meta.year < yLocal, 'local save is ahead of the cloud');
-  await A.goto(BASE); await ready(A);
+  await A.goto(PAGE()); await ready(A);
   await A.waitForFunction(() => CLOUD.rev === 4, null, { timeout: 20000 });
   ok((await st(A)).yr === yLocal && (await server()).meta.year === yLocal && !(await A.isVisible('#confirm.show')), 'newer local save of the same revision loads and uploads without asking');
 
@@ -143,7 +143,7 @@ try {
   await B.evaluate(async () => { SF.ff(2); await saveAll(true); });
   await A.evaluate(async () => { SF.ff(20); CLOUD.lastTry = Date.now(); await saveAll(); });
   const yA = (await st(A)).yr;
-  await A.goto(BASE); await A.waitForSelector('#confirm.show', { timeout: 20000 });
+  await A.goto(PAGE()); await A.waitForSelector('#confirm.show', { timeout: 20000 });
   ok(await A.textContent('#cTitle') === 'This browser has a newer save', 'diverged: offers to upload', await A.textContent('#cText'));
   await A.click('#cYes'); await ready(A);
   await A.waitForFunction(y => CLOUD.rev === 6, yA, { timeout: 20000 });
@@ -161,12 +161,12 @@ try {
   await A.unroute('**/api/save');
   const C = watch(await cA.newPage(), 'C'); // a 401 at startup: carries on from this browser's save
   await C.route('**/api/me', r => r.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"not signed in"}' }));
-  await C.goto(BASE); await ready(C);
+  await C.goto(PAGE()); await ready(C);
   const cc = await st(C);
   ok(cc.out && cc.yr === ySigned && /^Signed out/.test(cc.banner), 'signed out (401) at startup: loads the local save', `year ${cc.yr}`);
   await C.close();
   // logging in again (a reload): same revision underneath, so the local progress just uploads
-  await A.goto(BASE); await ready(A);
+  await A.goto(PAGE()); await ready(A);
   await A.waitForFunction(() => CLOUD.rev === 7, null, { timeout: 20000 });
   ok((await server()).meta.year === ySigned && !(await st(A)).out, 'after logging in again, the local progress uploads');
 
@@ -193,7 +193,7 @@ try {
   await A.evaluate(() => aiTest());
   ok(/signed out/.test(await A.evaluate(() => AI.status)) && (await st(A)).out, 'voice: signed out is reported, not blamed on the key');
   await A.unroute('**/api/voice');
-  await A.goto(BASE); await ready(A);
+  await A.goto(PAGE()); await ready(A);
 
   // 8) the footer button loads a save.json into a running world (after asking)
   await A.keyboard.press('c');
@@ -233,7 +233,7 @@ try {
   // 10) a scratch world (?fresh) saves nothing and doesn't take the world from the tab that owns it
   const rev1 = (await server()).meta.rev;
   const D = watch(await (await newCtx()).newPage(), 'D');
-  await D.goto(BASE + '?seed=5&fresh&nointro'); await ready(D);
+  await D.goto(PAGE('?seed=5&fresh&nointro')); await ready(D);
   await D.evaluate(async () => { SF.ff(30); await saveAll(true); await saveAll(); });
   await D.waitForTimeout(1000);
   const dd = await D.evaluate(async () => ({ scratch: SCRATCH, cloud: CLOUD.on, foot: $('ftext').textContent, local: !!(await IDB.get('save')) }));

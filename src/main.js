@@ -1,6 +1,7 @@
 /* ============================== main ============================== */
 const QS = new URLSearchParams(location.search);
 const DEV = QS.has('dev');
+const HEADLESS = QS.has('headless'); // (tests of the sim, the panels and saves: the world runs and the panels work, nothing is drawn)
 let RUNNING = false, lastT = 0, simAcc = 0, frameN = 0, uiT = 0, fpsN = 0, fpsT = 0;
 const PACE = { relaxed: 300, normal: 180, brisk: 60, preview: 4 };
 function randSeed() { return (Math.random() * 1e9) | 0; }
@@ -14,14 +15,11 @@ function startWorld(isNew) {
   $('pace').value = S.settings.pace; $('optCap').checked = S.settings.captions;
   $('optSky').value = S.settings.sky; $('optWx').checked = S.settings.weather; $('optSh').checked = S.settings.shadows;
   if (isNew && S.flags.intro) startIntro();
-  else { const [x, y, z] = overviewTarget(); CAM.x = CAM.tx = x; CAM.y = CAM.ty = y; CAM.z = CAM.tz = z; CAM.nextTour = DYN.t + 20; }
   syncWalkers();
   UIDIRTY.chron = UIDIRTY.stats = UIDIRTY.tools = true;
   UIDIRTY.prayers = true; FAITH.shown = '';
   renderHUD(); renderTools(); renderFolderStatus(); faithRecalc(); renderFaith();
-  if (glWanted()) { if (!GL3.on) glInit(); else for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); }
-  if (!GL3.on && !SC) { ensure2D(); renderAll(); } // no WebGL2 here: the 2D view after all
-  glBtn();
+  if (!HEADLESS) { if (!GL3.gl) glInit(); else for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); }
   if (!RUNNING) { RUNNING = true; requestAnimationFrame(frame); }
 }
 async function newWorld(seed, archive, size) {
@@ -52,10 +50,9 @@ function frame(now) {
   }
   processFX();
   if (frameN++ % 45 === 0) syncWalkers();
+  lightTick(dt);
   updateDyn(dt);
-  stepCamera(dt);
-  if (GL3.on) { if (!CATCH || performance.now() - (GL3.catchT || 0) > 2500) { glFrame(dt); GL3.catchT = performance.now(); } } // the 3D view draws the world itself (only now and then while catching up, so the years go by quickly)
-  else { lightTick(dt); flushDirty(); drawFrame(); updateTip(); }
+  if (GL3.on && (!CATCH || performance.now() - (GL3.catchT || 0) > 2500)) { glFrame(dt); GL3.catchT = performance.now(); } // (only now and then while catching up, so the years go by quickly)
   uiT += dt;
   if (uiT > .5) { uiT = 0; renderHUD(); renderTools(); renderFaith(); if (UI.panel) renderPanel(false); }
   if (DEV) { fpsN++; if (now - fpsT > 1000) { $('fps').textContent = `${fpsN} fps · y${S.year.toFixed(1)} · walkers ${DYN.walkers.length} · parts ${DYN.parts.length}`; fpsN = 0; fpsT = now; } }
@@ -148,7 +145,7 @@ SF.ff = function (years) {
 };
 SF.state = () => S;
 SF.save = () => saveAll();
-SF.cam = CAM; SF.dyn = DYN;
+SF.cam = GL3.cam; SF.dyn = DYN;
 SF.fx = (k, d) => { FXQ.push(Object.assign({ k }, d)); };
 SF.light = LIGHT;
 SF.hour = h => { LIGHT.forceHr = h; LIGHT.chk = 0; };               // dev: pin the synthetic clock (null = live)
@@ -159,7 +156,7 @@ SF.incident = k => simRun(() => startIncident(k)); // dev: start an incident now
 SF.season = s => { LIGHT.forceSeason = s ? Object.assign({ autumn: 0, winter: 0, spring: 0 }, s) : null; LIGHT.seasonT = 0; LIGHT.chk = 0; };
 
 async function boot() {
-  initView(); LT = mkLight(defaultEnv()); if (!glWanted()) ensure2D(); bindUI(); bindAI(); bindFaith(); bindAway(); bindDebug(); bindWorlds();
+  LT = mkLight(defaultEnv()); bindUI(); bindAI(); bindFaith(); bindAway(); bindDebug(); bindWorlds();
   if (DEV) $('fps').style.display = 'block';
   try { await IDB.open(); } catch (e) { }
   try { await aiLoad(); } catch (e) { }

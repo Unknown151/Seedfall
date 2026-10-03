@@ -2,7 +2,7 @@ import { launch, ROOT, HTTP } from './env.mjs';
 const b = await launch();
 const p = await b.newPage({viewport:{width:1920,height:1080}});
 const errs=[]; p.on('pageerror', e=>errs.push('PAGEERR '+e.message+' '+(e.stack||'').split('\n').slice(0,4).join(' | '))); p.on('console', m=>{ if(m.type()==='error') errs.push('CONSOLE '+m.text()); });
-await p.goto(ROOT+'seedfall.html?seed=4242&fresh&nointro&dev&2d'); // (the panels and prayers; 3D is glpick's)
+await p.goto(ROOT+'seedfall.html?seed=4242&fresh&nointro&dev&headless'); // (the panels and prayers: nothing needs drawing)
 await p.waitForTimeout(800);
 await p.evaluate(()=>{ SF.ff(420); S.settings.captions=true; SF.hour(11); SF.weather('fair', 9999); S.rev = 70; });
 await p.waitForTimeout(1500);

@@ -24,7 +24,7 @@ const t = await p.evaluate(() => { glTouch(); const a = [GL3.cam.tx, GL3.cam.tz]
 ok(!t.shot && t.moved < .01, 'a touch hands the camera back and it stays put', JSON.stringify(t));
 ok(await p.evaluate(() => { GL3.lastIn = performance.now() - 61000; glDirector(.25); return !!GL3.shot; }), 'a minute later the film carries on');
 // weather and the season reach the shader
-const u = await p.evaluate(() => { LIGHT.forceSeason = { autumn: 0, winter: 1, spring: 0 }; LIGHT.seasonT = 0; SF.weather('snow', 9999); Object.assign(S.wx, { snow: .8, sc: 1, cover: .88 }); glFrame(.1); const gl = GL3.gl, P = GL3.main.p; gl.useProgram(P); return { sea: [...gl.getUniform(P, GL3.main.u.uSea)], wx: [...gl.getUniform(P, GL3.main.u.uWx)] }; });
+const u = await p.evaluate(() => { LIGHT.forceSeason = { autumn: 0, winter: 1, spring: 0 }; LIGHT.seasonT = 0; SF.weather('snow', 9999); Object.assign(S.wx, { snow: .8, sc: 1, cover: .88 }); lightTick(.1); glFrame(.1); const gl = GL3.gl, P = GL3.main.p; gl.useProgram(P); return { sea: [...gl.getUniform(P, GL3.main.u.uSea)], wx: [...gl.getUniform(P, GL3.main.u.uWx)] }; });
 ok(u.sea[1] === 1 && u.sea[3] === 1 && u.wx[1] > .5, 'winter, snow on the ground and cloud reach the 3D view', JSON.stringify(u));
 if (SHOTS) { await p.evaluate(() => { GL3.cam.auto = false; GL3.shot = null; glCap(null); glFocusTown(); GL3.cam.zoom = 3; GL3.cam.pitch = .12; }); await p.waitForTimeout(3500); await p.screenshot({ path: 'film_snow_sky.png', timeout: 120000 }); }
 ok(await p.evaluate(() => { const gl = GL3.gl; while (gl.getError()); glFrame(.1); return gl.getError() === 0; }), 'WebGL draws without errors');

@@ -1,5 +1,5 @@
 /* ============================== work you can watch: production buildings in 3D, and what moves on them ============================== */
-// Two halves. The still parts some types lacked in 3D, because their 2D art was lines and flat shapes: pits for the quarry,
+// Two halves. The still parts some types lacked in 3D, because their old art was lines and flat shapes: pits for the quarry,
 // the clay and the sand (glPit), log piles (glLogPile), the mine's headframe, the quarry's derrick, the weaver's drying frame,
 // the shipyard's slipway and hull, and the wind turbine's tower. They're built into chunks like any building (called from
 // buildings.js when GLB is set). Then the moving parts, rebuilt every frame in glPeople by glWorks: sails and blades turning
@@ -44,25 +44,25 @@ function wkBits(at, tau, n, col, glow, seed) { // a burst of chips or sparks, ta
     glOBox([at[0] + Math.cos(a) * v * tau, at[1] + up * tau - 2.4 * tau * tau, at[2] + Math.sin(a) * v * tau], [.005, 0, 0], [0, 0, .005], [0, .005, 0], col, glow ? 2 : 0);
   }
 }
-function gLog(A, Bp, r, col, end = '#d8b98a') { // a round log from A to B: eight staves and two cut ends
+function gLog(A, Bp, r, col, end = '#d8b98a', mat = M_BARK) { // a round log from A to B: eight staves and two cut ends
   const C = gcol(col), E = gcol(end), d = [Bp[0] - A[0], Bp[1] - A[1], Bp[2] - A[2]], L = Math.hypot(...d) || 1, ax = V3s(d, 1 / L);
   let s = Math.abs(ax[1]) < .9 ? V3x(ax, [0, 1, 0]) : V3x(ax, [1, 0, 0]); s = V3s(s, 1 / (Math.hypot(...s) || 1)); const t = V3x(ax, s);
   const R = k => { const a = k / 8 * TAU; return V3a(V3s(s, Math.cos(a) * r), V3s(t, Math.sin(a) * r)); };
-  GLB.ctr = V3a(A, V3s(d, .5)); GLB.mat = M_BARK;
+  GLB.ctr = V3a(A, V3s(d, .5)); GLB.mat = mat;
   for (let k = 0; k < 8; k++) { const p = R(k), q = R(k + 1); gquad(V3a(A, p), V3a(Bp, p), V3a(Bp, q), V3a(A, q), C); }
   GLB.mat = 0; for (const [P0, sg] of [[A, -1], [Bp, 1]]) { GLB.ctr = V3a(P0, V3s(ax, -sg * r)); for (let k = 0; k < 8; k++) gtri(P0, V3a(P0, R(k)), V3a(P0, R(k + 1)), E); }
 }
 
 /* ---------- the still parts (built into chunks) ---------- */
-// A pit can't go down into the 3D ground, so banks rise round its back instead, stepped down in terraces to its floor.
-function glPit(cx, cy, hw, hd, depth, rim, wall, floor, steps, mat = M_EARTH) {
-  const [u0, v0] = gunscreen(cx, cy), X = GLB.x + u0, Z = GLB.y + v0, y = GLB.base, bw = Math.min(hw, hd) * .55 / Math.max(1, steps);
+// A pit can't go down into the ground the chunk is built on, so banks rise round its back instead, stepped down in terraces to its floor.
+function glPit(u0, v0, hw, hd, depth, rim, wall, floor, steps, mat = M_EARTH) {
+  const X = GLB.x + u0, Z = GLB.y + v0, y = GLB.base, bw = Math.min(hw, hd) * .55 / Math.max(1, steps);
   gBox([X, y, Z], [hw, 0, 0], [0, 0, hd], .3 * ZS, floor, mat);
   for (let k = 0; k < steps; k++) { const w = bw * (k + 1), h = Math.max(1.2, depth * (1 - k / steps)) * ZS, col = k ? wall : rim; // a tall narrow lip at the back, lower and wider terraces inside it
     gBox([X, y, Z - hd + w / 2], [hw, 0, 0], [0, 0, w / 2], h, col, mat); gBox([X - hw + w / 2, y, Z], [w / 2, 0, 0], [0, 0, hd], h, col, mat); }
   gBox([X, y, Z + hd - .02], [hw, 0, 0], [0, 0, .025], 1.4 * ZS, rim, mat); gBox([X + hw - .02, y, Z], [.025, 0, 0], [0, 0, hd], 1.4 * ZS, rim, mat); // a low spoil bank on the open sides
 }
-function glLogPile(cx, cy, u, v, n, col) { // logs stacked in a pyramid, cut ends out
+function glLogPile(u, v, n, col) { // logs stacked in a pyramid, cut ends out
   const X = GLB.x + u, Z = GLB.y + v, y = GLB.base, r = .024;
   for (let row = 0; row < n; row++) for (let k = 0; k < n - row; k++) { const o = (k - (n - row - 1) / 2) * r * 2.05, yy = y + r + row * r * 1.75; gLog([X - .11, yy, Z + o], [X + .11 + hash2(k, row, 7) * .02, yy, Z + o], r, shade(col, .9 + hash2(row, k, 8) * .2)); }
 }
@@ -87,6 +87,8 @@ function glTurbine(B) { // a tall white tower on its pad and the nacelle on top 
   gBox([X, y, Z], [.13, 0, 0], [0, 0, .13], .02, '#cfcac4', M_STONE);
   GLB.wall = 0; glCylAt(0, 0, .045, 0, 28, '#f2f3f5', '#f2f3f5', 10); glCylAt(0, 0, .034, 28, 27, '#f2f3f5', '#f2f3f5', 10);
   gBox([X + .03, y + 55 * ZS, Z], [.08, 0, 0], [0, 0, .035], 3.2 * ZS, '#e7e9ec');
+  kSet(X, Z, [1, 0, 0], [0, 0, 1], B.id); kDoor(0, .044, .018, .075, '#c9ced4', { ty: 'plank', y: .02 }); // a door at its foot, and the kiosk the power goes out through
+  kBox(.16, .08, 0, .035, .025, .055, '#d6dade', M_PLASTER); if (KF.lod) { kBox(.16, .106, .005, .02, .002, .035, '#9aa3ad'); kBox(.16, .106, .04, .006, .002, .006, '#e0a43a'); }
 }
 // the shipyard: a slipway running down into the water, a hull on it with its ribs up and part planked, a gantry and the shed
 function glShipyard(B, st) {
@@ -102,7 +104,10 @@ function glShipyard(B, st) {
       gquad(P(a, -.05, zb), P(a1, -.05, zb1), P(a1, .05, zb1), P(a, .05, zb), C); } }
   for (const b of [-.3, .3]) gBeam(P(.15, b, 0), P(.15, b, 20), .014, '#c8553d'); // the gantry (its hoist moves: GLW.shipyard)
   gBeam(P(.15, -.31, 20), P(.15, .31, 20), .014, '#c8553d'); gBox(P(.15, .3, 20.6), [.012, 0, 0], [0, 0, .012], .02, '#ff4d4d', 0, 2);
-  box(GSTUB, 0, 0, -d[0] * .3, -d[1] * .3, .16, .16, 0, 7, st.wall); roofGable(GSTUB, 0, 0, -d[0] * .3, -d[1] * .3, .17, .17, 7, 4, st.roof, st.wall, true);
+  { const c = gw(-d[0] * .3, -d[1] * .3, 0), [wc, wm] = kWall(B, st); kSet(c[0], c[2], [d[1], 0, d[0]], [d[0], 0, d[1]], B.id); // the shed: big doors to the slip, windows, a gable, timber stacked by
+    kPlinth(-.16, .16, -.16, .16, .02); kBox(0, 0, .02, .16, .16, .3, wc, wm); kBox(0, .16, .02, .1, .006, .22, '#4a3a30', M_PLANK); if (KF.lod) for (const dd of [-1, 1]) kBeam([dd * .1, .168, .03], [0, .168, .2], .003, '#3a2a20', M_PLANK);
+    kWalls(-.16, .16, -.16, .16, (a, b, ff, q) => kWins(a, b, ff, .02, .28, 1, 2, { back: 1, hk: .45 }, null, q * 5), 14); kGable(-.17, .17, -.16, .16, .32, .14, st.roof, { wall: wc, wm });
+    if (KF.lod) for (let q = 0; q < 4; q++) kLog([-.2, -.22 + q * .03, .016], [.12, -.22 + q * .03, .016], .014, '#9b7657', '#d8b98a'); }
 }
 
 /* ---------- what moves, every frame (near the camera) ---------- */

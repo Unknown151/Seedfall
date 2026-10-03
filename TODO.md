@@ -71,8 +71,7 @@ only, or a few invited emails.
 
 - Done: per-world size (`S.size`, old saves 64), picked for each new world; the page reloads at a world's size.
 - Done: towns (twice as many on wide lands, further apart) and research trimmed so the pace holds.
-- Done: graphics memory. The 3D view doesn't use the static layer, which is only made for the 2D fallback
-  (at 128 it's ~170 MB there).
+- Done: graphics memory. The 2D view and its ~170 MB static layer are gone altogether.
 - Left: a worldgen retune for the bigger map (more rivers, ranges and ruins), and simpler far chunks if
   128 turns out heavy on laptops.
 
@@ -81,8 +80,17 @@ only, or a few invited emails.
 - Done: the sim's own seeded randomness (`simRun`, `S.rs`): same seed, same world; a reloaded save grows on the same.
 - Done: the event bus (`EV.on` / `EV.fire`): chron, placed, built, removed, town, tech, era, age, event.
 - Done: 3D-native models (`GL_MODEL`, `glModel`): well, granary, shrine, watchstone so far.
-- Next: move the other building types to `GL_MODEL` a few at a time (houses last: they're the biggest), then drop
-  the 2D renderer, keeping only what the ?2d fallback needs, or dropping that too.
+- Done: 3D only. The 2D view, its camera, static canvases, relight, sprites and `?2d` are gone; everything it alone drew
+  is in 3D now (fx3d.js: the nudges, rockets, the sky, flyers, Longstriders, birds, caravans, captions, place names, the zone
+  view, lighthouse beams, lightning, the landing). Tests that don't need drawing use `&headless`.
+- Done: the building art is all 3D and tile-local (no screen points, no canvas, no 2D-only strokes); what only the 2D art had
+  (the works' sawtooth roof, solar panels, masts and dishes, the launch gantry, clocks, crosses, banners, statues, the harp
+  and the colossus, round fields and orchards, the plaza fire, dome lattices) is real geometry now.
+- Done: detailed native models for nearly every type, from the kit (kit.js): every house tier (homes.js), the public
+  buildings and the big landmark lots (civic.js), the workplaces (industry.js), the shops, greens, modern works and the
+  monuments (modern.js).
+- Next: the same for what's left on the older art (the harbour's warehouses and quays, the shipyard, farms and their
+  farmhouses, the reshaping styles' houses: round, organic, tiered, tall, low), and more own-colour glows at night.
 - Done: incidents (incidents.js): a house fire, sheep loose in the market, a wedding procession, a river flood, a
   runaway cabbage cart and a whale on the beach.
 - Next: more incidents (a storm tearing tiles off roofs, a hot-air balloon that drifts off with the mayor, a mine
