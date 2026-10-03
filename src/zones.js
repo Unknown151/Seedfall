@@ -154,29 +154,4 @@ function redevelop(T) {
 /* ---------- shops: the market quarter's own buildings, from shopfronts to offices ---------- */
 const SHOP_N = ['Shopfronts', 'Arcade', 'Department Store', 'Offices'];
 function shopKind() { return hasTech('computing') ? 3 : hasTech('electric') ? 2 : hasTech('masonry') ? 1 : 0; }
-function drawShops(B, st) {
-  const k = B.sub || 0, wc = winCol(st, B);
-  if (k === 0) { // a row of little shops, each with its own awning
-    box(0, 0, .42, .3, 0, 9, st.wall); windows(0, 0, .42, .3, 0, 9, 1, 3, wc); roofGable(0, 0, .42, .3, 9, 5, st.roof, st.wall, true);
-    const cols = [st.accent, mix(st.accent, '#ffffff', .45), st.roof];
-    for (let n = 0; n < 3; n++) { ctr(-.28 + n * .28, .3, 0); tq([-.4 + n * .28, .305, 5.4], [-.16 + n * .28, .305, 5.4], [-.16 + n * .28, .4, 4.4], [-.4 + n * .28, .4, 4.4], cols[n]); }
-    return;
-  }
-  if (k === 1) { // an arcade: arched shop windows, a glass roof over the lane
-    box(0, 0, .44, .3, 0, 12, st.wall);
-    for (let n = 0; n < 4; n++) { const u = -.33 + n * .22; ctr(u, 0, 4); tq([u - .06, .303, 0], [u + .06, .303, 0], [u + .06, .303, 7], [u - .06, .303, 7], wc, 0, .5); tt([u - .06, .303, 7], [u + .06, .303, 7], [u, .303, 8.5], wc, 0, .5); }
-    windows(0, 0, .44, .3, 8, 4, 1, 4, wc); const sv = GLB.wall; GLB.wall = M_GLASS; roofGable(0, 0, .44, .3, 12, 6, st.glass, st.wall, true); GLB.wall = sv;
-    return;
-  }
-  if (k === 2) { // a department store with its name up in lights
-    box(0, 0, .42, .38, 0, 22, st.wall); windows(0, 0, .42, .38, 6, 16, 3, 4, wc); awning(0, 0, .42, .38, st, true);
-    GLB.mat = 0; glOBox(gw(0, .39, 19.5), [.3, 0, 0], [0, 0, .006], [0, 1.5 * ZS, 0], st.accent, 3); box(0, 0, .43, .39, 22, 1.4, shade(st.trim, 1.2));
-    return;
-  }
-  // offices: glass floors on a stone base
-  box(0, 0, .4, .36, 0, 7, st.wall); awning(0, 0, .4, .36, st, true);
-  const sv = GLB.wall; GLB.wall = M_GLASS; box(0, 0, .36, .32, 7, 30, st.glass); GLB.wall = sv;
-  for (let z = 12; z < 37; z += 6) box(0, 0, .362, .322, z, .8, st.wall);
-  windows(0, 0, .36, .32, 7, 30, 5, 4, st.glass); box(0, 0, .37, .33, 37, 1.2, shade(st.trim, 1.2));
-}
 

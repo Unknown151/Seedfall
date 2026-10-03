@@ -39,250 +39,22 @@ function drawBuilding0(B, i, st) {
   if (B.prog < 1) { drawConstruction(B, st, i); return; }
   const m = glModel(B); if (m && m(B, st) !== false) return; // (a native model when the type has one)
   const v = B.var || 0;
-  switch (B.type) {
+  switch (B.type) { // (the rest have native models: homes.js, civic.js, industry.js, modern.js)
     case 'pod': return glPod(B);
-    case 'house': return drawHouse(B, st);
-    case 'shops': return drawShops(B, st);
+    case 'house': return drawHouse(B, st); // (the reshaping styles: round, organic, tiered, tall, low)
     case 'farm': return drawFarm(B, i);
-    case 'plaza': return drawPlaza(B, st);
-    case 'dock': { // a boathouse, and a timber pier out over the water with a lantern at its end
-      box(-.1, -.1, .2, .16, 0, 6, mix(st.wall, '#a57f5e', .5)); roofGable(-.1, -.1, .2, .16, 6, 3.5, st.roof, st.wall, true);
-      const d = B.dir || [1, 0], s = [d[1], d[0]], A = (a, b) => [d[0] * a + s[0] * b, d[1] * a + s[1] * b];
-      GLB.wall = M_PLANK; box(...A(.28, 0), Math.abs(d[0]) * .23 + Math.abs(s[0]) * .065, Math.abs(d[1]) * .23 + Math.abs(s[1]) * .065, 0, 1, '#9b7657');
-      for (const a of [.12, .3, .48]) for (const b of [-.06, .06]) { const [u, w] = A(a, b); post(u, w, 1, .01, '#6b5040', -3); }
-      { const [u, w] = A(.46, .08); post(u, w, 6, .005, '#6b5040', 1); lamp(u, w, 6.3, .014); }
-      return;
-    }
-    case 'market': { // three stalls under striped canopies
-      const cols = [st.accent, '#e9c46a', '#e76f51'];
-      [[-.2, -.12], [.16, -.2], [.02, .18]].forEach(([u, w], k) => {
-        GLB.wall = M_PLANK; box(u, w, .1, .1, 0, 3.4, mix(st.wall, '#c9a47e', .4)); GLB.wall = 0;
-        for (const [a, b] of [[-.12, -.12], [.12, -.12], [-.12, .13], [.12, .13]]) post(u + a, w + b, b < 0 ? 6.5 : 4.2, .004, '#6b5040');
-        ctr(u, w, 0); tq([u - .13, w - .13, 6.5], [u + .13, w - .13, 6.5], [u + .14, w + .15, 4.2], [u - .14, w + .15, 4.2], cols[k]);
-        tq([u - .04, w - .13, 6.52], [u + .04, w - .13, 6.52], [u + .04, w + .15, 4.22], [u - .04, w + .15, 4.22], '#fff6ea');
-        if (GLB.lod) for (let q = 0; q < 3; q++) ball(u - .06 + q * .06, w + .06, .022, 3.6, .8, ['#e05b52', '#f2c14e', '#7fb069'][(q + k) % 3]); // what's for sale
-        lamp(u, w + .14, 4, .01);
-      });
-      return;
-    }
-    case 'school': {
-      box(0, 0, .34, .24, 0, 10, st.wall); windows(0, 0, .34, .24, 0, 10, 1, 3, winCol(st, B));
-      door(0, 0, .24, .1, 5, shade(st.trim, .9)); roofGable(0, 0, .34, .24, 10, 6, st.roof, st.wall, true);
-      box(.18, 0, .06, .06, 13, 6, st.wall); roofPyr(.18, 0, .07, .07, 19, 5, st.roof); // the bell tower
-      if (GLB.lod) ball(.18, 0, .025, 15.5, .9, '#c9a447', 0); // its bell
-      return;
-    }
-    case 'library': {
-      box(0, -.04, .36, .28, 0, 12, st.wall); windows(0, -.04, .36, .28, 0, 12, 1, 3, winCol(st, B));
-      for (let k = 0; k < 4; k++) cyl(-.27 + k * .18, .3, .03, 0, 11, shade(st.wall, 1.08), null, 8); // columns
-      box(0, .3, .36, .06, 11, 2, shade(st.wall, 1.02)); dome(0, -.04, .17, 12, 9, st.roof);
-      return;
-    }
-    case 'workshop': {
-      box(0, 0, .3, .26, 0, 8, st.wall); windows(0, 0, .3, .26, 0, 8, 1, 2, winCol(st, B));
-      door(-.1, 0, .26, .14, 5.5, '#5c4a3e'); roofGable(0, 0, .3, .26, 8, 5, st.roof, st.wall, v < .5);
-      box(.16, -.14, .05, .05, 8, 12, '#8f6f62'); return; // the forge chimney (it smokes: gl.js SMOKE_AT)
-    }
-    case 'mine': { // a mound with the adit in it, a cart at the mouth and the headframe over the shaft (works.js)
-      roofPyr(0, 0, .36, .36, 0, 10, '#9e95a8'); door(-.05, 0, .36, .16, 5, '#2f2a33');
-      box(.05, .3, .06, .04, 0, 2.5, '#6b6470'); for (const r of [-.03, .03]) beam(-.05 + r, .36, .2, -.05 + r, .5, .2, .004, '#5a5f66');
-      glMineFrame(B); return;
-    }
-    case 'lumber': return drawLumber(B, st, i);
+    case 'lumber': return drawLumber(B, st);
     case 'harbor': return glHarbour(B);
-    case 'lighthouse': return drawLighthouse(B, st);
     case 'quarry': return drawQuarry(B, i);
     case 'claypit': return drawClaypit(B, i);
-    case 'mill': { cyl(0, 0, .17, 0, 16, st.wall); door(0, 0, .16, .08, 4.5, '#5c4a3e'); cone(0, 0, 16, .2, 8, st.roof); return; } // (the sails turn: works.js)
-    case 'hall': { // a town hall before it spreads onto its bigger lot (gl.js glBigHall after)
-      box(0, 0, .4, .3, 0, 13, st.wall); windows(0, 0, .4, .3, 0, 13, 2, 4, winCol(st, B));
-      door(0, 0, .3, .12, 6, shade(st.trim, .9)); roofPyr(0, 0, .4, .3, 13, 5, st.roof);
-      box(0, 0, .1, .1, 15, 17, shade(st.wall, 1.03)); roofPyr(0, 0, .11, .11, 32, 9, st.roof);
-      clockFace(0, .1, 26.5, .045); return;
-    }
-    case 'observatory': {
-      cyl(0, 0, .22, 0, 10, st.wall); dome(0, 0, .22, 10, 9, '#f1f1f4');
-      box(.07, -.02, .03, .06, 14, 6, '#c9ccd2'); beam(.02, 0, 16, .16, .06, 22, .022, '#3a3f4a'); // the slit, and the telescope poking out
-      return;
-    }
-    case 'works': { // a sawtooth roof of north lights over the shop floor, and a tall chimney
-      box(0, 0, .42, .3, 0, 12, st.wall); windows(0, 0, .42, .3, 0, 12, 2, 5, winCol(st, B));
-      for (let k = 0; k < 3; k++) { const u = -.28 + k * .28; ctr(u, 0, 0);
-        tq([u - .14, -.3, 12], [u - .14, .3, 12], [u + .14, .3, 18], [u + .14, -.3, 18], shade(st.roof, .95), roofMat(gcol(st.roof)));
-        tq([u + .14, -.3, 18], [u + .14, .3, 18], [u + .14, .3, 12], [u + .14, -.3, 12], shade(st.glass, .8), M_GLASS);
-        for (const w of [-.3, .3]) tt([u - .14, w, 12], [u + .14, w, 12], [u + .14, w, 18], st.wall, GLB.wall); }
-      cyl(.28, -.18, .055, 12, 30, '#9a5c4c', '#3a3434'); return;
-    }
-    case 'station': { // (before it spreads: gl.js glBigStation after)
-      box(0, 0, .42, .24, 0, 9, st.wall); windows(0, 0, .42, .24, 0, 9, 1, 5, winCol(st, B));
-      roofGable(0, 0, .44, .26, 9, 7, shade(st.glass, .9), st.wall, true); clockFace(.442, 0, 12, .03, true);
-      for (const u of [-.3, .3]) { post(u, .3, 8, .006, '#4c4f58'); lamp(u, .3, 8.3, .016); }
-      return;
-    }
-    case 'clinic': {
-      box(0, 0, .32, .3, 0, 13, '#f3f1ee'); windows(0, 0, .32, .3, 0, 13, 2, 3, winCol(st, B));
-      box(0, 0, .33, .31, 13, 1.2, shade(st.trim, 1.3));
-      GLB.mat = 0; for (const [a, b] of [[.05, .014], [.014, .05]]) glOBox(gw(-.12, .312, 9), [a, 0, 0], [0, 0, .004], [0, b, 0], '#e25d5d', 3); // a red cross that shines at night
-      door(.08, 0, .3, .1, 5, '#e8e8e8'); return;
-    }
-    case 'power': {
-      box(0, 0, .36, .28, 0, 14, st.wall); windows(0, 0, .36, .28, 0, 14, 2, 3, winCol(st, B));
-      roofGable(0, 0, .36, .28, 14, 4, st.roof, st.wall, true);
-      for (const u of [-.16, .16]) cyl(u, -.2, .06, 14, 22, '#a39a92', '#333'); return;
-    }
     case 'turbine': return glTurbine(B);
-    case 'mast': { // a lattice radio mast on three legs, red and white, with a light on top
-      const L = [[-.18, .12], [.18, .12], [0, -.2]], T = 66;
-      for (const [u, w] of L) beam(u, w, 0, 0, 0, T, .008, '#c0584f');
-      for (let k = 1; k < 9; k++) { const f = k / 9, p = L.map(([u, w]) => [u * (1 - f), w * (1 - f)]), z = T * f, col = k % 2 ? '#c0584f' : '#f3efe9';
-        for (let q = 0; q < 3; q++) { const a = p[q], b = p[(q + 1) % 3]; beam(a[0], a[1], z, b[0], b[1], z, .004, col); } }
-      glowAt(0, 0, T + .6, .016, '#ff4d4d'); box(.25, .2, .1, .08, 0, 4, st.wall); return;
-    }
-    case 'airfield': {
-      flat(0, 0, .48, .48, .3, '#b8b9bb'); flat(0, .08, .48, .13, .5, '#707378');
-      for (let k = 0; k < 4; k++) flat(-.36 + k * .24, .08, .06, .015, .7, '#f5f5f0');
-      for (let k = 0; k < 6; k++) for (const w of [-.04, .2]) glowAt(-.44 + k * .176, w, .9, .008, k % 5 ? '#bfe0ff' : '#9dff9d'); // runway lights
-      box(.3, -.3, .07, .07, 0, 12, st.wall); box(.3, -.3, .09, .09, 12, 3, st.glass); glowAt(.3, -.3, 15.4, .012, '#bfe8ff');
-      box(-.26, -.28, .16, .12, 0, 5, shade(st.roof, 1.1)); roofGable(-.26, -.28, .16, .12, 5, 2.5, shade(st.roof, .9), shade(st.roof, 1.1), true); return;
-    }
-    case 'university': { // (before it spreads: gl.js glBigUniversity after)
-      box(0, 0, .44, .36, 0, 16, st.wall); windows(0, 0, .44, .36, 0, 16, 3, 5, winCol(st, B));
-      for (let k = 0; k < 5; k++) cyl(-.3 + k * .15, .38, .025, 0, 14, shade(st.wall, 1.1), null, 8);
-      box(0, 0, .45, .37, 16, 1.4, shade(st.trim, 1.2)); dome(0, 0, .19, 17, 13, st.roof); return;
-    }
-    case 'antenna': { // the weave relay: a mast with a dish on it
-      box(0, 0, .2, .2, 0, 8, st.wall); beam(0, 0, 8, 0, 0, 46, .012, '#b9c0c9');
-      dish(.04, 0, 42, .14, [.8, .5, .3], '#e9edf2'); glowAt(0, 0, 46.6, .01, '#ff4d4d'); return;
-    }
-    case 'solar': { // rows of panels tilted to the sun
-      flat(0, 0, .46, .46, .2, '#c7c3b5');
-      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { const u = -.3 + a * .3, w = -.3 + b * .3; ctr(u, w, -5);
-        tq([u - .12, w - .1, 3], [u + .12, w - .1, 3], [u + .12, w + .1, 1], [u - .12, w + .1, 1], '#2f4e7a', M_GLASS);
-        if (GLB.lod) for (const s of [-.09, .09]) post(u + s, w - .08, 2.8, .004, '#8c9199'); }
-      return;
-    }
-    case 'vfarm': { // the gene garden: a glass tower of growing floors, lit pink at night
-      box(0, 0, .34, .34, 0, 30, st.glass);
-      for (let k = 1; k < 5; k++) { box(0, 0, .345, .345, k * 6, 1.3, '#6fbf73'); if (GLB.lod) for (const [u, w] of [[0, .346], [.346, 0], [0, -.346], [-.346, 0]]) { GLB.mat = 0; glOBox(gw(u, w, k * 6 - 2.5), [w ? .25 : .002, 0, 0], [0, 0, u ? .25 : .002], [0, .012, 0], '#ff7ad9', 3); } }
-      domeFrame(0, 0, .3, 30, 9, '#bfe8c4'); parkTree(0, 0, .1, 30); return;
-    }
-    case 'park': {
-      if (dsRound()) { flat(0, 0, .47, .47, .2, '#a4dfa9'); ring(0, 0, .31, .05, .35, '#eadbc1'); cyl(0, 0, .1, 0, 1.5, '#d8d2c8', '#7fc7de'); for (let k = 0; k < 5; k++) { const a = k / 5 * TAU + v; parkTree(Math.cos(a) * .38, Math.sin(a) * .38, v + k * .21); } return; }
-      flat(0, 0, .47, .47, .2, '#a4dfa9'); flat(0, 0, .47, .06, .35, '#eadbc1'); flat(0, 0, .06, .47, .35, '#eadbc1');
-      cyl(0, 0, .1, 0, 1.5, '#d8d2c8', '#7fc7de'); if (GLB.lod) post(0, 0, 3, .006, '#bfe7f2', 1.5); // a fountain
-      parkTree(-.26, -.26, v); parkTree(.26, -.24, v + .3); parkTree(-.25, .26, v + .6); parkTree(.27, .26, v + .9);
-      for (const [u, w] of [[-.12, .2], [.2, -.12]]) benchAt(u, w, '#6b5040');
-      return;
-    }
-    case 'stadium': { // (before it spreads: gl.js glBigStadium after)
-      cyl(0, 0, .45, 0, 7, st.wall, shade(st.accent, 1.1)); disc(0, 0, .36, 7, '#7cc47f'); disc(0, 0, .2, 7.1, '#86cc88'); flat(0, 0, .005, .2, 7.3, '#ffffff');
-      if (hasTech('electric')) for (const [u, w] of [[-.42, -.42], [.42, -.42], [.42, .42], [-.42, .42]]) { post(u, w, 18, .007, '#8a8f99'); GLB.mat = 0; glOBox(gw(u, w, 19), [.03, 0, 0], [0, 0, .03], [0, .012, 0], '#f2f4f7', 2); }
-      return;
-    }
-    case 'museum': { box(0, 0, .4, .34, 0, 12, st.wall); windows(0, 0, .4, .34, 0, 12, 1, 4, winCol(st, B)); roofPyr(0, 0, .22, .22, 12, 12, st.glass); return; }
-    case 'launchpad': { // the pad, scorched, its red gantry, and the rocket waiting (between launches: fx3d.js)
-      flat(0, 0, .47, .47, .3, '#bfbdb8'); disc(0, 0, .24, .32, '#7a756f');
-      for (const s of [-.04, .04]) beam(.22 + s, -.22, 0, .22 + s, -.22, 62, .01, '#c8553d');
-      for (let k = 1; k < 10; k++) beam(.18, -.22, k * 6, .26, -.22, k * 6 + 3, .004, '#c8553d');
-      for (let k = 2; k < 10; k += 3) beam(.18, -.22, k * 6, .06, -.06, k * 6, .006, '#c8553d'); // arms reaching to the rocket
-      if (B.rk !== 0) { cyl(0, 0, .08, 1, 46, '#f4f4f2'); cone(0, 0, 47, .08, 9, st.accent); box(0, .075, .02, .01, 24, 6, '#333'); }
-      glowAt(.22, -.22, 63, .014, '#ff4d4d'); return;
-    }
-    case 'fusion': { // (before it spreads: gl.js glBigFusion after)
-      box(0, 0, .42, .42, 0, 6, st.wall); dome(0, 0, .34, 6, 20, shade(st.wall, 1.02)); ring(0, 0, .37, .03, 11.7, st.accent, 0, TAU, 24, 3); return;
-    }
-    case 'terraformer': { // the climate engine: a tall stack ringed with teal light, misting at the top (fx3d.js)
-      cyl(0, 0, .14, 0, 58, st.wall); cyl(0, 0, .24, 58, 10, shade(st.wall, 1.02), shade(st.accent, 1.1));
-      for (let k = 1; k < 6; k++) ring(0, 0, .17, .03, k * 10, '#9ff0ea', 0, TAU, 20, 3);
-      return;
-    }
-    case 'dome': { // a garden dome: green inside a glass lattice
-      cyl(0, 0, .42, 0, 2, st.wall, '#9fd9a4'); parkTree(-.12, -.1, v, 2); parkTree(.12, .06, v + .5, 2);
-      domeFrame(0, 0, .42, 2, 22, mix(st.glass, '#ffffff', .4), 10); return;
-    }
-    case 'elevator': {
-      box(0, 0, .46, .46, 0, 10, st.wall); windows(0, 0, .46, .46, 0, 10, 1, 5, st.glass);
-      box(0, 0, .3, .3, 10, 22, shade(st.wall, 1.03)); windows(0, 0, .3, .3, 10, 22, 3, 3, st.glass);
-      box(0, 0, .14, .14, 32, 40, shade(st.wall, 1.06)); box(0, 0, .16, .16, 72, 3, st.accent); glowAt(0, 0, 75.5, .03, '#bff3ff'); return;
-    }
-    case 'monument': return drawMonument(B, st);
     case 'pasture': return drawPasture(B, st);
-    case 'warehouse': {
-      box(0, -.02, .42, .24, 0, 9, st.wall); roofGable(0, -.02, .43, .25, 9, 5, st.roof, st.wall, true);
-      for (const u of [-.22, .08]) door(u, -.02, .24, .1, 6.5, shade(st.trim, .75));
-      windows(0, -.02, .42, .24, 0, 9, 1, 4, winCol(st, B));
-      GLB.wall = M_PLANK; for (const [u, w, z] of [[.3, .36, 0], [.36, .3, 0], [.33, .33, 2.4]]) box(u, w, .05, .05, z, 2.4, '#b58d62'); // crates
-      for (const [u, w] of [[-.34, .34], [-.26, .36]]) cyl(u, w, .045, 0, 3, '#8a5a3c', '#6b4530', 8); // barrels
-      lamp(-.07, .225, 7.5, .012); return;
-    }
     case 'shipyard': return glShipyard(B, st);
-    case 'theatre': { // (before it spreads: gl.js glBigTheatre after)
-      box(0, -.06, .36, .26, 0, 13, st.wall); windows(0, -.06, .36, .26, 0, 13, 1, 3, winCol(st, B));
-      box(.06, -.14, .18, .14, 13, 10, shade(st.wall, .96)); roofGable(.06, -.14, .19, .15, 23, 4, st.roof, st.wall, true); // the fly tower
-      for (let k = 0; k < 4; k++) cyl(-.27 + k * .18, .26, .028, 0, 11, shade(st.wall, 1.1), null, 8); // portico
-      box(0, .24, .37, .07, 11, 2.5, shade(st.wall, 1.04)); roofPyr(0, .24, .37, .07, 13.5, 3, st.roof);
-      door(0, -.06, .26, .1, 6, '#7a3b3b');
-      post(.3, -.2, 9, .004, '#6b5040', 23); GLB.mat = 0; glOBox(gw(.33, -.2, 31), [.03, 0, 0], [0, 0, .003], [0, .012, 0], shade(st.accent, 1.05)); // a flag on the fly tower
-      for (const u of [-.2, .2]) lamp(u, .31, 9, .014, '#ffd08a');
-      return;
-    }
-    case 'bathhouse': {
-      box(0, 0, .3, .22, 0, 7, mix(st.wall, '#e8e2d6', .4)); windows(0, 0, .3, .22, 0, 7, 1, 3, winCol(st, B));
-      dome(0, 0, .2, 7, 8, shade(st.roof, 1.05)); cyl(0, 0, .04, 15, 2.5, st.accent); door(0, 0, .22, .09, 4.5, '#5c4a3e');
-      return;
-    }
-    case 'digsite': { // the Maker dig: trenches, strings marking the grid, the scholars' tent, a sieve
-      flat(0, 0, .44, .44, .1, '#c9a980');
-      for (const [u, w] of [[-.2, -.1], [.12, -.18], [-.05, .18], [.22, .14]]) glPit(u, w, .09, .09, 2.5, '#bf9d74', '#a9855f', '#b89266', 1);
-      if (GLB.lod) { for (const u of [-.35, -.05, .25]) beam(u, -.4, .4, u, .4, .4, .0015, '#f0ebe1'); for (const w of [-.35, -.05, .25]) beam(-.4, w, .4, .4, w, .4, .0015, '#f0ebe1'); }
-      ctr(-.3, -.32, -3); tq([-.42, -.4, 0], [-.18, -.4, 0], [-.18, -.32, 8], [-.42, -.32, 8], '#e9e2d0'); tq([-.42, -.24, 0], [-.18, -.24, 0], [-.18, -.32, 8], [-.42, -.32, 8], '#d6ceb8');
-      tt([-.42, -.4, 0], [-.42, -.24, 0], [-.42, -.32, 8], '#cfc6ae');
-      cyl(.32, .3, .05, 1.2, .6, '#8a6446', '#c9b48a', 10); for (const [a, b] of [[-.04, 0], [.03, .03], [.02, -.04]]) post(.32 + a, .3 + b, 1.2, .003, '#6b5040');
-      return;
-    }
-    case 'botanic': {
-      flat(0, 0, .46, .46, .15, '#9ed49a');
-      for (const [u, w, col] of [[-.34, .34, '#f28bb5'], [.34, .34, '#f5d25b'], [-.34, -.34, '#b69cf0']]) { flat(u, w, .08, .08, .3, '#8a6446'); if (GLB.lod) for (let q = 0; q < 4; q++) flowersAt(u - .04 + (q % 2) * .08, w - .04 + (q >> 1) * .08, hash2(B.id | 0, q, 17), .4); }
-      box(0, -.04, .3, .2, 0, 6, shade(st.glass, 1.05)); parkTree(-.08, -.06, v + .2, 6); parkTree(.1, 0, v + .7, 6);
-      domeFrame(0, -.04, .26, 6, 9, '#f2f6f8'); return;
-    }
-    case 'guildhall': {
-      const T = S.T[B.sid], r = T && guildOf(T), ec = r ? RES_COL[r] : st.accent;
-      box(0, 0, .2, .26, 0, 18, st.wall); windows(0, 0, .2, .26, 0, 18, 3, 2, winCol(st, B));
-      roofGable(0, 0, .21, .27, 18, 11, st.roof, st.wall, false); door(0, 0, .26, .08, 6, shade(st.trim, .85));
-      beam(-.2, .27, 16, -.32, .27, 16.5, .004, '#6b5040'); GLB.mat = 0; glOBox(gw(-.3, .275, 13), [.025, 0, 0], [0, 0, .003], [0, .045, 0], ec); // the guild's banner
-      lamp(.06, .275, 8, .012); return;
-    }
     case 'sandpit': return drawSandpit(B, i);
-    case 'weaver': {
-      box(-.08, -.06, .28, .22, 0, 9, st.wall); windows(-.08, -.06, .28, .22, 0, 9, 1, 3, winCol(st, B));
-      door(-.08, -.06, .22, .1, 5, '#5c4a3e'); roofGable(-.08, -.06, .28, .22, 9, 5.5, st.roof, st.wall, v < .5);
-      return glDryFrame(.3); // (the cloth on it moves: works.js)
-    }
-    case 'glassworks': { // a house for the glassblowers, and the furnace: a brick cone with a glowing mouth (works.js)
-      box(-.12, .06, .24, .22, 0, 8, st.wall); windows(-.12, .06, .24, .22, 0, 8, 1, 2, st.glass); roofGable(-.12, .06, .24, .22, 8, 4.5, st.roof, st.wall, true);
-      cyl(.2, -.16, .15, 0, 7, '#b8684f'); cone(.2, -.16, 7, .15, 13, '#a85c44'); cyl(.2, -.16, .035, 20, 4, '#8a4a3a', '#3a3434');
-      box(.2, -.01, .025, .004, .3, 2.5, '#3a2a24');
-      if (GLB.lod) for (const [u, w] of [[.34, .26], [.26, .34]]) cyl(u, w, .012, 0, 3, '#a0dceb', '#cfeff6', 6); // fresh bottles
-      return;
-    }
-    case 'watertower': {
-      if (!S.tech.done.steam || B.built < S.tech.done.steam) { // a stone cistern tower
-        cyl(0, 0, .15, 0, 17, st.wall); door(0, 0, .14, .06, 4.5, '#5c4a3e'); cyl(0, 0, .21, 17, 8, mix(st.wall, '#a8b4bf', .35), '#6fb7d4'); cone(0, 0, 25, .23, 7, st.roof); return;
-      }
-      for (const [u, w] of [[-.15, -.15], [.15, -.15], [.15, .15], [-.15, .15]]) beam(u, w, 0, u * .75, w * .75, 22, .012, '#6c7683');
-      beam(-.15, .15, 7, .15, .15, 7, .006, '#7c8693'); beam(.15, -.15, 7, .15, .15, 7, .006, '#7c8693');
-      cyl(0, 0, .22, 22, 10, mix('#c9d2da', st.accent, .15), '#aab6c1'); dome(0, 0, .22, 32, 4, '#b6c2cc'); lamp(0, .222, 27, .01); return;
-    }
     default: box(0, 0, .3, .3, 0, 8, st.wall);
   }
 }
 // a clock face on a tower, lit at night: (u, v) on the wall, facing out along v (or u)
-function clockFace(u, v, z, r, alongU) {
-  GLB.mat = 0; const n = alongU ? [1, 0, 0] : [0, 0, 1], a = alongU ? [0, 0, 1] : [1, 0, 0], c = gw(u, v, z);
-  glOBox(c, V3s(a, r), V3s(n, .003), [0, r, 0], '#fbf6ea', 2);
-  if (GLB.lod) { glOBox(V3a(c, V3s(n, .004)), V3s(a, .003), V3s(n, .001), [0, r * .7, 0], '#333'); glOBox(V3a(V3a(c, V3s(n, .004)), V3s(a, r * .25)), V3s(a, r * .3), V3s(n, .001), [0, .003, 0], '#333'); }
-}
 function dish(u, v, z, r, dir, col) { // a dish aerial facing dir
   const n = V3s(dir, 1 / Math.hypot(...dir)), s0 = V3x(n, [0, 1, 0]), s = V3s(s0, 1 / (Math.hypot(...s0) || 1)), t = V3x(s, n), O = gw(u, v, z), C = gcol(col);
   GLB.mat = 0; GLB.ctr = V3a(O, V3s(n, -1)); const R = k => { const a = k / 14 * TAU; return V3a(V3a(O, V3s(s, Math.cos(a) * r)), V3a(V3s(t, Math.sin(a) * r), V3s(n, r * .35))); };
@@ -291,63 +63,7 @@ function dish(u, v, z, r, dir, col) { // a dish aerial facing dir
 }
 
 /* ---------- where the materials come from ---------- */
-function drawLumber(B, st, i) { // the woodcutters' hut, the log pile, the chopping block (the woodcutter works it by day: works.js)
-  const v = B.var || 0;
-  flat(.05, .1, .34, .3, .25, '#d7c09a'); // sawdust and trodden earth
-  const wall = mix(st.wall, '#a8784e', .7), sv = GLB.wall; GLB.wall = M_PLANK;
-  box(-.16, -.16, .17, .13, 0, 6.5, wall); GLB.wall = sv;
-  door(-.22, -.16, .13, .07, 4, '#5a4436'); roofGable(-.16, -.16, .19, .15, 6.5, 4.5, mix(st.roof, '#7d5a3e', .6), wall, true);
-  box(-.04, -.26, .03, .03, 7, 5, '#7a6a5e');
-  glLogPile(.22, .12, 3, '#8f6440');
-  cyl(-.2, .24, .06, 0, 2, '#8a6446', '#d8b98a', 10);
-  if (v > .4) for (const [a, b] of [[-.06, -.03], [.06, .03]]) { beam(.28 + a, -.22 + b, 0, .28, -.22, 2.6, .006, '#6b5040'); beam(.28 + a, -.22 - b, 0, .28, -.22, 2.6, .006, '#6b5040'); } // a sawhorse
-  if (hasTech('steam')) box(.2, -.18, .1, .08, 0, 4, '#8f8a86');
-}
 function stoneCol(i) { const b = M.bio[i]; return b === BIO.ROCK ? '#bdb6cf' : b === BIO.HIGH ? '#dcc39c' : b === BIO.SNOW ? '#d8d7e2' : '#cfc8bb'; }
-function drawQuarry(B, i) {
-  const sc = stoneCol(i);
-  glPit(0, 0, .36, .34, 9, shade(sc, 1.03), sc, shade(sc, .9), 3, M_STONE);
-  for (const [u, w, z] of [[.12, .14, .3], [.22, .02, .3], [.36, .12, 0], [.36, .26, 0], [.36, .19, 2.2], [.2, .38, 0]]) box(u, w, .055, .05, z, 2.2, shade(sc, 1.04)); // cut blocks waiting to be carted off
-  glDerrick(-.34, .3); if (hasTech('steam')) box(-.38, -.34, .08, .07, 0, 3.5, '#8f8a86'); // (its boom swings: works.js)
-}
-function drawClaypit(B, i) {
-  const v = B.var || 0;
-  glPit(0, 0, .22, .2, 3, '#caa27c', '#a85c44', '#b8664a', 1);
-  disc(-.08, -.05, .08, .3, '#7fb2c4', -1); // a puddle
-  for (let r = 0; r < 2; r++) for (let k = 0; k < 4; k++) box(-.3 + k * .09, .32 + r * .08, .03, .02, 0, 1.2, r ? '#c9795c' : '#d68b6a'); // bricks drying
-  if (hasTech('brick')) { cyl(.3, -.2, .13, 0, 6, '#b06a52'); cone(.3, -.2, 6, .13, 7, '#a25f49'); cyl(.3, -.2, .04, 13, 2, '#8a4f3e'); } // a bottle kiln
-  else dome(.3, -.2, .15, 0, 7, '#b27058');
-  box(.3, -.07, .025, .004, .2, 2.4, '#3a2420'); // its mouth (the fire flickers: works.js)
-  if (v > .5) for (let k = 0; k < 3; k++) ball(.05 + k * .05, .25, .025, .9, .9, shade('#c98a66', .9 + k * .05), 0);
-}
-function drawLighthouse(B, st) { // on its rock: red and white bands, the lantern room, a cap (the beam sweeps: fx3d.js)
-  for (const [u, w, r] of [[0, 0, .3], [.14, .12, .16], [-.16, .1, .14], [.08, -.18, .15]]) ball(u, w, r, 0, 2.5, u ? '#cfc9dc' : '#b9b3c8', M_STONE);
-  box(.22, .2, .1, .08, 0, 4, '#ece6da'); roofGable(.22, .2, .1, .08, 4, 3, '#c0584f', '#ece6da', true); // the keeper's cottage
-  const rs = [.12, .11, .1, .09];
-  for (let k = 0; k < 4; k++) cyl(0, 0, rs[k], k * 9 + 2, 9, k % 2 ? '#c0584f' : '#f4f1ea');
-  cyl(0, 0, .115, 38, 1.2, '#3a3f4a'); cyl(0, 0, .07, 39.2, 5, '#cfe6ee', '#cfe6ee'); lamp(0, 0, 41.6, .045, '#fff3cf');
-  cone(0, 0, 44.2, .09, 5, '#c0584f');
-}
-function drawPasture(B, st) {
-  const v = B.var || 0, E = .43;
-  flat(0, 0, .46, .46, .15, '#b3d98c');
-  if (GLB.lod) for (let k = 0; k < 7; k++) tuftAt(hash2(B.x * 7 + k, B.y, 21) * .8 - .4, hash2(B.x, B.y * 7 + k, 22) * .8 - .4, '#94c47a'); // grazed tufts
-  const corners = [[-E, -E], [E, -E], [E, E], [-E, E]], sw = GLB.wall; GLB.wall = M_PLANK; // a post-and-rail fence
-  for (const z of [1.2, 2.3]) { box(0, -E, E, .008, z, .35, '#8a6446'); box(0, E, E, .008, z, .35, '#8a6446'); box(-E, 0, .008, E, z, .35, '#8a6446'); box(E, 0, .008, E, z, .35, '#8a6446'); }
-  for (const [u, w] of corners.concat([[0, -E], [E, 0], [0, E], [-E, 0]])) box(u, w, .014, .014, 0, 2.8, '#7a5a44');
-  GLB.wall = sw;
-  box(-.25, -.25, .1, .08, 0, 4, mix(st.wall, '#a57f5e', .5)); roofGable(-.25, -.25, .12, .1, 4, 2.4, st.roof, st.wall, true);
-  box(.18, -.26, .09, .03, 0, 1.2, '#8a6446'); // the trough
-  sheepAt(.06, .12, 2.2, v < .5); sheepAt(.28, -.1, 1.8, v >= .5); if (v > .3) sheepAt(-.18, .26, 1.2, true);
-}
-function drawSandpit(B, i) {
-  const v = B.var || 0;
-  glPit(0, 0, .3, .26, 4, '#ecd5a8', '#d9b77f', '#e7cc98', 2, M_SAND);
-  for (const [u, w, s] of [[.3, .2, 1], [.22, .34, .8]]) ball(u, w, .12 * s, 0, 2.2 * s, '#efd9ad', M_SAND); // heaps of sand
-  box(-.32, .3, .08, .05, 1, 2, '#9b7657'); ball(-.32, .3, .065, 3, .9, '#ead3a2', M_SAND); // a cart full of it
-  for (const s of [-1, 1]) { GLB.mat = 0; glOBox(gw(-.32 + s * .05, .36, 1), [.02, 0, 0], [0, 0, .006], [0, .02, 0], '#6b5040'); }
-  if (v > .5) beam(-.1, -.3, 0, -.08, -.32, 6, .004, '#7a5a44'); // a spade left standing in a heap
-}
 
 /* ---------- houses: no two quite alike, and terraces where the street fills up ---------- */
 const SHAPE_HM = { tall: 1.45, low: .7 }, SHAPE_WM = { tall: .86, low: 1.12 };
@@ -563,56 +279,11 @@ function drawFarm(B, i) {
     if (au) flat(0, o, .42, .05, 2, col); else flat(o, 0, .05, .42, 2, col);
   }
   for (const [u, w] of [[-.46, -.46], [.46, -.46], [-.46, .46], [.46, .46]]) post(u, w, 2.5, .007, '#8a6d57'); // corner posts
+  if (GLB.lod && hash2(B.x, B.y, 77) < .3 && B.prog >= 1) { kSet(GLB.x, GLB.y, [1, 0, 0], [0, 0, 1], B.id); const s = au ? .4 : .27, f = au ? .27 : .4; // a scarecrow
+    kBox(s, f, 0, .004, .004, .14, '#6b5040', M_PLANK); kBeam([s - .04, f, .1], [s + .04, f, .1], .003, '#6b5040', M_PLANK); kBox(s, f, .07, .018, .012, .045, ['#6a5a8a', '#8a4a3a', '#4a6a5a'][(B.id | 0) % 3], M_PLANK);
+    kBlob(s, f, .13, .014, .015, '#d8b86a', M_THATCH); kCone(s, f, .14, .022, .025, '#3a3430', 8, 0); for (const dd of [-1, 1]) kBlob(s + dd * .043, f, .1, .006, .01, '#d8b86a', M_THATCH); }
 }
 
-function drawPlaza(B, st) {
-  const pave = B.style >= 2 ? mix(st.wall, '#d8d0c4', .6) : '#cdb79a';
-  flat(0, 0, .47, .47, .3, pave);
-  if (GLB.lod) { if (dsRound()) for (const r of [.2, .34]) ring(0, 0, r, .01, .35, shade(pave, .85)); else for (let k = -2; k <= 2; k++) { flat(k * .18, 0, .004, .47, .35, shade(pave, .85)); flat(0, k * .18, .47, .004, .35, shade(pave, .85)); } }
-  if (B.style < 2) { // the village fire: a ring of stones, the embers glowing
-    for (let k = 0; k < 9; k++) { const a = k / 9 * TAU; ball(Math.cos(a) * .1, Math.sin(a) * .1, .025, .6, .8, '#6d5a4c', M_STONE); }
-    GLB.mat = 0; glOBox(gw(0, 0, .8), [.06, 0, 0], [0, 0, .06], [0, .012, 0], '#e98b4a', 3);
-    for (const a of [.4, 2.5, 4.4]) beam(Math.cos(a) * .06, Math.sin(a) * .06, .6, -Math.cos(a) * .02, -Math.sin(a) * .02, 3, .008, '#5a4030');
-    return;
-  }
-  for (const [u, w] of [[-.42, .42], [.42, -.42]]) { post(u, w, 8, .006, '#4c4f58'); lamp(u, w, 8.3, .016); }
-  cyl(0, 0, .2, 0, 2.2, shade(pave, .9), '#7fc7de');
-  if (B.statue) { box(0, 0, .06, .06, 2.2, 5, '#d8d2c8'); figure(0, 0, 7.2, .7, '#b9a99a'); }
-  else { cyl(0, 0, .05, 2.2, 3, shade(pave, .95), '#bfe7f2'); if (GLB.lod) post(0, 0, 3, .008, '#cfeff6', 5.2); } // a fountain and its jet
-}
-function figure(u, v, z, s, col, armUp) { // a stone figure on its plinth: legs, a robe, arms, a head
-  const sv = GLB.wall; GLB.wall = M_STONE;
-  box(u, v, .03 * s, .025 * s, z, 5 * s, col); box(u, v, .04 * s, .03 * s, z + 5 * s, 5 * s, shade(col, 1.05)); ball(u, v, .022 * s, z + 11.5 * s, 1.4 * s, col, M_STONE);
-  if (armUp) beam(u + .03 * s, v, z + 9 * s, u + .07 * s, v, z + 15 * s, .008 * s, col, M_STONE);
-  GLB.wall = sv;
-}
-function drawMonument(B, st) {
-  const k = B.sub || 'obelisk', ac = st.accent;
-  box(0, 0, .44, .44, 0, 2, '#d9d1c4');
-  switch (k) {
-    case 'statue': { box(0, 0, .14, .14, 2, 10, '#e2dbcf'); figure(0, 0, 12, 1.3, '#c9b8a6', true); glowAt(.09, 0, 31, .018, '#e5874f'); return; } // the founder, a torch held high
-    case 'lantern': { box(0, 0, .16, .16, 2, 48, shade(st.wall, 1.02)); windows(0, 0, .16, .16, 2, 48, 6, 1, st.glass); GLB.mat = 0; glOBox(gw(0, 0, 54), [.22, 0, 0], [0, 0, .22], [0, 4 * ZS, 0], '#ffe39a', 2); roofPyr(0, 0, .23, .23, 58, 10, st.roof); return; }
-    case 'spire': { roofPyr(0, 0, .3, .3, 2, 74, shade(st.wall, 1.02)); box(0, 0, .31, .31, 2, 3, ac); return; }
-    case 'harp': { // a great harp: its frame a curve of bronze, strings catching the light
-      const P = f => [-.3 + f * .6, .1 - f * .2, 2 + Math.sin(f * Math.PI) * 80 * (1 - f * .4)];
-      for (let q = 0; q < 12; q++) { const a = P(q / 12), b = P((q + 1) / 12); beam(a[0], a[1], a[2], b[0], b[1], b[2], .02, ac); }
-      if (GLB.lod) for (let q = 1; q < 9; q++) { const p = P(q / 9.5); beam(p[0], p[1], 2, p[0], p[1], p[2] - 2, .0025, '#f4f0e6'); }
-      return;
-    }
-    case 'gardens': { for (let t = 0; t < 4; t++) { box(0, 0, .42 - t * .09, .42 - t * .09, 2 + t * 9, 8, st.wall); box(0, 0, .43 - t * .09, .43 - t * .09, 10 + t * 9, 1.5, '#72c27a'); } parkTree(0, 0, .2, 38); return; } // hanging gardens, terrace on terrace
-    case 'colossus': { // a great Longstrider in stone
-      for (const [a, b] of [[-.2, -.15], [.2, -.15], [-.2, .15], [.2, .15]]) beam(a, b, 2, a * .5, b * .5, 18, .03, '#b7a58f', M_STONE);
-      ball(0, 0, .3, 22, 7, '#c7b59f', M_STONE); ball(-.05, 0, .2, 26, 3, '#8fbf88'); beam(.15, 0, 22, .4, 0, 30, .04, '#c7b59f', M_STONE); ball(.42, 0, .07, 31, 2.5, '#c7b59f', M_STONE); return;
-    }
-    case 'hall': { box(0, 0, .42, .34, 2, 18, shade(st.wall, 1.05)); for (let q = 0; q < 5; q++) cyl(-.34 + q * .17, .36, .025, 2, 17, '#f4efe6', null, 8); roofGable(0, 0, .44, .36, 20, 7, st.roof, st.wall, true); return; }
-    case 'clock': { box(0, 0, .18, .18, 2, 50, st.wall); for (const [a, b, al] of [[0, .182, 0], [.182, 0, 1], [0, -.182, 0], [-.182, 0, 1]]) clockFace(a, b, 42, .07, al); roofPyr(0, 0, .2, .2, 52, 14, st.roof); return; }
-    case 'orchard': { // a glass orchard: arches of glass over trees
-      for (let q = 0; q < 3; q++) { const u = -.35 + q * .35; for (let j = 0; j < 8; j++) { const a0 = j / 8 * Math.PI, a1 = (j + 1) / 8 * Math.PI; beam(u + Math.cos(a0) * .14, .2, 2 + Math.sin(a0) * 26, u + Math.cos(a1) * .14, .2, 2 + Math.sin(a1) * 26, .012, st.glass); } }
-      parkTree(-.1, 0, .1, 2); parkTree(.15, -.1, .4, 2); return;
-    }
-    default: { box(0, 0, .12, .12, 2, 52, '#ece6da'); roofPyr(0, 0, .12, .12, 54, 10, '#d6b85a'); glowAt(0, .122, 40, .02, ac); } // an obelisk with a stone that glows
-  }
-}
 
 function drawConstruction(B, st, i) {
   if (FLAT_TYPES[B.type]) { flat(0, 0, .44, .44, .3, B.type === 'farm' ? '#c79b72' : '#cdbda3'); if (B.type === 'farm') drawFarm(B, i); return; }

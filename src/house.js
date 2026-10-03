@@ -9,9 +9,7 @@
 // Everything is in world units: s along the street, f out towards it, y up from the ground.
 const WH_DOOR = ['#2f4f3f', '#6b2a2a', '#2a3a5a', '#2a2a2e', '#5a3a28', '#3f6b6b'], WH_TRIM = '#efe9dc', WH_STONE = '#cfc6b4';
 function whFits(B, st) { return B.tier === 4 && rowStyleOK(B) && !dsFlat() && !hasTech('computing') && (SHAPE_HM[st.shape] || 1) === 1; }
-GL_MODEL.house = function (B, st) {
-  if (!whFits(B, st)) return false; // (other houses still come from the shared art)
-  st = houseTint(st, B);
+function glWorkerHouse(B, st) { // (homes.js hands it the rowhouse; st is already tinted)
   const J = houseJoin(B), U = (J ? J.a : houseAx(B)) === 'u', X = GLB.x, Z = GLB.y, y0 = GLB.base, lod = GLB.lod;
   const fx = U ? 0 : 1, fz = U ? 1 : 0, sg = inb(X + fx, Z + fz) && netTile(idx(X + fx, Z + fz)) ? 1 : inb(X - fx, Z - fz) && netTile(idx(X - fx, Z - fz)) ? -1 : 1; // the street side
   const A = U ? [1, 0, 0] : [0, 0, 1], F = [fx * sg, 0, fz * sg], UP = [0, 1, 0];
@@ -118,4 +116,4 @@ GL_MODEL.house = function (B, st) {
     bx(s, (fB + f1) / 2, 0, w, (fB - f1) / 2, h2, wallC, wm); if (lod) win(s, f1, g0 + fh0 * .2, .035, fh0 * .27, 70, false, true);
     GLB.mat = rm; GLB.ctr = P(s, (fB + f1) / 2, h2 - .2); gquad(P(s - w - .02, f1 - .03, h2 - .01), P(s + w + .02, f1 - .03, h2 - .01), P(s + w + .02, fB, h2 + .12), P(s - w - .02, fB, h2 + .12), RC); }
   GLB.wall = sv; GLB.mat = 0;
-};
+}

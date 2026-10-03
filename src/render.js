@@ -203,6 +203,7 @@ function bridgeZ(i) {
 
 // the 3D garden: each free corner of the plot gets a bush, a flower bed, a tree or a clump of grass, and some plots a hedge
 function glYard(B, x, y) {
+  if (B.tier <= 3 && hFits(B) && B.prog >= 1) return; // (the first homes, cottages and townhouses bring their own gardens: homes.js)
   const row = houseJoin(B), big = B.tier > 3;
   if (!row && B.tier >= 1 && B.tier <= 3 && B.prog >= 1) glYardBits(B, x, y);
   for (const [u, v, k] of [[-.42, -.42, 0], [-.42, .42, 1], [.42, .42, 2], [.42, -.42, 3]]) {

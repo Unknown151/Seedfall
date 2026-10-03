@@ -497,15 +497,16 @@ function glHarbour(B) {
   }
   for (let k = 0; k < L; k++) {
     const s = -L / 2 + k + .5, h = hash2(B.x + k, B.y, 5);
-    // a warehouse at the back of each berth
-    const wh = (boxes ? 13 : steel ? 11 : 9) * ZS, wall = boxes ? '#98a2ab' : brick ? '#b8684f' : '#c8a77a';
-    const sv = GLB.wall; GLB.wall = boxes ? M_PLASTER : brick ? M_BRICK : M_PLANK;
-    gBox(P(s, -.24), V3s(A3, .4), V3s(D3, .2), wh, wall, GLB.wall);
-    if (boxes) gBox(P(s, -.24, y + wh), V3s(A3, .41), V3s(D3, .21), .012, '#6b737c', M_TAR);
-    else gRoof(P(s, -.24), V3s(A3, .4), V3s(D3, .2), y + wh, 4.5 * ZS, steel ? '#5d6670' : '#a0523c', wall);
-    gWins(P(s, -.03), A3, D3, .36, y + .03, boxes ? 3 : 2, 4, wh / (boxes ? 3.4 : 2.4), B.x * 3 + k);
-    GLB.mat = 0; glOBox(P(s + .22, -.035, y + wh * .3), V3s(A3, .07), V3s(D3, .004), [0, wh * .3, 0], '#4a3a30'); // the big door
-    GLB.wall = sv;
+    // a warehouse at the back of each berth (kit.js): loading doors up its front under a hoist, windows, a gable or a flat roof
+    const wh = (boxes ? 13 : steel ? 11 : 9) * ZS, wall = boxes ? '#98a2ab' : brick ? '#b8684f' : '#c8a77a', wm = boxes ? M_PLASTER : brick ? M_BRICK : M_PLANK, c = P(s, -.24), fl = boxes ? 3 : 2, fh = (wh - .02) / fl;
+    kSet(c[0], c[2], A3, D3, B.id * 7 + k); KF.y0 = y;
+    kPlinth(-.4, .4, -.2, .2, .02, '#a39a8c'); kBox(0, 0, .02, .4, .2, wh - .02, wall, wm);
+    kWins(-.4, .4, .2, .02, fh, fl, 5, { ty: boxes ? 'modern' : 'sash', hk: .48, arch: brick && !boxes ? 'seg' : null, wall, back: 1 }, q => q === 3, 0);
+    kWins(-.4, .4, -.2, .02, fh, fl, 4, { back: 1 }, null, 20);
+    kBox(.24, .2, .02, .055, .006, Math.min(.18, fh * .85), '#4a3a30', M_PLANK); // the big door
+    for (let f = 1; f < fl; f++) kBox(.24, .2, .02 + f * fh + fh * .15, .04, .006, fh * .6, '#5a4a3c', M_PLANK); // loft doors above it
+    if (KF.lod) { kBeam([.24, .2, wh - .01], [.24, .3, wh - .01], .007, '#5a4a3c', M_PLANK); kBeam([.24, .29, wh - .01], [.24, .29, wh * .45], .0015, '#3a3028'); kBox(0, .204, wh - .05, .2, .003, .028, boxes ? '#2f3a44' : '#efe2c0'); } // the hoist, its rope; the company's name
+    if (boxes) kFlat(-.4, .4, -.2, .2, wh, wall, .03); else kGable(-.4, .4, -.2, .2, wh, 4.5 * ZS, steel ? '#5d6670' : '#a0523c', { wall, wm });
     // a crane at each berth
     if (boxes) { // gantry: four legs, a beam and a boom out over the ship
       const hc = .95, col = h < .5 ? '#d6703a' : '#3f6f9f';
@@ -524,115 +525,13 @@ function glHarbour(B) {
   for (const s of [-L / 2 + .06, L / 2 - .06]) { gBox(P(s, .4), [.01, 0, 0], [0, 0, .01], 9 * ZS, '#4c4f58'); gBox(P(s, .4, y + 9 * ZS), [.025, 0, 0], [0, 0, .025], .04, '#fff3d0', 0, 2); }
 }
 
-// landmarks on their bigger lots
-function glBigHall(B, st) { // a grand town hall: a long range with a portico and a tower
-  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t];
-  const stone = hasTech('masonry'), wall = stone ? '#d9cfbd' : st.wall, h = 20 * ZS; GLB.wall = stone ? M_STONE : M_PLASTER;
-  gBox(P(0, -.05), V3s(A3, .85), V3s(D3, .3), h, wall, GLB.wall); gRoof(P(0, -.05), V3s(A3, .85), V3s(D3, .3), y + h, 7 * ZS, st.roof, wall);
-  gWins(P(0, .25), A3, D3, .8, y + .04, 3, 9, h / 3.3, B.x * 5 + B.y);
-  gBox(P(0, .3), V3s(A3, .26), V3s(D3, .08), .02, '#cfc6b4', M_STONE); // steps
-  for (let k = 0; k < 6; k++) gBox(P(-.22 + k * .088, .34, y + .02), [.014, 0, 0], [0, 0, .014], 12 * ZS, '#eee8dc', M_STONE); // columns
-  gBox(P(0, .34, y + .02 + 12 * ZS), V3s(A3, .27), V3s(D3, .06), .03, '#e4ddcf', M_STONE);
-  gBox(P(0, -.05, y + h), [.1, 0, 0], [0, 0, .1], 22 * ZS, wall, GLB.wall); // the tower
-  gBox(P(0, .055, y + h + 13 * ZS), [.03, 0, 0], [0, 0, .004], .06, '#f4f0e0', 0, .5); // its clock face, lit at night
-  GLB.mat = M_SLATE; glDomeAt(P(0, -.05)[0] - GLB.x, P(0, -.05)[2] - GLB.y, .1, (h + 22 * ZS) / ZS, 7, hasTech('steam') ? '#6f8f84' : st.roof, 0, M_SLATE);
-  GLB.wall = 0;
-}
-function glBigMuseum(B, st) { // a classical museum: stone, a colonnade, a pediment, and later a glass roof
-  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t];
-  const h = 15 * ZS; GLB.wall = M_STONE;
-  gBox(P(0, 0, y), V3s(A3, .88), V3s(D3, .42), .04, '#cfc6b4', M_STONE); // plinth
-  gBox(P(0, -.06, y + .04), V3s(A3, .8), V3s(D3, .3), h, '#e2dccf', M_STONE);
-  for (let k = 0; k < 10; k++) gBox(P(-.72 + k * .16, .3, y + .04), [.016, 0, 0], [0, 0, .016], h - .02, '#f2eee4', M_STONE);
-  gBox(P(0, .12, y + .02 + h), V3s(A3, .84), V3s(D3, .24), .03, '#e8e2d6', M_STONE);
-  gRoof(P(0, .12), V3s(A3, .84), V3s(D3, .24), y + .05 + h, 5 * ZS, '#8d8a86', '#efe9dd');
-  if (hasTech('computing')) { GLB.mat = M_GLASS; const c = P(0, -.25, y + .04 + h); glBoxW(c[0], c[2], .16, c[1], 8 * ZS, '#9fc4d8', .5); } // a glass lantern on the roof
-  GLB.wall = 0;
-}
-function glBigTheatre(B, st) { // a fly tower behind a rounded auditorium, lights round the front at night
-  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t];
-  const wall = hasTech('brick') ? '#b8684f' : st.wall; GLB.wall = hasTech('brick') ? M_BRICK : M_PLASTER;
-  gBox(P(-.35, -.05), V3s(A3, .35), V3s(D3, .32), 26 * ZS, wall, GLB.wall); gRoof(P(-.35, -.05), V3s(D3, .32), V3s(A3, .35), y + 26 * ZS, 5 * ZS, st.roof, wall); // the fly tower
-  const c = P(.25, 0); GLB.mat = GLB.wall; glCylAt(c[0] - GLB.x, c[2] - GLB.y, .42, 0, 15, wall, st.roof); // the auditorium
-  GLB.mat = M_SLATE; glDomeAt(c[0] - GLB.x, c[2] - GLB.y, .42, 15, 6, st.roof, 0, M_SLATE);
-  for (let k = 0; k < 12; k++) { const t = (k / 11 - .5) * 2.2, p = [c[0] + Math.cos(t) * .43 * d[0] + Math.sin(t) * .43 * a[0], y + 11 * ZS, c[2] + Math.cos(t) * .43 * d[1] + Math.sin(t) * .43 * a[1]]; glOBox(p, [.012, 0, 0], [0, 0, .012], [0, .012, 0], '#ffe7a0', .5); } // marquee lights
-  GLB.wall = 0;
-}
-function glBigUniversity(B, st) { // four ranges round a green quad, and a clock tower over the gate
-  const [lx, lz] = glLot(B), y = GLB.base, stone = hasTech('masonry'), wall = hasTech('brick') && !stone ? '#b8684f' : '#d8c9a8', h = 18 * ZS; GLB.wall = stone ? M_STONE : M_BRICK;
-  const R = [[0, -.72, 1, 0, .88, .16], [0, .72, 1, 0, .88, .16], [-.72, 0, 0, 1, .56, .16], [.72, 0, 0, 1, .56, .16]]; // x, z, along x, along z, half length, half depth
-  for (const [ox, oz, ax, az, hl, hd] of R) {
-    const c = [lx + ox, y, lz + oz], f = [ax * hl, 0, az * hl], r = [az * hd, 0, ax * hd];
-    gBox(c, f, r, h, wall, GLB.wall); gRoof(c, f, r, y + h, 6 * ZS, st.roof, wall);
-    for (const sg of [1, -1]) gWins(V3a(c, V3s(r, sg)), [ax, 0, az], V3s(r, sg), hl * .9, y + .03, 3, Math.round(hl * 9), h / 3.3, (lx * 11 + ox * 7 + sg) | 0);
-  }
-  gBox([lx, y, lz], [.55, 0, 0], [0, 0, .55], .012, '#6f9a52', M_GRASS); // the quad
-  glSmallTree(lx - GLB.x - .25, lz - GLB.y + .2, 0, .4, 1.1, '#5f9a4d'); glSmallTree(lx - GLB.x + .28, lz - GLB.y - .22, 0, .7, 1, '#6aa556');
-  const tw = [lx, y, lz + .72]; gBox(tw, [.1, 0, 0], [0, 0, .1], 34 * ZS, wall, GLB.wall); // the tower
-  gBox([tw[0], y + 26 * ZS, tw[2] + .102], [.035, 0, 0], [0, 0, .002], .07, '#f4f0e0', 0, .5); // clock
-  gSpire([tw[0], y + 34 * ZS, tw[2]], .11, 12 * ZS, st.roof);
-  GLB.wall = 0;
-}
-function glBigStadium(B) { // a bowl of stands round a striped pitch, floodlights on masts
-  const [lx, lz] = glLot(B), y = GLB.base, n = 28, rx = .95, rz = .95, ix = .62, iz = .45, top = y + 9 * ZS;
-  const P = (t, fx, fz, yy) => [lx + Math.cos(t) * fx, yy, lz + Math.sin(t) * fz];
-  GLB.mat = M_STONE; const cw = gcol('#b0a898'), seats = [gcol(hasTech('motor') ? '#5b8fc4' : '#b3aa9b'), gcol(hasTech('motor') ? '#dd7466' : '#c4bcae'), gcol('#ece7dc')];
-  for (let tier = 0; tier < 3; tier++) { // three rings of seats, each a step higher and further out
-    const f0 = tier / 3, f1 = (tier + 1) / 3, fx0 = ix + (rx - ix) * f0, fx1 = ix + (rx - ix) * f1, fz0 = iz + (rz - iz) * f0, fz1 = iz + (rz - iz) * f1, y0 = y + .02 + (top - y) * f0, y1 = y + .02 + (top - y) * f1;
-    for (let k = 0; k < n; k++) { const t0 = k / n * TAU, t1 = (k + 1) / n * TAU;
-      GLB.ctr = [lx, y1 + 2, lz]; gquad(P(t0, fx0, fz0, y0), P(t1, fx0, fz0, y0), P(t1, fx1, fz1, y1), P(t0, fx1, fz1, y1), seats[tier]);
-      GLB.ctr = [lx, y - 2, lz]; gquad(P(t0, fx0, fz0, y0), P(t1, fx0, fz0, y0), P(t1, fx0, fz0, y0 - (y1 - y0) * .15), P(t0, fx0, fz0, y0 - (y1 - y0) * .15), cw); } // (the riser in front of each tier)
-  }
-  for (let k = 0; k < n; k++) { const t0 = k / n * TAU, t1 = (k + 1) / n * TAU; GLB.ctr = [lx, y, lz]; gquad(P(t0, rx, rz, y), P(t1, rx, rz, y), P(t1, rx, rz, top + .03), P(t0, rx, rz, top + .03), cw); } // the outer wall
-  if (hasTech('concrete')) for (let k = 0; k < n; k++) { const t0 = k / n * TAU, t1 = (k + 1) / n * TAU; if (Math.sin(t0) < .2) continue; GLB.ctr = [lx, top - 1, lz]; GLB.mat = 0; gquad(P(t0, rx, rz, top + .03), P(t1, rx, rz, top + .03), P(t1, rx * .8, rz * .8, top + .09), P(t0, rx * .8, rz * .8, top + .09), gcol('#e8ecf0')); } // a roof over the main stand
-  for (let k = 0; k < 6; k++) gBox([lx - ix * .8 + k * ix * .32, y, lz], [ix * .16, 0, 0], [0, 0, iz * .78], .012, k % 2 ? '#5f9a4d' : '#6aa556', M_GRASS); // the pitch
-  if (hasTech('electric')) for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = [lx + sx * .78, y, lz + sz * .78]; gBox(p, [.018, 0, 0], [0, 0, .018], 30 * ZS, '#8c9199'); gBox([p[0], y + 30 * ZS, p[2]], [.06, 0, 0], [0, 0, .02], .05, '#fff8e0', 0, 2); }
-}
-function glBigFusion(B) { // twin containment domes, a cooling ring and a blue glow
-  const [lx, lz] = glLot(B), y = GLB.base;
-  gBox([lx, y, lz], [.85, 0, 0], [0, 0, .85], .03, '#c4c9cf', M_STONE);
-  for (const sx of [-.42, .42]) { GLB.mat = M_PLASTER; glCylAt(lx + sx - GLB.x, lz - .15 - GLB.y, .3, 0, 8, '#e8edf2', '#e8edf2'); glDomeAt(lx + sx - GLB.x, lz - .15 - GLB.y, .3, 8, 12, '#eef2f6', 0, M_PLASTER); }
-  GLB.mat = 0; glCylAt(lx - GLB.x, lz + .45 - GLB.y, .26, 0, 3, '#7fe8e0', null); // the ring's glow
-  gBox([lx, y, lz + .45], [.3, 0, 0], [0, 0, .06], 4 * ZS, '#9aa3ad', M_PLASTER);
-  gBox([lx, y + 3 * ZS, lz + .45], [.02, 0, 0], [0, 0, .02], .02, '#7fe8e0', 0, 2);
-}
-function glBigStation(B, st) { // a station house with a clock, and a long platform under a canopy
-  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s2, t, yy = y) => [lx + a[0] * s2 + d[0] * t, yy, lz + a[1] * s2 + d[1] * t];
-  const glass = hasTech('concrete'), wall = hasTech('brick') ? '#b8684f' : st.wall, h = 14 * ZS; GLB.wall = hasTech('brick') ? M_BRICK : M_PLASTER;
-  gBox(P(-.35, .12), V3s(A3, .4), V3s(D3, .24), h, wall, GLB.wall); gRoof(P(-.35, .12), V3s(A3, .4), V3s(D3, .24), y + h, 6 * ZS, st.roof, wall);
-  gWins(P(-.35, .36), A3, D3, .34, y + .03, 2, 5, h / 2.4, B.x * 3 + B.y);
-  gBox(P(-.35, .37, y + h - .02), [.035, 0, 0], [0, 0, .035], .07, '#f4f0e0', 0, .5); // the clock
-  gBox(P(0, -.3), V3s(A3, .95), V3s(D3, .14), .035, '#bdb5a7', M_STONE); // the platform
-  for (let k = 0; k < 6; k++) gBeam(P(-.8 + k * .32, -.3, y + .035), P(-.8 + k * .32, -.3, y + 12 * ZS), .01, glass ? '#8c9199' : '#3d4a44');
-  if (glass) gBox(P(0, -.3, y + 12 * ZS), V3s(A3, .95), V3s(D3, .2), .012, '#bfe3f0', 0, 0); // glass canopy
-  else gRoof(P(0, -.3), V3s(A3, .95), V3s(D3, .2), y + 12 * ZS, 3 * ZS, '#5d6670', '#3d4a44');
-  for (let k = 0; k < 3; k++) gBox(P(-.6 + k * .5, -.28, y + .035), V3s(A3, .07), V3s(D3, .02), .02, '#6b5040', M_PLANK); // benches
-  GLB.wall = 0;
-}
-function glBigMarket(B, st) { // a cobbled market street of stalls under striped awnings, or later a glass market hall
-  const { a, d } = glFacing(B), [lx, lz] = glLot(B), y = GLB.base, A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]], P = (s2, t, yy = y) => [lx + a[0] * s2 + d[0] * t, yy, lz + a[1] * s2 + d[1] * t];
-  gBox(P(0, 0, y - .005), V3s(A3, .98), V3s(D3, .48), .02, '#a39a8c', M_COBBLE);
-  if (hasTech('concrete')) { // the market hall
-    GLB.wall = M_BRICK; gBox(P(0, 0), V3s(A3, .85), V3s(D3, .38), 11 * ZS, '#b8684f', M_BRICK);
-    gWins(P(0, .38), A3, D3, .8, y + .03, 1, 8, 9 * ZS, B.x * 5 + B.y);
-    GLB.wall = M_GLASS; const c0 = P(0, 0); GLB.mat = M_GLASS; glOBox([c0[0], y + 11 * ZS + .06, c0[2]], V3s(A3, .86), V3s(D3, .39), [0, .06, 0], '#9fc4d8', .5); GLB.wall = 0; return;
-  }
-  const cols = [['#c0584f', '#f2ece0'], ['#3f7fb0', '#f2ece0'], ['#4e9a6a', '#f2ece0'], ['#e0a43a', '#6b5040']], food = ['#c0392b', '#e0a43a', '#6aa556', '#8a5a9a', '#d8b86a'];
-  for (let r2 = 0; r2 < 2; r2++) for (let k = 0; k < 4; k++) { // two rows of stalls facing each other
-    const s2 = -.72 + k * .48, t = r2 ? .26 : -.26, c = cols[(k + r2 * 2 + B.id) % cols.length], out = r2 ? -1 : 1;
-    gBox(P(s2, t), V3s(A3, .17), V3s(D3, .08), 3.2 * ZS, '#8a6a4c', M_PLANK); // the table
-    for (let q = 0; q < 4; q++) gBox(P(s2 - .12 + q * .08, t, y + 3.2 * ZS), [.022, 0, 0], [0, 0, .022], .025, food[(k * 3 + q + r2) % food.length]); // what's for sale
-    for (const [sa, ta] of [[-.16, -.08], [.16, -.08], [-.16, .08], [.16, .08]]) gBeam(P(s2 + sa, t + ta), P(s2 + sa, t + ta, y + 9 * ZS), .005, '#5a4030');
-    for (let q = 0; q < 4; q++) { const sa = -.18 + q * .09; GLB.ctr = P(s2, t, y); GLB.mat = 0; gquad(P(s2 + sa, t - .1 * out, y + 9 * ZS), P(s2 + sa + .09, t - .1 * out, y + 9 * ZS), P(s2 + sa + .09, t + .14 * out, y + 7 * ZS), P(s2 + sa, t + .14 * out, y + 7 * ZS), gcol(c[q % 2])); } // the striped awning, sloping out over the lane
-  }
-}
-const GL_BIG = { station: glBigStation, market: glBigMarket, hall: glBigHall, museum: glBigMuseum, theatre: glBigTheatre, university: glBigUniversity, stadium: glBigStadium, fusion: glBigFusion };
+const GL_BIG = {}; // the landmarks on their bigger lots: civic.js (hall, museum, theatre, station, market, university), modern.js (stadium, fusion)
 
 /* ---------- building sites in 3D: rising walls (or the old house, being done up) in scaffolding, materials stacked by, a crane on tall ones ---------- */
 function glBuildSite(B, st, f, hh) {
   const C0 = gw(0, 0, 0), x = C0[0], z = C0[2], y = GLB.base, steel = hasTech('concrete'), pole = steel ? '#8c939b' : '#a07f58', plank = steel ? '#b8a37a' : '#8f6f4c';
   let top = 0, hw = .3;
-  if (B.type === 'house' && B.up != null && B.tier >= 1) { const sv = B.prog; B.prog = 1; try { drawHouse(B, st); } finally { B.prog = sv; } top = HOUSE_H[B.tier] * .7; hw = .38; } // the old house stays up while it's done up
+  if (B.type === 'house' && B.up != null && B.tier >= 1) { const sv = B.prog; B.prog = 1; try { if (GL_MODEL.house(B, st) === false) drawHouse(B, st); } finally { B.prog = sv; } top = HOUSE_H[B.tier] * .7; hw = .38; } // the old house stays up while it's done up
   else if (f >= .2) { const h = Math.max(2, hh * Math.min(1, (f - .2) / .8)); top = h; GLB.wall = GLB.B ? glWallMat(GLB.B) : M_PLASTER; box(0, 0, .28, .28, 0, h, st.wall); hw = .3; } // walls going up
   const H = Math.max(top + 3, f < .2 ? 3 : 0) * ZS, o = hw + .05, mat = steel ? 0 : M_PLANK;
   if (f >= .2 || top) {
@@ -665,40 +564,7 @@ function gCone(u, v, r, z0, h, col, n = 12) { // a cone standing on tile-local (
   const c = gcol(col), A = gw(u, v, z0 + h); GLB.ctr = gw(u, v, z0 - 1); GLB.mat = roofMat(c);
   for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gtri(gw(u + Math.cos(a) * r, v + Math.sin(a) * r, z0), gw(u + Math.cos(b) * r, v + Math.sin(b) * r, z0), A, c); }
 }
-const GL_MODEL = {
-  well(B, st) { // a stone ring of water under a little roof, with a windlass and a bucket (a pump once the style turns modern)
-    const x = GLB.x, z = GLB.y, y = GLB.base;
-    if (B.style >= 4) { gBox([x, y, z], [.1, 0, 0], [0, 0, .1], 5 * ZS, '#8c96a3', M_STONE); gBeam([x + .1, y + 4 * ZS, z], [x + .22, y + 4 * ZS, z], .012, '#6c7683'); return; }
-    GLB.wall = M_STONE; glCylAt(0, 0, .15, 0, 3.5, '#bdb3a6', '#4f9cbc', 14); GLB.wall = 0;
-    for (const s of [-1, 1]) gBeam([x + s * .13, y + 3 * ZS, z], [x + s * .13, y + 9.2 * ZS, z], .012, '#7a5a44', M_PLANK);
-    gBeam([x - .15, y + 7.6 * ZS, z], [x + .15, y + 7.6 * ZS, z], .008, '#5f4636', M_PLANK); // the windlass
-    if (GLB.lod) { gBeam([x, y + 7.6 * ZS, z], [x, y + 5.4 * ZS, z], .002, '#c9b48a'); gBox([x, y + 4.6 * ZS, z], [.022, 0, 0], [0, 0, .022], 1.6 * ZS, '#6b5040', M_PLANK); } // its rope and bucket
-    gRoof([x, 0, z], [.19, 0, 0], [0, 0, .12], y + 9 * ZS, 3.2 * ZS, st.roof, st.wall);
-  },
-  granary(B, st) { // a round store up on staddle stones (so the rats can't climb in), with a steep roof and a ladder to its door
-    const x = GLB.x, z = GLB.y, y = GLB.base, wall = mix(st.wall, '#d9c29a', .4);
-    for (const [a, b] of [[-.12, -.12], [.12, -.12], [-.12, .12], [.12, .12]]) gBox([x + a, y, z + b], [.025, 0, 0], [0, 0, .025], 2.2 * ZS, '#a49c90', M_STONE);
-    GLB.wall = GLB.B ? glWallMat(GLB.B) : M_PLANK; glCylAt(0, 0, .2, 2.2, 10, wall, wall, 14); GLB.wall = 0;
-    gCone(0, 0, .26, 12.2, 8, st.roof);
-    gBox([x, y + 2.3 * ZS, z + .198], [.04, 0, 0], [0, 0, .008], 4.2 * ZS, '#5a4a40', M_PLANK); // its door, up off the ground
-    if (GLB.lod) for (const s of [-1, 1]) gBeam([x + s * .03, y, z + .34], [x + s * .03, y + 2.6 * ZS, z + .21], .004, '#6b5040', M_PLANK); // and the ladder
-  },
-  shrine(B, st) { // a stone plinth, a white pillar under a little pointed roof, and a candle burning before it
-    const x = GLB.x, z = GLB.y, y = GLB.base;
-    gBox([x, y, z], [.28, 0, 0], [0, 0, .28], 1.6 * ZS, '#d6cfc3', M_STONE);
-    GLB.wall = M_STONE; gBox([x, y + 1.6 * ZS, z], [.07, 0, 0], [0, 0, .07], 15 * ZS, '#e8e2d6', M_STONE); GLB.wall = 0;
-    glPyr(0, 0, .075, .075, 16.6, 4, st.accent);
-    gBox([x + .1, y + 1.6 * ZS, z + .22], [.012, 0, 0], [0, 0, .012], .9 * ZS, '#ffd27a', 0, 2); // the candle
-    if (GLB.lod) for (let k = 0; k < 3; k++) glBlob(-.16 + k * .1, .24, .03, 1.9, .9, FLOWER_C[(k + B.id) % FLOWER_C.length], 0); // flowers left on the plinth
-  },
-  watchstone(B, st) { // a tall pale obelisk with a gilded cap and a glowing teal stone set in its face
-    const x = GLB.x, z = GLB.y, y = GLB.base;
-    gBox([x, y, z], [.3, 0, 0], [0, 0, .3], 2 * ZS, '#d2cabd', M_STONE);
-    gBox([x, y + 2 * ZS, z], [.09, 0, 0], [0, 0, .09], 28 * ZS, '#e9e3d8', M_STONE);
-    gSpire([x, y + 30 * ZS, z], .095, 6 * ZS, '#d6b85a');
-    gBox([x, y + 23 * ZS, z + .092], [.03, 0, 0], [0, 0, .006], .03, '#5fd0c9', 0, 2);
-  }
-};
+const GL_MODEL = {}; // (filled in by homes.js, civic.js, industry.js and modern.js)
 function glSheep(X, Z, y0, s, ang, ph = -1) { // a woolly body, a black face and four legs, in world units; ph >= 0: walking
   const f = [Math.cos(ang), 0, Math.sin(ang)], r = [-Math.sin(ang), 0, Math.cos(ang)], u = X - GLB.x, v = Z - GLB.y, zz = (y0 - GLB.base) / ZS;
   for (const [a, b, q] of [[.03, .018, 0], [.03, -.018, Math.PI], [-.03, .018, Math.PI], [-.03, -.018, 0]]) glLimb([X + f[0] * a * s + r[0] * b * s, y0 + 1.1 * s * ZS, Z + f[2] * a * s + r[2] * b * s], f, r, ph >= 0 ? Math.sin(ph + q) * .45 : 0, 1.1 * s * ZS, .007 * s, '#3a3430');

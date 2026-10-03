@@ -87,6 +87,8 @@ function glTurbine(B) { // a tall white tower on its pad and the nacelle on top 
   gBox([X, y, Z], [.13, 0, 0], [0, 0, .13], .02, '#cfcac4', M_STONE);
   GLB.wall = 0; glCylAt(0, 0, .045, 0, 28, '#f2f3f5', '#f2f3f5', 10); glCylAt(0, 0, .034, 28, 27, '#f2f3f5', '#f2f3f5', 10);
   gBox([X + .03, y + 55 * ZS, Z], [.08, 0, 0], [0, 0, .035], 3.2 * ZS, '#e7e9ec');
+  kSet(X, Z, [1, 0, 0], [0, 0, 1], B.id); kDoor(0, .044, .018, .075, '#c9ced4', { ty: 'plank', y: .02 }); // a door at its foot, and the kiosk the power goes out through
+  kBox(.16, .08, 0, .035, .025, .055, '#d6dade', M_PLASTER); if (KF.lod) { kBox(.16, .106, .005, .02, .002, .035, '#9aa3ad'); kBox(.16, .106, .04, .006, .002, .006, '#e0a43a'); }
 }
 // the shipyard: a slipway running down into the water, a hull on it with its ribs up and part planked, a gantry and the shed
 function glShipyard(B, st) {
@@ -102,7 +104,10 @@ function glShipyard(B, st) {
       gquad(P(a, -.05, zb), P(a1, -.05, zb1), P(a1, .05, zb1), P(a, .05, zb), C); } }
   for (const b of [-.3, .3]) gBeam(P(.15, b, 0), P(.15, b, 20), .014, '#c8553d'); // the gantry (its hoist moves: GLW.shipyard)
   gBeam(P(.15, -.31, 20), P(.15, .31, 20), .014, '#c8553d'); gBox(P(.15, .3, 20.6), [.012, 0, 0], [0, 0, .012], .02, '#ff4d4d', 0, 2);
-  box(-d[0] * .3, -d[1] * .3, .16, .16, 0, 7, st.wall); roofGable(-d[0] * .3, -d[1] * .3, .17, .17, 7, 4, st.roof, st.wall, true);
+  { const c = gw(-d[0] * .3, -d[1] * .3, 0), [wc, wm] = kWall(B, st); kSet(c[0], c[2], [d[1], 0, d[0]], [d[0], 0, d[1]], B.id); // the shed: big doors to the slip, windows, a gable, timber stacked by
+    kPlinth(-.16, .16, -.16, .16, .02); kBox(0, 0, .02, .16, .16, .3, wc, wm); kBox(0, .16, .02, .1, .006, .22, '#4a3a30', M_PLANK); if (KF.lod) for (const dd of [-1, 1]) kBeam([dd * .1, .168, .03], [0, .168, .2], .003, '#3a2a20', M_PLANK);
+    kWalls(-.16, .16, -.16, .16, (a, b, ff, q) => kWins(a, b, ff, .02, .28, 1, 2, { back: 1, hk: .45 }, null, q * 5), 14); kGable(-.17, .17, -.16, .16, .32, .14, st.roof, { wall: wc, wm });
+    if (KF.lod) for (let q = 0; q < 4; q++) kLog([-.2, -.22 + q * .03, .016], [.12, -.22 + q * .03, .016], .014, '#9b7657', '#d8b98a'); }
 }
 
 /* ---------- what moves, every frame (near the camera) ---------- */

@@ -250,6 +250,13 @@ QUARTERS, TERRACES AND REBUILDING
   gardens, a wash of colour of their own, and flat roofs with tanks, domes and
   awnings. Townhouses, rowhouses and flats on the same street join up into
   terraces and blocks, and the towers each have a shape and a tint of glass.
+  Come in close and everything is built properly: windows set in their
+  frames with sills and lintels (casements, then sashes, then steel and
+  glass), doors in their doorcases with fanlights and hoods, roofs with
+  ridges, gutters and chimney pots. Cottages have gardens with a path and a
+  gate, townhouses are timber-framed and jettied while the old styles last,
+  flats grow iron balconies and mansards, and the town hall, library, school,
+  theatre and the rest each look the part, down to the clock on the tower.
 
 BOATS, SHIPS AND PLANES
   Fishing boats leave their piers in the morning, fish all day (you can see

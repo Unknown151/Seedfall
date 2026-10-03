@@ -86,8 +86,11 @@ only, or a few invited emails.
 - Done: the building art is all 3D and tile-local (no screen points, no canvas, no 2D-only strokes); what only the 2D art had
   (the works' sawtooth roof, solar panels, masts and dishes, the launch gantry, clocks, crosses, banners, statues, the harp
   and the colossus, round fields and orchards, the plaza fire, dome lattices) is real geometry now.
-- Next: give the busiest types their own detailed models in the worker house's spirit (cottages and townhouses, the blocks
-  of flats, the market, the church-like landmarks), and more own-colour glows at night.
+- Done: detailed native models for nearly every type, from the kit (kit.js): every house tier (homes.js), the public
+  buildings and the big landmark lots (civic.js), the workplaces (industry.js), the shops, greens, modern works and the
+  monuments (modern.js).
+- Next: the same for what's left on the older art (the harbour's warehouses and quays, the shipyard, farms and their
+  farmhouses, the reshaping styles' houses: round, organic, tiered, tall, low), and more own-colour glows at night.
 - Done: incidents (incidents.js): a house fire, sheep loose in the market, a wedding procession, a river flood, a
   runaway cabbage cart and a whale on the beach.
 - Next: more incidents (a storm tearing tiles off roofs, a hot-air balloon that drifts off with the mayor, a mine
