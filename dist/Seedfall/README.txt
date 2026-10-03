@@ -69,10 +69,26 @@ THE WATCHER'S VOICE (optional, uses Claude)
     new town       settlers leave to found a town with the name you gave it
     night          warm, cool, colourful, candlelight or dark-sky nights; sky lanterns
     weather wish   sunny, rainy, snowy (in any season), foggy, stormy or mild
+    season         an endless spring, summer, autumn or winter (or back to the calendar)
+    sky            a golden, rosy, violet or green sky, or an aurora every night
+    houses         painted rainbow, pastel, whitewashed, earthy or bold; houses built
+                   of timber, stone, brick or whatever the land gives; winding or
+                   planned streets
+    trees          oaks, pines, birches, blossom or red maples, in the woods and towns
+    streets        bunting or paper lanterns strung across them, flags along them, or
+                   flower boxes under every window; bustling or quiet
+    people         when they go to bed (and so how many windows glow at night), what
+                   they wear, tall hats or flower crowns, dogs or cats
+    the valley     great flocks of birds (or none), fireworks most nights (or never)
+    ways of life   hard workers or an easy pace (buildings go up faster or slower),
+                   eager traders or towns that keep to themselves, seafarers (more
+                   ships) or landlubbers, devout (Reverence gathers faster, shrines go
+                   up) or secular, clean air or smoky works
     and            the crop every town grows, buildings they refuse to build, faster
                    or slower discoveries, more or fewer children
   Try "Only circular things are allowed", "Paint the valley pink", "Let it snow",
-  "Name the river after my cat Mittens" or "Protect the forests".
+  "Name the river after my cat Mittens", "Protect the forests", "Let the summer
+  never end", "Dance, lights in the sky" or "Everyone loves cats and festivals".
   C > Lore lists the customs in force. Like the rest of a teaching they fade over
   the centuries unless you speak again.
   "Town gossip" (off / hourly / every ~20 min) lets Claude write small vignettes about

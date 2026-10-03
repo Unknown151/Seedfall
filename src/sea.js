@@ -89,7 +89,7 @@ function edgeWater(from) { // somewhere out past the edge of the map, on the sam
 function edgeOut(i) { const x = i % W, y = (i / W) | 0; return x === 0 ? [-1, 0] : x === W - 1 ? [1, 0] : y === 0 ? [0, -1] : [0, 1]; }
 
 /* ---------- ships ---------- */
-const shipCap = () => 7 + Math.min(3, builtOf('shipyard').length); // shipyards put more ships on the water
+const shipCap = () => Math.round((7 + Math.min(3, builtOf('shipyard').length)) * (LVV.sea === 'seafaring' ? 1.6 : LVV.sea === 'landlubbers' ? .4 : 1)); // shipyards put more ships on the water (and a seafaring people more)
 function shipKind() { return hasTech('hover') ? 'hover' : hasTech('computing') ? 'boxship' : hasTech('electric') ? 'freighter' : hasTech('steam') ? 'steamer' : 'sail'; }
 function spawnShip(fromB, toB, r) {
   if (DYN.ships.length >= shipCap()) return null;

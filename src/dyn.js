@@ -11,10 +11,10 @@ function processFX() {
     const f = FXQ.shift();
     switch (f.k) {
       case 'caption': if (S.settings.captions) addCaption(f); break;
-      case 'fireworks': DYN.fireworks = (DYN.fireworks || []); DYN.fireworks.push({ x: f.x, y: f.y, t: 0, life: 9, next: 0 }); camHint(f.x, f.y, '🎆 Fireworks'); break;
+      case 'fireworks': if (LVV.fireworks === 'never') break; DYN.fireworks = (DYN.fireworks || []); DYN.fireworks.push({ x: f.x, y: f.y, t: 0, life: 9, next: 0 }); camHint(f.x, f.y, '🎆 Fireworks'); break;
       case 'rain': DYN.rains.push({ x: f.x, y: f.y, t: 0, life: f.big ? 16 : 10 }); break;
       case 'herd': spawnHerd(f.x, f.y, true); break;
-      case 'birds': spawnBirds(f.x, f.y); break;
+      case 'birds': if (LVV.birds !== 'none') spawnBirds(f.x, f.y); break;
       case 'giant': spawnGiant(); break;
       case 'meteors': DYN.meteorShower = 20; break;
       case 'comet': DYN.comet = { az: rf(-1.2, 1.2), el: rf(.45, .8), t: 0, life: 80 }; break;
@@ -116,6 +116,10 @@ function launchRocket(bid, seed) {
 function updateDyn(dt) {
   DYN.t += dt;
   stepIntro(dt);
+  if (!FAST && S && !S.flags.intro) { // customs from the Watcher's words: flocks of birds, fireworks most nights
+    if (LVV.birds === 'flocks' && chance(dt * .025)) spawnBirds();
+    if (LVV.fireworks === 'often' && (LIGHT.emK || 0) > .6 && chance(dt * .012)) { const T = pick(towns()); if (T) (DYN.fireworks = DYN.fireworks || []).push({ x: T.x + rf(-1.5, 1.5), y: T.y + rf(-1.5, 1.5), t: 0, life: 9, next: 0 }); }
+  }
   stepAgents(dt);
   stepBoats(dt); stepShips(dt); stepFerries(dt); stepPlanes(dt);
   for (const tr of DYN.trains) {

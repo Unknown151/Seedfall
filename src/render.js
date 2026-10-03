@@ -22,7 +22,7 @@ function markDirty(i) { if (GL3.on) glDirty(i); } // (the 3D chunk round this ti
 function markDirtyXY(x, y) { if (inb(x, y)) markDirty(idx(x, y)); }
 
 function renderAll() { // a new or loaded world: the light from scratch, every chunk rebuilt
-  LIGHT.sun = sunNow(); LIGHT.season = LIGHT.forceSeason || seasonNow(); LIGHT.seasonT = 300;
+  LIGHT.sun = sunNow(); LIGHT.season = seasonFor(); LIGHT.seasonT = 300;
   LIGHT.cur = LT = mkLight(envNow()); LIGHT.artKey = null; LIGHT.chk = 0;
   if (GL3.on) for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k);
 }
@@ -135,6 +135,7 @@ function tileVerge(i, x, y) {
   refreshOwn();
   const sf = M.road[i], T = OWN[i] ? S.T[OWN[i]] : null, inT = T && dist(x, y, T.x, T.y) <= townRadius(T) + 1, z = zoneAt(i), grass = leafC(shade(BIO_COL[M.bio[i]] || '#94d4a6', .72));
   const nb = roadNeighbors(M.road, x, y), wood = '#8a6d57';
+  if (inT && LVV.deco && LVV.deco !== 'flower_boxes') tileDeco(x, y, nb, T);
   for (const [u, v, k] of [[-.37, -.37, 0], [-.38, .37, 1], [.37, .38, 2]]) {
     const h = hash2(x, y, 300 + k);
     if (!inT) { // country roads: tufts, flowers, a bit of fence, a milestone, a road sign
@@ -171,6 +172,20 @@ function tileVerge(i, x, y) {
     else if (h < .62) { post(u, v, 7, .006, '#dfe7ef'); GLB.mat = 0; glOBox(gp(u, v, 7.5), [.016, 0, 0], [0, 0, .016], [0, .016, 0], '#8fe3ec', 2); }
     else if (h < .7) benchAt(u, v, '#cfd8e0');
   }
+}
+// streets dressed for the custom the Watcher's words began: bunting or paper lanterns strung across, flags on poles
+const BUNT = ['#d9534f', '#f2c14e', '#4a8fd0', '#5fae5f', '#f4f1ea', '#e070a8'], PLANT_C = ['#ffb45e', '#ff8a5e', '#ffd27a', '#ff9ad0'];
+function tileDeco(x, y, nb, T) {
+  const ew = nb.some(d => d[0]) && !nb.some(d => d[1]), ns = nb.some(d => d[1]) && !nb.some(d => d[0]), h = hash2(x, y, 707); if (!ew && !ns) return;
+  const d = LVV.deco, lod = GLB.lod, P = t => ew ? [0, -.48 + t * .96] : [-.48 + t * .96, 0];
+  if (d === 'flags') { if (h > .5) return; for (const sg of [-1, 1]) { const [u, v] = ew ? [sg * .1, -.44 * sg] : [-.44 * sg, sg * .1]; post(u, v, 15, .005, '#8c9199'); GLB.mat = 0; glOBox(gp(u + (ew ? .035 : 0), v + (ew ? 0 : .035), 13.6), ew ? [.032, 0, 0] : [.002, 0, 0], ew ? [0, 0, .002] : [0, 0, .032], [0, .022, 0], [BUNT[(x + y + (sg > 0 ? 1 : 0)) % BUNT.length], S.styles[S.styleIdx] ? S.styles[S.styleIdx].accent : '#d9534f'][h < .25 ? 1 : 0]); } return; }
+  if (h > .75) return;
+  const zt = 12 + h * 3, sag = 2.2, at = t => { const [u, v] = P(t); return gp(u, v, zt - Math.sin(t * Math.PI) * sag); }, n = 6;
+  for (let q = 0; q < n; q++) gBeam(at(q / n), at((q + 1) / n), .0012, '#d8d2c4'); // the string across the street
+  const m = lod ? 14 : 5;
+  for (let q = 1; q < m; q++) { const t = q / m, p = at(t);
+    if (d === 'bunting') { GLB.mat = 0; const a = ew ? [0, 0, .014] : [.014, 0, 0], nx = ew ? [.1, 0, 0] : [0, 0, .1], c = gcol(BUNT[(q + x + y) % BUNT.length]); for (const sg of [-1, 1]) { GLB.ctr = V3a(p, V3s(nx, sg)); gtri(V3a(p, V3s(a, -1)), V3a(p, a), [p[0], p[1] - .03, p[2]], c); } } // (both faces)
+    else { GLB.mat = 0; glOBox([p[0], p[1] - .016, p[2]], [.011, 0, 0], [0, 0, .011], [0, .013, 0], PLANT_C[(q + x) % PLANT_C.length], 3); } } // paper lanterns, glowing
 }
 // open grass: tufts, clover and wildflowers, thicker on lush ground
 function tileGround(i, x, y) {

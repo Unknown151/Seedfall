@@ -7,6 +7,8 @@ function hexOk(s) {
   if (/^#[0-9a-f]{3}$/.test(s)) return '#' + s.slice(1).split('').map(c => c + c).join('');
   return null;
 }
+const LV_MORE = { material: v => v !== 'local' ? '. Old houses get rebuilt that way, a few a year' : '', weather: () => '. The sky starts to listen within a minute or so',
+  housecol: () => '. Houses are repainted as the custom spreads', trees: () => '. The woods and gardens change over', faith: v => v === 'devout' ? ' (and more shrines go up)' : '' };
 function applyLevers(d, r, fx) {
   const lv = {};
   const a = r.architecture;
@@ -28,16 +30,9 @@ function applyLevers(d, r, fx) {
     fx.push(`New building style “${st.name}”${bits.length ? ': ' + bits.join(', ') : ''}. Everything new is built this way, and old buildings are renovated into it over the next decades`);
     chron('🎨', `A new way of building spreads from ${biggestTown().name}: the ${st.name} style.`, { T: biggestTown() });
   }
-  if (LV_KEYS.nature.includes(r.nature)) { lv.nature = r.nature; fx.push(`Nature: ${LV_TXT.nature[r.nature]}`); }
-  if (LV_KEYS.growth.includes(r.growth)) { lv.growth = r.growth; fx.push(`Growth: ${LV_TXT.growth[r.growth]}`); }
-  if (LV_KEYS.streets.includes(r.street_layout)) { lv.streets = r.street_layout; fx.push(`Streets: ${LV_TXT.streets[r.street_layout]}`); }
-  if (LV_KEYS.material.includes(r.building_material)) { lv.material = r.building_material; fx.push(`Materials: ${LV_TXT.material[r.building_material]}${r.building_material !== 'local' ? '. Old houses get rebuilt that way, a few a year' : ''}`); }
-  if (LV_KEYS.lights.includes(r.night_lights)) { lv.lights = r.night_lights; fx.push(`Night: ${LV_TXT.lights[r.night_lights]}`); }
+  for (const L of LEVERS) { const v = r[L.f]; if (typeof v !== 'string' || !Object.hasOwn(L.o, v)) continue; lv[L.k] = v; fx.push(`${L.n}: ${L.o[v]}${LV_MORE[L.k] ? LV_MORE[L.k](v) : ''}`); }
   if (r.sky_lanterns === true) { lv.lanterns = 1; fx.push('Sky lanterns drift up from the towns after dark'); }
-  if (LV_KEYS.weather.includes(r.weather_wish)) {
-    lv.weather = r.weather_wish; fx.push(`Weather wish: ${LV_TXT.weather[r.weather_wish]}. The sky starts to listen within a minute or so`);
-    if (S.wx) S.wx.left = Math.min(S.wx.left, rf(20, 60));
-  }
+  if (lv.weather && S.wx) S.wx.left = Math.min(S.wx.left, rf(20, 60));
   if (Object.keys(lv).length) d.lv = lv;
   if (r.new_town && r.new_town.name) {
     const n = clean(r.new_town.name, 30);
@@ -110,7 +105,7 @@ function applyName(o) {
 function customsBrief() {
   const out = [], st = S.styles[S.styleIdx];
   if (st && (st.shape || st.roofK || st.fields || st.cult)) out.push(`building style ${st.name} (${[st.shape, st.roofK && st.roofK + ' roofs', st.fields && st.fields + ' fields'].filter(Boolean).join(', ') || 'custom colours'})`);
-  for (const k of ['nature', 'growth', 'streets', 'material', 'lights', 'weather']) { const v = lever(k); if (v) out.push(`${k}: ${v}`); }
+  for (const L of LEVERS) { const v = lever(L.k); if (v) out.push(`${L.f}: ${v}`); }
   if (lever('lanterns')) out.push('sky lanterns at night');
   const sh = Object.keys(CULT.shun || {}).filter(b => CULT.shun[b] >= .3); if (sh.length) out.push(`shunned: ${sh.join(', ')}`);
   if ((S.names || []).length) out.push('named places: ' + S.names.map(f => `${f.n} (${f.k})`).join(', '));
@@ -120,8 +115,7 @@ function customsBrief() {
 function customsList() {
   const out = [], st = S.styles[S.styleIdx];
   if (st && st.cult) out.push(['Building style', `${st.name}${[st.shape, st.roofK && st.roofK + ' roofs', st.fields && st.fields + ' fields'].filter(Boolean).length ? ': ' + [st.shape, st.roofK && st.roofK + ' roofs', st.fields && st.fields + ' fields'].filter(Boolean).join(', ') : ''}`]);
-  const nm = { nature: 'Nature', growth: 'Growth', streets: 'Streets', material: 'Materials', lights: 'Nights', weather: 'Weather wish' };
-  for (const k in nm) { const v = lever(k); if (v) out.push([nm[k], `${LV_TXT[k][v]} (${Math.round(leverW(k) * 100)}%)`]); }
+  for (const L of LEVERS) { const v = lever(L.k); if (v) out.push([L.n, `${L.o[v]} (${Math.round(leverW(L.k) * 100)}%)`]); }
   if (lever('lanterns')) out.push(['Sky lanterns', `released after dark (${Math.round(leverW('lanterns') * 100)}%)`]);
   const sh = Object.keys(CULT.shun || {}).filter(b => CULT.shun[b] >= .3); if (sh.length) out.push(['Shunned', sh.map(b => BT[b] ? plural(BT[b].n) : b).join(', ')]);
   if (Math.abs(CULT.rs || 0) > .1) out.push(['Discoveries', CULT.rs > 0 ? 'a little faster' : 'a little slower']);

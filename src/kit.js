@@ -51,7 +51,7 @@ function kAlongU() { return Math.abs(KF.A[0]) > .5; }
 const K_TRIM = '#efe9dc', K_STONE = '#cfc6b4', K_IRON = '#33363b', K_DARK = '#2c3440', K_WOOD = '#4a3426';
 function kWinTy() { return hasTech('computing') ? 'glass' : hasTech('concrete') ? 'modern' : hasTech('masonry') ? 'sash' : 'case'; } // casements, then sashes, then steel, then glass
 function kWall(B, st) { // a wall's colour and what it is made of
-  const wm = glWallMat(B);
+  const wm = glWallMat(B); if (st.painted) return [st.wall, wm === M_PLANK ? M_PLANK : M_PLASTER]; // (painted houses: rendered over, or painted boards)
   return wm === M_BRICK ? [mix(st.wall, '#a5573f', .55), M_BRICK] : wm === M_STONE ? [mix(st.wall, '#cdbfa6', .35), M_STONE] : wm === M_PLANK ? [mix(st.wall, '#8a6a4c', .45), M_PLANK] : [st.wall, wm];
 }
 
@@ -80,7 +80,7 @@ function kWin(s, ff, y, hw, h, k, o = K_NO) {
   else if (o.ped) { kBox(s, ff + g * .008, y + h + .004, hw * 1.3, .008, .012, stn, M_STONE); kCtr(s, ff - g * .1, y + h); kT([s - hw * 1.35, ff + g * .012, y + h + .016], [s + hw * 1.35, ff + g * .012, y + h + .016], [s, ff + g * .012, y + h + .05], stn, M_STONE); } // a little pediment
   else if (ty !== 'glass' && !back) kBox(s, ff + g * .005, y + h + .002, hw * 1.15, .005, .014, ty === 'case' ? K_WOOD : stn, ty === 'case' ? M_PLANK : M_STONE); // a plain lintel
   if (o.shut) for (const d of [-1, 1]) { F(s + d * (hw + hw * .5), y, hw * .48, h, o.shut, .006, M_PLANK); for (let t = .2; t < .9; t += .2) F(s + d * (hw + hw * .5), y + h * t, hw * .44, .003, shade(o.shut, .8), .008); } // shutters, louvred
-  if (o.box) { kBox(s, ff + g * .03, y - .034, hw * 1.1, .016, .022, '#6b4a32', M_PLANK); kBox(s, ff + g * .03, y - .014, hw * 1.02, .014, .008, '#4f8a45');
+  if (o.box || LVV.deco === 'flower_boxes' && !back && ty !== 'glass' && kLit(k + 3) < .6) { kBox(s, ff + g * .03, y - .034, hw * 1.1, .016, .022, '#6b4a32', M_PLANK); kBox(s, ff + g * .03, y - .014, hw * 1.02, .014, .008, '#4f8a45');
     for (let q = 0; q < 3; q++) kBlob(s + (q - 1) * hw * .62, ff + g * .03, y - .004, .013, .012, FLOWER_C[(q + KF.id + k) % FLOWER_C.length], 0); }
 }
 const K_NO = {};

@@ -66,7 +66,7 @@ function needValues(T, n, radios) {
 
 /* ---------- smoke: the works and power houses of the steam age dirty the air until clean power comes ---------- */
 const SMOKY = { works: 3, power: 4, glassworks: 1 };
-const sootK = () => !hasTech('steam') ? 0 : hasTech('climate') ? 0 : hasTech('solar') ? .2 : 1;
+const sootK = () => (!hasTech('steam') ? 0 : hasTech('climate') ? 0 : hasTech('solar') ? .2 : 1) * (lever('smoke') === 'clean' ? .3 : lever('smoke') === 'smoky' ? 1.3 : 1); // (the custom can keep the air clean)
 function pollution(T, n) {
   n = n || townCounts(T); let s = 0;
   for (const k in SMOKY) s += (n[k] || 0) * SMOKY[k];

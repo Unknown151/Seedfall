@@ -8,15 +8,36 @@ const AI_BUILDINGS = ['park', 'dome', 'market', 'library', 'school', 'observator
 const AI_EVENTS = ['festival', 'art', 'song', 'invent', 'book', 'harvest', 'herd', 'rivalry', 'swallows', 'meteors', 'wedding', 'climb'];
 const AI_MONUMENTS = ['statue', 'lantern', 'spire', 'harp', 'gardens', 'colossus', 'hall', 'clock', 'obelisk', 'orchard'];
 const AI_SHUNNABLE = ['works', 'power', 'mine', 'mast', 'turbine', 'airfield', 'stadium', 'mill', 'market', 'solar', 'antenna', 'clinic', 'school', 'workshop'];
-const LV_KEYS = { nature: ['protect', 'plant', 'clear', 'wild', 'gardens'], growth: ['taller', 'spread_out', 'compact', 'more_towns', 'stay_small'], lights: ['warm', 'cool', 'colourful', 'candlelight', 'dark_sky'], weather: ['sunny', 'rainy', 'snowy', 'foggy', 'stormy', 'mild'], material: ['timber', 'stone', 'brick', 'local'], streets: ['winding', 'planned'] };
-const LV_TXT = {
-  nature: { protect: 'forests are left alone, towns build around them', plant: 'trees get planted in and around the towns', clear: 'woods near towns are cleared for fields', wild: 'the meadows go back to forest', gardens: 'flowers and parks everywhere' },
-  growth: { taller: 'towns build upward sooner', spread_out: 'towns spread out wider', compact: 'towns stay compact and dense', more_towns: 'more new towns get founded', stay_small: 'towns grow slowly and stay small' },
-  lights: { warm: 'warm golden window light', cool: 'cool white light at night', colourful: 'every window and lamp a different colour', candlelight: 'candlelight: dim, orange nights', dark_sky: 'lights out at night, for the stars' },
-  streets: { winding: 'new streets wind along the land, like an old village', planned: 'new quarters are laid out in straight, square grids' },
-  material: { timber: 'houses are built of timber wherever it can be had', stone: 'houses are built of stone, even if it has to be carted in', brick: 'brick and clay for everything', local: 'every town builds with what its own land gives' },
-  weather: { sunny: 'more sunshine', rainy: 'more rain', snowy: 'snow, whatever the season', foggy: 'more fog', stormy: 'more thunderstorms', mild: 'gentle weather, no storms' }
-};
+// The levers the Watcher's words can pull: each is a custom the towns take up (it fades as the teaching does). k: its name in
+// CULT.lv, f: the tool's field, o: the choices and what each does (shown in the Voice tab and the Customs list), n: what the
+// Customs list calls it, d: the tool's description, art: buildings or ground change with it (the view is rebuilt)
+const LEVERS = [
+  { k: 'nature', f: 'nature', n: 'Nature', d: 'how they treat the land. protect: leave forests alone and build around them. plant: plant trees in and around towns. clear: clear woods for fields. wild: let meadows turn back to forest. gardens: flowers and parks everywhere.', o: { protect: 'forests are left alone, towns build around them', plant: 'trees get planted in and around the towns', clear: 'woods near towns are cleared for fields', wild: 'the meadows go back to forest', gardens: 'flowers and parks everywhere' } },
+  { k: 'growth', f: 'growth', n: 'Growth', d: 'how the towns grow.', o: { taller: 'towns build upward sooner', spread_out: 'towns spread out wider', compact: 'towns stay compact and dense', more_towns: 'more new towns get founded', stay_small: 'towns grow slowly and stay small' } },
+  { k: 'streets', f: 'street_layout', n: 'Streets', d: 'how new streets are laid out. winding: crooked lanes that follow the land. planned: straight grid quarters.', o: { winding: 'new streets wind along the land, like an old village', planned: 'new quarters are laid out in straight, square grids' } },
+  { k: 'material', f: 'building_material', n: 'Materials', d: 'what they prefer to build houses from. timber, stone or brick; local means each town uses whatever its own land gives. Towns cut, quarry and trade to get it.', o: { timber: 'houses are built of timber wherever it can be had', stone: 'houses are built of stone, even if it has to be carted in', brick: 'brick and clay for everything', local: 'every town builds with what its own land gives' } },
+  { k: 'lights', f: 'night_lights', n: 'Nights', d: 'how the towns light their nights.', o: { warm: 'warm golden window light', cool: 'cool white light at night', colourful: 'every window and lamp a different colour', candlelight: 'candlelight: dim, orange nights', dark_sky: 'lights out at night, for the stars' } },
+  { k: 'weather', f: 'weather_wish', n: 'Weather wish', d: 'if the words ask for weather, the sky starts to listen.', o: { sunny: 'more sunshine', rainy: 'more rain', snowy: 'snow, whatever the season', foggy: 'more fog', stormy: 'more thunderstorms', mild: 'gentle weather, no storms' } },
+  { k: 'seasons', f: 'season', n: 'Season', d: 'if the words ask for a season to stay (an endless summer, an eternal spring), the valley keeps it whatever the calendar says. natural lets the calendar back in.', o: { spring: 'an endless spring: blossom and fresh green', summer: 'an endless summer', autumn: 'an endless autumn: red and gold leaves', winter: 'an endless winter: white trees and pale fields', natural: 'the seasons follow the calendar again' } },
+  { k: 'sky', f: 'sky_colour', n: 'Sky', d: 'the colour of the sky itself, or an aurora dancing over the valley at night.', o: { golden: 'a golden sky', rosy: 'a rose-tinted sky', violet: 'a violet sky', green: 'a green-tinted sky', aurora: 'an aurora dances over the valley every night' } },
+  { k: 'housecol', f: 'house_colours', n: 'House colours', d: 'how people paint their houses.', o: { rainbow: 'every house painted a different bright colour', pastel: 'houses in soft pastels', whitewash: 'all the houses whitewashed', earthy: 'houses in earthy browns and ochres', bold: 'houses in deep, bold colours' }, art: 1 },
+  { k: 'trees', f: 'trees', n: 'Trees', d: 'which trees they love: the woods and the garden and street trees slowly look that way.', o: { oaks: 'round green oaks everywhere', pines: 'dark pines everywhere', birches: 'white birches everywhere', blossom: 'blossom trees everywhere, pink all year', maples: 'red maples everywhere' }, art: 1 },
+  { k: 'deco', f: 'street_decorations', n: 'Streets dressed with', d: 'how the streets are decorated: bunting strung across them, paper lanterns, flags on poles, or flower boxes under every window.', o: { bunting: 'bunting strung across the streets', paper_lanterns: 'strings of paper lanterns across the streets', flags: 'flags flying along the streets', flower_boxes: 'flower boxes under every window' }, art: 1 },
+  { k: 'bedtime', f: 'bedtime', n: 'Bedtime', d: 'when the towns go to bed, so how many windows are lit at night.', o: { early: 'early to bed: dark windows by nine', late: 'late nights: windows lit till the small hours', never: 'nobody sleeps: windows lit all night' } },
+  { k: 'clothes', f: 'clothes', n: 'Clothes', d: 'what people wear.', o: { colourful: 'everyone in bright colours', white: 'everyone in white', dark: 'everyone in black and dark grey', earthy: 'browns, greens and homespun', matching: 'everyone in the colour of the town style' } },
+  { k: 'hats', f: 'hats', n: 'Hats', d: 'a fashion in hats.', o: { tall_hats: 'tall hats are the fashion', flower_crowns: 'flower crowns on everyone', no_hats: 'nobody wears a hat', everyone: 'everyone wears the hat of the age' } },
+  { k: 'pets', f: 'pets', n: 'Pets', d: 'the animals people keep.', o: { dogs: 'everyone has a dog', cats: 'cats follow people about', none: 'no pets in town' } },
+  { k: 'bustle', f: 'street_life', n: 'Street life', d: 'how busy the streets are.', o: { bustling: 'the streets are always bustling', quiet: 'quiet streets, people keep indoors' } },
+  { k: 'birds', f: 'birds', n: 'Birds', d: 'birds over the valley.', o: { flocks: 'great flocks of birds over the valley', none: 'the birds keep away' } },
+  { k: 'fireworks', f: 'fireworks', n: 'Fireworks', d: 'fireworks: often (some town lets them off most nights) or never.', o: { often: 'fireworks most nights', never: 'no more fireworks' } },
+  { k: 'pace', f: 'work_pace', n: 'Work', d: 'how hard they work: industrious builds faster, leisurely slower (and they mind it less).', o: { industrious: 'hard workers: buildings go up faster', leisurely: 'an easy pace: buildings go up slower' } },
+  { k: 'trade', f: 'trade', n: 'Trade', d: 'open: the towns trade eagerly, closed: each keeps to itself.', o: { open: 'the towns trade eagerly with each other', closed: 'each town keeps to itself and trades little' } },
+  { k: 'sea', f: 'seafaring', n: 'The sea', d: 'how they feel about the sea.', o: { seafaring: 'a seafaring people: more ships on the water', landlubbers: 'landlubbers: few ships put out' } },
+  { k: 'faith', f: 'faith', n: 'Faith', d: 'devout: they revere the Watcher more (Reverence gathers faster, shrines go up), secular: less.', o: { devout: 'devout: Reverence gathers faster', secular: 'secular: Reverence gathers slower' } },
+  { k: 'smoke', f: 'smoke', n: 'Smoke', d: 'clean: works and power houses burn clean, the air stays clear. smoky: they don’t mind the smoke.', o: { clean: 'clean air: the works hardly smoke', smoky: 'they don’t mind smoke: the works smoke harder' } }
+];
+const LV_KEYS = Object.fromEntries(LEVERS.map(L => [L.k, Object.keys(L.o)])), LV_TXT = Object.fromEntries(LEVERS.map(L => [L.k, L.o]));
+let LVV = {}, LVA = ''; // the levers in force (for the view, which reads them every frame) and those the buildings' art depends on
 let CULT = { tb: {}, bld: {}, ev: {}, lv: {}, shun: {}, rs: 0, bs: 0 };
 function lever(k) { const x = CULT.lv && CULT.lv[k]; return x && x.w >= .25 ? x.v : null; }
 function leverW(k) { const x = CULT.lv && CULT.lv[k]; return x && x.w >= .25 ? Math.min(1, x.w) : 0; }
@@ -158,22 +179,17 @@ const TOOL_WORDS = {
         roof_color: { type: 'string', description: 'Hex colour.' },
         accent_color: { type: 'string', description: 'Hex colour.' },
         fields: { type: 'string', enum: ['rows', 'round', 'stripes', 'flowers', 'orchard'], description: 'How farm fields are laid out.' } } },
-      nature: { type: 'string', enum: LV_KEYS.nature, description: 'Optional: how they treat the land. protect: leave forests alone and build around them. plant: plant trees in and around towns. clear: clear woods for fields. wild: let meadows turn back to forest. gardens: flowers and parks everywhere.' },
-      growth: { type: 'string', enum: LV_KEYS.growth, description: 'Optional: how the towns grow.' },
-      street_layout: { type: 'string', enum: LV_KEYS.streets, description: 'Optional: how new streets are laid out. winding: crooked lanes that follow the land. planned: straight grid quarters.' },
-      building_material: { type: 'string', enum: LV_KEYS.material, description: 'Optional: what they prefer to build houses from. timber, stone or brick; local means each town uses whatever its own land gives. Towns cut, quarry and trade to get it.' },
       new_town: { type: 'object', description: 'Optional: settlers leave to found a new town with this name.', properties: { name: { type: 'string' } } },
       names: { type: 'array', maxItems: 3, description: 'Optional: things that get (re)named because of the words. Only if the words ask for it or it clearly fits. river, sea, peak and forest names are written on the map.', items: { type: 'object', properties: {
         kind: { type: 'string', enum: ['planet', 'town', 'moon', 'river', 'sea', 'peak', 'forest'] },
         current: { type: 'string', description: 'For a town or moon: its current name.' },
         name: { type: 'string' } }, required: ['kind', 'name'] } },
-      night_lights: { type: 'string', enum: LV_KEYS.lights, description: 'Optional: how the towns light their nights.' },
       sky_lanterns: { type: 'boolean', description: 'Optional: true if they start releasing floating lanterns into the night sky.' },
-      weather_wish: { type: 'string', enum: LV_KEYS.weather, description: 'Optional: if the words ask for weather, the sky starts to listen.' },
       crop: { type: 'string', enum: CROPS.map(c => c.n), description: 'Optional: a crop every town switches to.' },
       shunned_buildings: { type: 'array', maxItems: 3, items: { type: 'string', enum: AI_SHUNNABLE }, description: 'Optional: kinds of buildings the towns refuse to build any more.' },
       research: { type: 'integer', minimum: -1, maximum: 1, description: 'Optional: -1 they turn away from new ideas (slower discoveries), 1 they chase them.' },
-      births: { type: 'integer', minimum: -1, maximum: 1, description: 'Optional: -1 fewer children, 1 more.' }
+      births: { type: 'integer', minimum: -1, maximum: 1, description: 'Optional: -1 fewer children, 1 more.' },
+      ...Object.fromEntries(LEVERS.map(L => [L.f, { type: 'string', enum: Object.keys(L.o), description: 'Optional: ' + L.d }]))
     },
     required: ['doctrine_name', 'interpretation', 'chronicle']
   }
@@ -257,7 +273,7 @@ THE WATCHER HAS JUST SPOKEN THESE WORDS (they reach the colonists as an omen: a 
 """${words}"""
 
 Interpret them. The colonists take the words seriously, but they may misunderstand, argue, split into schools of thought, or turn them into customs, festivals and fashions. If the words are unkind or ask for harm, the colonists find a gentle, harmless reading instead. Use the named people and towns above where it fits.
-Besides the story, you can change how the world looks and behaves: architecture (shape, roofs, colours, fields), building materials, street layout, nature, growth, names, night lights, sky lanterns, a weather wish, crops, shunned buildings, research and births. Use those levers when the words clearly touch on them, and take the words fairly literally when that's fun (e.g. "only circles" means round buildings and round fields). Leave levers out when the words don't touch on them. Story effects should still be modest; this nudges a culture, it doesn't rewrite it.`, TOOL_WORDS, 2000, 'words', words);
+Besides the story, you can change how the world looks and behaves: architecture (shape, roofs, colours, fields), building materials, street layout, nature, growth, names, night lights, sky lanterns, a weather wish, a season that stays, the colour of the sky or an aurora, house colours, the kind of trees, street decorations, bedtime, clothes, hats, pets, how busy the streets are, birds, fireworks, how hard they work, trade, the sea, faith, smoke, crops, shunned buildings, research and births. Use those levers when the words touch on them (several at once is fine when the words are about a way of life), and take the words fairly literally when that's fun (e.g. "only circles" means round buildings and round fields). Leave levers out when the words don't touch on them. Story effects should still be modest; this nudges a culture, it doesn't rewrite it.`, TOOL_WORDS, 2000, 'words', words);
     applyWords(d, r, log);
     toast(`They call it ${d.name}.`);
   } catch (e) {
@@ -347,10 +363,13 @@ function recomputeCulture() {
   }
   for (const k in c.tb) c.tb[k] = clamp(c.tb[k], -3, 3);
   c.rs = clamp(c.rs, -1, 1); c.bs = clamp(c.bs, -1, 1);
+  if (c.lv.faith && c.lv.faith.v === 'devout' && c.lv.faith.w >= .25) c.bld.shrine = (c.bld.shrine || 0) + c.lv.faith.w; // (a devout people put up shrines)
   const lk = JSON.stringify(c.lv && Object.fromEntries(Object.entries(c.lv).map(([k, x]) => [k, x.w >= .25 ? x.v : null])));
-  if (CULT.lk !== lk && typeof LIGHT !== 'undefined') LIGHT.chk = 0;
+  if (CULT.lk !== lk && typeof LIGHT !== 'undefined') { LIGHT.chk = 0; LIGHT.seasonT = 0; } // (the art, the season and the sky look again)
   c.lk = lk;
   CULT = c;
+  LVV = {}; for (const L of LEVERS) { const v = lever(L.k); if (v) LVV[L.k] = v; } // (the view reads these every frame)
+  LVA = LEVERS.filter(L => L.art).map(L => LVV[L.k] || '').join('|');
 }
 function stepCulture() {
   for (const d of S.doctrines || []) {

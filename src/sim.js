@@ -197,6 +197,7 @@ function recalcTown(T) {
 }
 
 /* ---------- geometry helpers ---------- */
+const paceK = () => { const p = lever('pace'); return p === 'industrious' ? 1.15 : p === 'leisurely' ? .85 : 1; }; // (how hard the Watcher's words have them working)
 function townRadius(T) { const g = lever('growth'), m = g === 'spread_out' ? 1.3 : g === 'compact' ? .82 : 1; return clamp((2.2 + Math.sqrt(T.pop) * 0.4) * m, 2.6, 13 * m); } // (lanes take a little more room than the old grid did)
 function ownerOf(x, y) {
   let best = null, bd = 1e9;
@@ -644,7 +645,7 @@ function buildTown(T) {
   if (!active.length) return;
   const share = laborOf(T) / active.length;
   for (const B of active) {
-    const dp = Math.min(share / workFor(B), 1 - B.prog);
+    const dp = Math.min(share * paceK() / workFor(B), 1 - B.prog);
     B.prog = Math.min(1, B.prog + dp * payFor(T, B, dp)); // short of materials: slower, never stopped
     if (B.prog > .9999) B.prog = 1;
     const stage = B.prog >= 1 ? 9 : Math.floor(B.prog * 5);
