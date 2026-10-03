@@ -204,16 +204,15 @@ function ownerOf(x, y) {
   for (const k in S.T) { const T = S.T[k]; const d = dist(x, y, T.x, T.y); if (d < bd) { bd = d; best = T; } }
   return best;
 }
-const OWN = new Int16Array(W * H); let OWN_M = -1, OWN_N = -1;
-function refreshOwn() {
+const OWN = new Int16Array(W * H), OWN_D = new Float64Array(W * H); let OWN_M = -1, OWN_N = -1, OWN_S = null;
+function refreshOwn() { // each tile belongs to the nearest town in reach (ties: the older town)
   const ts = towns();
-  if (OWN_M === S.month && OWN_N === ts.length) return;
-  OWN_M = S.month; OWN_N = ts.length;
-  const rs = ts.map(T => townRadius(T) + 8);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    let best = 0, bd = 1e9;
-    for (let k = 0; k < ts.length; k++) { const T = ts[k]; const d = (x - T.x) * (x - T.x) + (y - T.y) * (y - T.y); if (d < bd && d <= rs[k] * rs[k]) { bd = d; best = T.id; } }
-    OWN[y * W + x] = best;
+  if (OWN_M === S.month && OWN_N === ts.length && OWN_S === S) return;
+  OWN_M = S.month; OWN_N = ts.length; OWN_S = S;
+  OWN.fill(0); OWN_D.fill(1e9);
+  for (const T of ts) { // only the square each town reaches, not the whole map once per town (a wide land late on spent a fifth of its sim time here)
+    const r = townRadius(T) + 8, r2 = r * r, x0 = Math.max(0, Math.ceil(T.x - r)), x1 = Math.min(W - 1, Math.floor(T.x + r)), y0 = Math.max(0, Math.ceil(T.y - r)), y1 = Math.min(H - 1, Math.floor(T.y + r));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const d = (x - T.x) * (x - T.x) + (y - T.y) * (y - T.y), i = y * W + x; if (d < OWN_D[i] && d <= r2) { OWN_D[i] = d; OWN[i] = T.id; } }
   }
 }
 function slopeOK(x, y, lim = 1) {
