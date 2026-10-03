@@ -6,9 +6,10 @@
 // street, y up from the ground. kSet puts the frame down; kSide(n, fn) turns it a quarter at a time (to work on a side
 // wall with the same parts). A wall part takes the wall's f (ff) and faces out on its side (the sign of ff).
 // Small parts only go into the near version of a chunk (KF.lod, from GLB.lod); the far one keeps shapes and glass.
-const KF = { X: 0, Z: 0, y0: 0, A: [1, 0, 0], F: [0, 0, 1], id: 0, lod: false };
+const KF = { X: 0, Z: 0, y0: 0, A: [1, 0, 0], F: [0, 0, 1], id: 0, lod: false, rk: null }; // (rk: a roof the house style wants instead: dome, cone or pyramid)
 function kSet(X, Z, A, F, id) { KF.X = X; KF.Z = Z; KF.y0 = GLB.base; KF.A = A; KF.F = F; KF.id = id || 0; KF.lod = !!GLB.lod; }
 const kFrom = (dx, dy) => [[dy, 0, -dx], [dx, 0, dy]]; // the frame facing (dx, dy): [along, out]
+function kRot(a, fn) { const A = KF.A, F = KF.F, c = Math.cos(a), s = Math.sin(a); KF.A = [A[0] * c + F[0] * s, 0, A[2] * c + F[2] * s]; KF.F = [F[0] * c - A[0] * s, 0, F[2] * c - A[2] * s]; try { fn(); } finally { KF.A = A; KF.F = F; } } // the frame turned by a (round buildings: a window at any angle)
 function kSide(n, fn) { const a = KF.A, f = KF.F; for (let k = 0; k < n; k++) { const A = KF.A; KF.A = KF.F; KF.F = [-A[0], 0, -A[2]]; } try { fn(); } finally { KF.A = a; KF.F = f; } }
 function kFace(B) { // a one-tile building faces the street (or road, or rails) beside it; with none, its own way
   const ds = [[0, 1], [1, 0], [0, -1], [-1, 0]], k0 = (hash2(B.id, 40, 131) * 4) | 0;
@@ -127,6 +128,7 @@ function kDoor(s, ff, w, h, col, o = K_NO) {
 // kGable: the ridge along s, over walls from fB (back) to fD (front), eaves at ye. o: lo, hi (party walls at s0, s1:
 // no overhang, no bargeboards), ov (eaves), wall + wm (the gable ends), noGut
 function kGable(s0, s1, fB, fD, ye, rh, col, o = K_NO) {
+  if (KF.rk) return kRoofAlt(s0, s1, fB, fD, ye, rh, col, o);
   const RC = gcol(col), rm = roofMat(RC), th = rm === M_THATCH, ov = o.ov != null ? o.ov : th ? .07 : .05, fc = (fB + fD) / 2, er = .035, lod = KF.lod;
   const a0 = o.lo ? s0 : s0 - (th ? .05 : er), a1 = o.hi ? s1 : s1 + (th ? .05 : er), sc = (s0 + s1) / 2, wc = o.wall || '#d8cfc0', drop = (rh / ((fD - fB) / 2)) * ov;
   kCtr(sc, fc, ye - .3);
@@ -161,7 +163,24 @@ function kWalls(s0, s1, fB, fD, fn, which = 15) {
 }
 function kGableF(s0, s1, fB, fD, ye, rh, col, o = K_NO) { kSide(1, () => kGable(fB, fD, -s1, -s0, ye, rh, col, o)); } // the gable end to the street
 // kHip: hipped (a pyramid when square), eaves overhang ov
+// an elliptical dome or cone over (sc, fc): hs along, hf out (n sides; a cone is a dome with one ring)
+function kEDome(sc, fc, y, hs, hf, h, col, mat = -1, cone = false, n = 16) {
+  const C = gcol(col), m = mat < 0 ? roofMat(C) : mat, rings = cone ? 1 : KF.lod ? 5 : 3; kCtr(sc, fc, y - .05);
+  const P = (a, t) => cone ? (t ? [sc, fc, y + h] : [sc + Math.cos(a) * hs, fc + Math.sin(a) * hf, y]) : [sc + Math.cos(a) * hs * Math.cos(t), fc + Math.sin(a) * hf * Math.cos(t), y + h * Math.sin(t)];
+  for (let j = 0; j < rings; j++) { const t0 = cone ? 0 : j / rings * Math.PI / 2, t1 = cone ? 1 : (j + 1) / rings * Math.PI / 2;
+    for (let k = 0; k < n; k++) { const a0 = k / n * TAU, a1 = (k + 1) / n * TAU; if (cone) kT(P(a0, 0), P(a1, 0), P(0, 1), C, m); else kQ(P(a0, t0), P(a1, t0), P(a1, t1), P(a0, t1), C, m); } }
+}
+// a house style's own roof in place of a gable or hip: a dome (with a little lantern), a cone (with a finial) or a pyramid
+function kRoofAlt(s0, s1, fB, fD, ye, rh, col, o = K_NO) {
+  const sc = (s0 + s1) / 2, fc = (fB + fD) / 2, hs = (s1 - s0) / 2 + .03, hf = (fD - fB) / 2 + .03, rk = KF.rk;
+  kBox(sc, fc, ye - .005, hs, hf, .02, shade(col, .8), roofMat(gcol(col))); // (the eaves)
+  if (rk === 'dome') { kEDome(sc, fc, ye + .015, hs, hf, Math.max(rh, Math.min(hs, hf) * .9), col, M_SLATE); if (KF.lod) { const h = Math.max(rh, Math.min(hs, hf) * .9); kCyl(sc, fc, ye + h, .025, .03, '#e8e2d6', M_STONE, 8); kBlob(sc, fc, ye + h + .04, .02, .015, '#c9a447', 0); } }
+  else if (rk === 'cone') { kEDome(sc, fc, ye + .015, hs, hf, rh * 1.6, col, -1, true); if (KF.lod) kBox(sc, fc, ye + rh * 1.6, .006, .006, .05, '#8c8f94'); }
+  else { const P = [[sc - hs, fc - hf], [sc + hs, fc - hf], [sc + hs, fc + hf], [sc - hs, fc + hf]], T = [sc, fc, ye + rh * 1.3], C = gcol(col), m = roofMat(C); kCtr(sc, fc, ye - .1);
+    for (let k = 0; k < 4; k++) kT([P[k][0], P[k][1], ye + .015], [P[(k + 1) % 4][0], P[(k + 1) % 4][1], ye + .015], T, C, m); if (KF.lod) kBox(sc, fc, ye + rh * 1.3, .008, .008, .04, '#8c8f94'); }
+}
 function kHip(s0, s1, fB, fD, ye, rh, col, o = K_NO) {
+  if (KF.rk && !o.bare) return kRoofAlt(s0, s1, fB, fD, ye, rh, col, o);
   const RC = gcol(col), rm = o.mat != null ? o.mat : roofMat(RC), ov = o.ov != null ? o.ov : .045, sc = (s0 + s1) / 2, fc = (fB + fD) / 2, hs = (s1 - s0) / 2 + ov, hf = (fD - fB) / 2 + ov, r = Math.max(0, hs - hf), drop = rh / hf * ov * .6;
   const e = [[sc - hs, fc - hf], [sc + hs, fc - hf], [sc + hs, fc + hf], [sc - hs, fc + hf]], R0 = [sc - r, fc, ye + rh], R1 = [sc + r, fc, ye + rh];
   kCtr(sc, fc, ye - .3); const E = e.map(q => [q[0], q[1], ye - drop]);
@@ -183,7 +202,7 @@ function kFlat(s0, s1, fB, fD, ye, col, ph = .04, o = K_NO) {
     kBox(sc, fD - .006, ye + ph, hs + .006, .016, .01, cop, M_STONE); kBox(sc, fB + .006, ye + ph, hs + .006, .016, .01, cop, M_STONE);
     if (!o.lo) kBox(s0 + .006, fc, ye + ph, .016, hf, .01, cop, M_STONE); if (!o.hi) kBox(s1 - .006, fc, ye + ph, .016, hf, .01, cop, M_STONE); }
 }
-function kMansard(s0, s1, fB, fD, ye, rh, col) { const [u, v] = kTL((s0 + s1) / 2, (fB + fD) / 2), [hw, hd] = kHW((s1 - s0) / 2, (fD - fB) / 2); glMansard(u, v, hw, hd, (ye) / ZS, rh / ZS, col); }
+function kMansard(s0, s1, fB, fD, ye, rh, col) { if (KF.rk) return kRoofAlt(s0, s1, fB, fD, ye, rh, col); const [u, v] = kTL((s0 + s1) / 2, (fB + fD) / 2), [hw, hd] = kHW((s1 - s0) / 2, (fD - fB) / 2); glMansard(u, v, hw, hd, (ye) / ZS, rh / ZS, col); }
 // a chimney stack (w along s, d along f) from yb to top, with its cap and pots
 function kChim(s, f, yb, top, w, d, col, mat) { const p = kP(s, f, yb), [hw, hd] = kHW(w, d); glChimney(p[0], p[1], p[2], hw, hd, KF.y0 + top, col, mat); if (KF.lod) { GLB.mat = mat; glOBox([p[0], KF.y0 + top - .03, p[2]], [hw + .01, 0, 0], [0, 0, hd + .01], [0, .013, 0], col); } }
 // a dormer in a roof slope facing out (f+), its window wall at ff

@@ -206,3 +206,63 @@ function drawPasture(B, st) {
   sheepAt(.06, .12, 2.2, v < .5); sheepAt(.28, -.1, 1.8, v >= .5); if (v > .3) sheepAt(-.18, .26, 1.2, true);
   if (lod) { kBlob(.32, .3, 0, .06, .05, '#d8b86a', M_THATCH); kBlob(-.36, .1, 0, .04, .04, '#c9a85a', M_THATCH); } // hay
 }
+
+/* ---------- farms: crops by kind in their rows, furrows, a hedgerow, wall or fence where the field ends, a gate; now and then a barn ---------- */
+// Five rows at the places works.js's farm hands walk between. Neighbouring farm tiles make one big field: the boundary only
+// goes where the field ends. A styled field (round pivot rings, an orchard, flowers, stripes) follows the style.
+GL_MODEL.farm = function (B, st0) {
+  iSet(B); const T = S.T[B.sid], st = S.styles[B.style] || STYLES0[0], fk = st.fields || (dsRound() ? 'round' : null), lod = KF.lod, v = B.var || 0;
+  const ck = T ? T.crop % CROPS.length : 5, crop = CROPS[ck].c, cn = CROPS[ck].n, soil = '#9a7350', au = v < .5, grown = B.prog >= 1 ? 1 : B.prog, green = hasTech('genegarden');
+  const isFarm = (dx, dy) => { const x = B.x + dx, y = B.y + dy; if (!inb(x, y)) return false; const C = S.B[M.bld[idx(x, y)]]; return !!C && C.type === 'farm'; };
+  const edge = () => { // the boundary where the field ends: a hedgerow, a dry-stone wall or a post-and-rail fence (by the town's land and age)
+    const h = hash2(B.sid | 0, 3, 61), ty = h < .45 ? 'hedge' : h < .7 && !hasTech('motor') ? 'wall' : 'rail', col = ty === 'wall' ? '#a8a092' : '#8a6d57', E = .47;
+    for (const [dx, dy, a, b] of [[0, -1, [-E, -E], [E, -E]], [1, 0, [E, -E], [E, E]], [0, 1, [E, E], [-E, E]], [-1, 0, [-E, E], [-E, -E]]]) { if (isFarm(dx, dy)) continue;
+      const gate = hash2(B.x + dx, B.y + dy, 63) < .3, m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      if (gate) { const g1 = [m[0] - (b[0] - a[0]) * .1, m[1] - (b[1] - a[1]) * .1], g2 = [m[0] + (b[0] - a[0]) * .1, m[1] + (b[1] - a[1]) * .1]; kFence([a, g1], ty === 'hedge' ? .06 : .05, col, ty); kFence([g2, b], ty === 'hedge' ? .06 : .05, col, ty);
+        if (lod) { kFence([g1, [g1[0] + (g2[0] - g1[0]) * .9 + (dy ? 0 : dx * -.05), g1[1] + (g2[1] - g1[1]) * .9 + (dx ? 0 : dy * -.05)]], .045, '#8a6d57', 'rail'); for (const p of [g1, g2]) kBox(p[0], p[1], 0, .008, .008, .065, '#6b5040', M_PLANK); } } // a gate, swung half open
+      else kFence([a, b], ty === 'hedge' ? .06 : .05, col, ty);
+      if (ty === 'hedge' && lod && hash2(B.x * 3 + dx, B.y * 3 + dy, 64) < .35) kTree(m[0] * .95, m[1] * .95, 0, hash2(B.x, B.y, 65 + dx), .75, '#5f8f45'); } // an oak in the hedgerow
+  };
+  if (fk === 'round') { // centre-pivot rings, and the pivot's arm on its wheeled towers
+    kBox(0, 0, 0, .47, .47, .006, soil, M_SOIL); for (let k = 0; k < 4; k++) { if (k / 4 > grown) break; const r = .42 - k * .1; ring(0, 0, r + .03, .06, 1, k % 2 ? shade(crop, .82) : crop, 0, TAU, 24, 0, M_CROP); }
+    const a = v * TAU, c = Math.cos(a), sn = Math.sin(a); kBox(0, 0, 0, .014, .014, .09, '#9aa0a6'); kBeam([0, 0, .085], [c * .44, sn * .44, .07], .005, '#d9d4cc');
+    if (lod) for (const t of [.2, .4]) { kBeam([c * t, sn * t, .075], [c * t - sn * .03, sn * t + c * .03, 0], .003, '#9aa0a6'); kBeam([c * t, sn * t, .075], [c * t + sn * .03, sn * t - c * .03, 0], .003, '#9aa0a6'); for (const d of [-1, 1]) kLog([c * t + d * sn * .035, sn * t - d * c * .035, .012], [c * t + d * sn * .04, sn * t - d * c * .04, .012], .012, '#3a3a3a', '#5a5a5a', 0); }
+    return edge();
+  }
+  if (fk === 'orchard') { // trees in rows, fruit on them, grass between, a ladder against one
+    kBox(0, 0, 0, .46, .46, .006, '#8fc47f', M_GRASS);
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { if ((a * 3 + b) / 9 > grown) break; const s = -.3 + a * .3, f = -.3 + b * .3; kTree(s, f, 0, .5, .9, '#6db873'); if (lod) for (let q = 0; q < 4; q++) kBlob(s + Math.cos(q * 1.6) * .06, f + Math.sin(q * 1.6) * .06, .14 + q * .012, .014, .014, crop === '#6f9748' ? '#c0392b' : crop, 0); }
+    if (lod && grown >= 1) { kBeam([.06, -.3, 0], [.0, -.3, .16], .003, '#8a6446', M_PLANK); kBeam([.06, -.27, 0], [.0, -.27, .16], .003, '#8a6446', M_PLANK); for (let q = 0; q < 3; q++) kCrate(.12 + q * .045, .14, 0, .018, '#a07850'); }
+    return edge();
+  }
+  // a field in rows: the soil, furrows between the rows, the crop by its kind
+  const P = (a, o) => au ? [a, o] : [o, a];
+  const barn = hash2(B.id | 0, 1, 77) > .55 && hash2(B.x, B.y, 78) < .22 && grown >= 1; // (only where no farm hand works: works.js)
+  kBox(0, 0, 0, .46, .46, .006, soil, M_SOIL);
+  for (let k = 0; k < 5; k++) { const o = -.36 + k * .18; if (k / 5 > grown) break;
+    const col = fk === 'flowers' ? FLOWERS[(k + ((v * 5) | 0)) % FLOWERS.length] : fk === 'stripes' && k % 2 ? mix(crop, st.accent, .55) : green && k % 2 ? shade(crop, 1.1) : crop;
+    const a0 = -.42, a1 = barn && o > .1 ? .1 : .42, L = a1 - a0, mid = (a0 + a1) / 2, [ms, mf] = P(mid, o);
+    if (lod && k < 4) { const [fs, ff] = P(mid, o + .09); kOB(fs, ff, .006, au ? [L / 2, 0, 0] : [0, L / 2, 0], au ? [0, .015, 0] : [.015, 0, 0], [0, 0, .002], shade(soil, .82), M_SOIL); } // a furrow
+    const grain = cn === 'barley' || cn === 'rye' || cn === 'oats' || cn === 'wheat';
+    if (!lod || fk === 'flowers' || fk === 'stripes') { kOB(ms, mf, .006 + (grain ? .022 : .014), au ? [L / 2, 0, 0] : [0, L / 2, 0], au ? [0, .055, 0] : [.055, 0, 0], [0, 0, grain ? .022 : .014], col, M_CROP); if (!lod) continue; }
+    if (fk === 'flowers' || fk === 'stripes') { for (let a = a0 + .02; a < a1; a += .05) { const [s, f] = P(a, o); kBlob(s, f, .03, .012, .008, shade(col, 1.15), 0); } continue; }
+    const along = au ? [L / 2, 0, 0] : [0, L / 2, 0], side = w => au ? [0, w, 0] : [w, 0, 0]; // (close up: cheap shapes, many of them)
+    if (grain) { kOB(ms, mf, .02, along, side(.05), [0, 0, .014], shade(col, .85), M_CROP); kOB(ms, mf, .038, along, side(.046), [0, 0, .006], shade(col, 1.08), M_CROP); // the stalks, the ears along the top
+      GLB.mat = M_CROP; const C = gcol(shade(col, 1.12)); for (let a = a0 + .03; a < a1; a += .06) { const [s, f] = P(a, o + ((a * 37) % 1 - .5) * .06), p = kP(s, f, .044); GLB.ctr = [p[0], p[1] - .1, p[2]]; gtri([p[0] - .008, p[1], p[2]], [p[0] + .008, p[1], p[2]], [p[0], p[1] + .022, p[2] + .004], C); gtri([p[0], p[1], p[2] - .008], [p[0], p[1], p[2] + .008], [p[0] + .004, p[1] + .02, p[2]], C); } } // ears standing above
+    else if (cn === 'cabbages') for (let a = a0 + .04; a < a1; a += .08) for (const d of [-.025, .025]) { const [s, f] = P(a + (d > 0 ? .04 : 0), o + d); kBox(s, f, .006, .018, .018, .022, shade(col, .95 + (d > 0 ? .1 : 0)), M_LEAF); }
+    else if (cn === 'flax') { kOB(ms, mf, .02, along, side(.045), [0, 0, .014], col, M_CROP); kOB(ms, mf, .036, along, side(.03), [0, 0, .002], '#7a9ad8', 0); } // blue flowers on top
+    else { kOB(ms, mf, .016, along, side(.05), [0, 0, .01], shade(col, .9), M_LEAF); for (let a = a0 + .04; a < a1; a += .08) { const [s, f] = P(a, o); kBox(s, f, .02, .024, .024, .018, shade(col, .95 + ((a * 30) % 1) * .12), M_LEAF); } } // potatoes: the haulm, bushier clumps along it
+  }
+  for (const [s, f] of [[-.46, -.46], [.46, -.46], [-.46, .46], [.46, .46]]) kBox(s, f, 0, .007, .007, .06, '#8a6d57', M_PLANK);
+  if (barn) { // a barn in the corner: boarded walls, big doors, a loft door, a gable (thatch while it lasts), a cart and hay
+    const bc = ['#8a3a2a', '#3a3430', '#d8cfc0'][(hash2(B.x, B.y, 79) * 3) | 0], rc = hasTech('masonry') ? st.roof : '#c9a65a', bs = au ? .28 : .28, bf = au ? .3 : .3; kSet(GLB.x + (au ? bs : bf), GLB.y + (au ? bf : bs), [1, 0, 0], [0, 0, -1], B.id);
+    kBox(0, 0, 0, .15, .1, .02, '#8f8578', M_STONE); kBox(0, 0, .02, .14, .09, .14, bc, M_PLANK); if (lod) for (let s = -.13; s < .14; s += .026) { kBox(s, .092, .02, .003, .003, .14, shade(bc, .8), M_PLANK); kBox(s, -.092, .02, .003, .003, .14, shade(bc, .8), M_PLANK); }
+    kBox(0, .092, .02, .055, .004, .11, shade(bc, .7), M_PLANK); if (lod) { kBeam([-.05, .097, .03], [.05, .097, .12], .003, '#e8e2d6', M_PLANK); kBeam([.05, .097, .03], [-.05, .097, .12], .003, '#e8e2d6', M_PLANK); }
+    kGableF(-.14, .14, -.09, .09, .16, .11, rc, { wall: bc, wm: M_PLANK }); kBox(0, .094, .2, .025, .004, .03, '#3a2a20', M_PLANK);
+    if (lod) { for (let q = 0; q < 3; q++) kCyl(-.1 + q * .05, .16, 0, .02, .03, '#d8b86a', M_THATCH, 8); kCtr(0, 0, 0); iCart(.16, .18, 0, '#8a6446', '#d8b86a'); }
+  }
+  if (lod && hash2(B.x, B.y, 77) < .3 && grown >= 1 && !barn) { kSet(GLB.x, GLB.y, [1, 0, 0], [0, 0, 1], B.id); const s = au ? .4 : .27, f = au ? .27 : .4; // a scarecrow
+    kBox(s, f, 0, .004, .004, .14, '#6b5040', M_PLANK); kBeam([s - .04, f, .1], [s + .04, f, .1], .003, '#6b5040', M_PLANK); kBox(s, f, .07, .018, .012, .045, ['#6a5a8a', '#8a4a3a', '#4a6a5a'][(B.id | 0) % 3], M_PLANK);
+    kBlob(s, f, .13, .014, .015, '#d8b86a', M_THATCH); kCone(s, f, .14, .022, .025, '#3a3430', 8, 0); for (const dd of [-1, 1]) kBlob(s + dd * .043, f, .1, .006, .01, '#d8b86a', M_THATCH); }
+  iSet(B); edge();
+};

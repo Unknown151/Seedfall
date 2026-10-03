@@ -85,7 +85,8 @@ function glDryFrame(u0, v0) { // the weaver's frame: two posts and a rail (the c
 function glTurbine(B) { // a tall white tower on its pad and the nacelle on top (the blades turn: GLW.turbine)
   const X = GLB.x, Z = GLB.y, y = GLB.base;
   gBox([X, y, Z], [.13, 0, 0], [0, 0, .13], .02, '#cfcac4', M_STONE);
-  GLB.wall = 0; glCylAt(0, 0, .045, 0, 28, '#f2f3f5', '#f2f3f5', 10); glCylAt(0, 0, .034, 28, 27, '#f2f3f5', '#f2f3f5', 10);
+  GLB.wall = 0; kSet(X, Z, [1, 0, 0], [0, 0, 1], B.id); kCone(0, 0, .02, .05, 55 * ZS - .02, '#f2f3f5', 14, 0, .03); kCyl(0, 0, 55 * ZS - .02, .032, .02, '#e2e4e8', 0, 12); // a tapering tower
+  if (KF.lod) for (const yy of [.6, 1.4, 2.1]) kCyl(0, 0, yy, .05 - yy / (55 * ZS) * .02 + .002, .008, '#dfe2e6', 0, 12, 0); // its section joints
   gBox([X + .03, y + 55 * ZS, Z], [.08, 0, 0], [0, 0, .035], 3.2 * ZS, '#e7e9ec');
   kSet(X, Z, [1, 0, 0], [0, 0, 1], B.id); kDoor(0, .044, .018, .075, '#c9ced4', { ty: 'plank', y: .02 }); // a door at its foot, and the kiosk the power goes out through
   kBox(.16, .08, 0, .035, .025, .055, '#d6dade', M_PLASTER); if (KF.lod) { kBox(.16, .106, .005, .02, .002, .035, '#9aa3ad'); kBox(.16, .106, .04, .006, .002, .006, '#e0a43a'); }

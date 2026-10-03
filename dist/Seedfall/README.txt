@@ -271,8 +271,11 @@ QUARTERS, TERRACES AND REBUILDING
   glass), doors in their doorcases with fanlights and hoods, roofs with
   ridges, gutters and chimney pots. Cottages have gardens with a path and a
   gate, townhouses are timber-framed and jettied while the old styles last,
-  flats grow iron balconies and mansards, and the town hall, library, school,
-  theatre and the rest each look the part, down to the clock on the tower.
+  flats grow iron balconies and mansards, round styles bring round houses
+  under cones or domes, tiered ones stepped terraces with gardens on every
+  step, fields grow their own crops behind hedgerows and gates, and the
+  town hall, library, school, theatre and the rest each look the part, down
+  to the clock on the tower.
 
 BOATS, SHIPS AND PLANES
   Fishing boats leave their piers in the morning, fish all day (you can see

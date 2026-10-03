@@ -4,18 +4,27 @@
 // garden, fence and gate, a townhouse (timber-framed and jettied while the old styles last), the worker house
 // (house.js), a modern townhouse, blocks of flats (iron balconies and mansards, then concrete, glass and planted
 // balconies), glass towers and the arcologies. Each faces its street and joins its terrace where the row allows.
-// The styles that reshape houses (round, organic, tiered, tall, low; dome, cone and pyramid roofs) still come from the shared
-// art (buildings.js); the public buildings and workplaces keep their own forms whatever the style.
-function hFits(B) { // a model for this house? (the reshaping styles keep the shared art; the first two tiers ignore styles)
-  if (B.tier <= 1) return true;
-  const st = S.styles[B.style]; return !(st && (st.shape === 'round' || st.shape === 'organic' || st.shape === 'tiered' || SHAPE_HM[st.shape] || st.roofK === 'dome' || st.roofK === 'cone' || st.roofK === 'pyramid'));
-}
+// The styles the Watcher's words bring reshape the houses too: round and organic houses (hRound), stepped terraces
+// (hTiered), tall and low ones (the usual model, stretched: hScale), and dome, cone or pyramid roofs (the kit swaps the roof:
+// KF.rk). The public buildings and workplaces keep their own forms whatever the style. The first two tiers ignore styles.
 GL_MODEL.house = function (B, st) {
-  if (!hFits(B)) return false;
-  const t = B.tier; st = houseTint(st, B);
-  if (t === 4 && whFits(B, st)) return glWorkerHouse(B, st);
-  return [hShelter, hHut, hCottage, hTown, hRow4, hFlats, hTower, hArco][Math.min(7, t)](B, st);
+  const t = B.tier, sty = S.styles[B.style], shp = t >= 2 && sty ? sty.shape : null; st = houseTint(st, B);
+  if (shp === 'round' || shp === 'organic') return hRound(B, st, shp === 'organic');
+  if (shp === 'tiered' && t < 7) return hTiered(B, st);
+  const hm = SHAPE_HM[shp] || 1, wm = SHAPE_WM[shp] || 1, v0 = GLB.v.length, s0 = GLB.smk ? GLB.smk.length : 0;
+  KF.rk = t >= 2 && sty && (sty.roofK === 'dome' || sty.roofK === 'cone' || sty.roofK === 'pyramid') ? sty.roofK : null;
+  try { if (t === 4 && whFits(B, st)) glWorkerHouse(B, st); else [hShelter, hHut, hCottage, hTown, hRow4, hFlats, hTower, hArco][Math.min(7, t)](B, st); }
+  finally { KF.rk = null; }
+  if (hm !== 1 || wm !== 1) hScale(v0, s0, hm, houseJoin(B) ? 1 : wm);
 };
+function hScale(v0, s0, hm, wm) { // stretch what the model just built: up by hm, out by wm round the middle of the tile (normals follow)
+  const V = GLB.v, X = GLB.x, Z = GLB.y, y0 = GLB.base;
+  for (let i = v0; i < V.length; i += 13) {
+    V[i] = X + (V[i] - X) * wm; V[i + 1] = y0 + (V[i + 1] - y0) * hm; V[i + 2] = Z + (V[i + 2] - Z) * wm;
+    const nx = V[i + 3] / wm, ny = V[i + 4] / hm, nz = V[i + 5] / wm, l = Math.hypot(nx, ny, nz) || 1; V[i + 3] = nx / l; V[i + 4] = ny / l; V[i + 5] = nz / l;
+  }
+  if (GLB.smk) for (let k = s0; k < GLB.smk.length; k++) { const p = GLB.smk[k]; GLB.smk[k] = [X + (p[0] - X) * wm, y0 + (p[1] - y0) * hm, Z + (p[2] - Z) * wm]; } // (the smoke rises from the stretched stacks)
+}
 function hSet(B) { // the frame: along the street, out towards it (kept as the worker house finds it, so mixed rows agree)
   const J = houseJoin(B), U = (J ? J.a : houseAx(B)) === 'u', X = GLB.x, Z = GLB.y, fx = U ? 0 : 1, fz = U ? 1 : 0;
   const sg = inb(X + fx, Z + fz) && netTile(idx(X + fx, Z + fz)) ? 1 : inb(X - fx, Z - fz) && netTile(idx(X - fx, Z - fz)) ? -1 : 1;
@@ -321,4 +330,63 @@ function hArco(B, st) {
     y += .03; }
   kCyl(0, 0, y, .06, .04, '#e8ecef', 0, 12); kBox(0, 0, y + .04, .012, .012, .6, st.accent); kBox(0, 0, y + .64, .02, .02, .025, '#ff6a6a', 0, 3);
   if (lod) for (let k = 0; k < 3; k++) { const a = k / 3 * TAU; kBeam([0, 0, y + .5], [Math.cos(a) * .1, Math.sin(a) * .1, y + .04], .002, '#c9ced4'); }
+}
+
+/* ---------- round and organic houses: round walls, windows all the way round, a cone or a dome (the style's own roof) ---------- */
+// Organic ones are softer: a dome by default, round-headed windows, a little domed annex leaning on the side, a round door.
+function hRound(B, st, org) {
+  kSetB(B); const t = Math.min(7, B.tier), v = B.var || 0, lod = KF.lod, [wc0, wm0] = kWall(B, st), wc = org ? mix(wc0, '#efe6d6', .25) : wc0, wm = org ? M_PLASTER : wm0;
+  const rk = st.roofK || (org ? 'dome' : 'cone'), wty = kWinTy(), n = lod ? 20 : 12;
+  if (t === 6 || t === 7) { // a round glass tower ringed at each floor, or round terraces of glass and garden
+    const h = (58 + ((v * 5) % 1) * 62) * ZS, glass = st.glass; let y = 0;
+    if (t === 7) { for (let k = 0; k < 4; k++) { const r = .47 - k * .09, hh = (34 + ((v * (k + 2)) % 1) * 10) * ZS; kCyl(0, 0, y, r, hh, k % 2 ? st.wall : glass, k % 2 ? M_PLASTER : 0, n, 0, k % 2 ? 0 : .02);
+        for (let f = y + .3; f < y + hh; f += .3) kCyl(0, 0, f, r + .012, .016, '#e8ecef', M_STONE, n, 0); y += hh; kCyl(0, 0, y, r + .01, .03, '#7cc47f', M_GRASS, n);
+        if (k < 3) for (let q = 0; q < (lod ? 6 : 3); q++) { const a = q / (lod ? 6 : 3) * TAU + k; kTree(Math.cos(a) * (r - .05), Math.sin(a) * (r - .05), y + .03, (q * .23 + k * .1) % 1, .5, ['#5f9a4d', '#6aa556', '#ee9fbe'][(q + k) % 3]); } y += .03; }
+      kBox(0, 0, y, .012, .012, .6, st.accent); kBox(0, 0, y + .6, .02, .02, .025, '#ff6a6a', 0, 3); return; }
+    kCyl(0, 0, 0, .36, .18, '#2f3a44', 0, n, 0, kLit(1)); kCyl(0, 0, .18, .37, .02, mix(st.wall, '#e4e4e0', .3), M_STONE, n); kDoor(0, .36, .06, .12, '#3a3f45', { ty: 'glass', hood: 'canopy' });
+    kCyl(0, 0, .2, .33, h * .82 - .2, glass, 0, n, 0, .02); for (let y2 = .5; y2 < h * .82; y2 += 8 * ZS) kCyl(0, 0, y2, .335, .012, st.trim, 0, n, 0);
+    if (lod) for (let q = 0; q < 24; q++) { const a = q / 24 * TAU; kBox(Math.cos(a) * .332, Math.sin(a) * .332, .2, .003, .003, h * .82 - .2, '#9aa3ad'); }
+    kCyl(0, 0, h * .82, .26, h * .18, shade(glass, 1.06), 0, n, 0, .02);
+    if (st.roofK === 'dome') kDome(0, 0, h, .26, .4, st.roof, M_SLATE); else if (st.roofK === 'garden') { kCyl(0, 0, h, .27, .02, '#7cc47f', M_GRASS, n); kTree(0, 0, h + .02, v, .8, '#5f9a4d'); }
+    else { kCyl(0, 0, h, .27, .02, '#cfd3d6', M_STONE, n); kBox(0, 0, h, .006, .006, .55, '#9aa3ad'); if (h > 90 * ZS) kBox(0, 0, h + .55, .012, .012, .02, '#ff5a5a', 0, 3); }
+    return;
+  }
+  const R = [0, 0, .24, .28, .32, .36][t], floors = [0, 0, 1, 2, 3, 5 + ((v * 3) | 0)][t], g0 = .03, fh = t === 2 ? .24 : t === 5 ? .26 : .22, H = g0 + floors * fh;
+  kCyl(0, 0, 0, R + .015, g0, org ? shade(wc, .85) : '#a59c8e', M_STONE, n); kCyl(0, 0, g0, R, H - g0, wc, wm, n, 0);
+  if (lod) for (let f = 1; f < floors; f++) kCyl(0, 0, g0 + f * fh - .008, R + .006, .016, org ? shade(wc, .9) : K_STONE, M_STONE, n, 0); // a band at each floor
+  const nw = t === 2 ? 5 : t === 5 ? 9 : 7; // windows all the way round, the door at the front
+  for (let f = 0; f < floors; f++) for (let k = 0; k < nw; k++) { const a = (k + (f % 2) * .5) / nw * TAU; if (f === 0 && Math.abs(Math.sin(a / 2)) < .25) continue;
+    kRot(a, () => kWin(0, R * Math.cos(Math.PI / nw * .4) - .002, g0 + f * fh + fh * .26, Math.min(.045, R * .28), fh * .5, f * 11 + k, { ty: wty === 'glass' ? 'modern' : wty, arch: org ? 'round' : null, box: !org && f > 0 && kLit(k + 40) < .25 })); }
+  kDoor(0, R - .004, .04, fh * .7, org ? '#6b8a5a' : WH_DOOR[(hk(B, 21) * WH_DOOR.length) | 0], { ty: org ? 'plank' : 'panel', steps: 1, fan: org, hood: org ? null : 'flat' });
+  if (t === 5) for (let f = 1; f < floors; f++) { kCyl(0, 0, g0 + f * fh, R + .05, .012, '#c9c6c0', M_STONE, n); if (lod) for (let q = 0; q < 28; q++) { const a = q / 28 * TAU; kBox(Math.cos(a) * (R + .046), Math.sin(a) * (R + .046), g0 + f * fh + .012, .0016, .0016, .04, K_IRON); } } // ring balconies
+  // the roof: the style's own, else a cone (a dome when organic); a stack through it
+  const ye = H, ov = .06;
+  if (rk === 'flat' || rk === 'garden') { kCyl(0, 0, ye, R + .01, .04, wc, wm, n, rk === 'garden' ? '#7cc47f' : '#77736c'); if (rk === 'garden' && lod) for (let q = 0; q < 3; q++) kBlob(Math.cos(q * 2.1) * R * .5, Math.sin(q * 2.1) * R * .5, ye + .05, .04, .03, leafC('#5f9a4d')); }
+  else if (rk === 'dome') { kCyl(0, 0, ye - .01, R + .03, .025, shade(st.roof, .85), M_SLATE, n); kDome(0, 0, ye + .01, R + .02, (R + .02) * (org ? 1 : .8), st.roof, M_SLATE); if (lod) { kCyl(0, 0, ye + (R + .02) * (org ? 1 : .8) - .01, .025, .035, K_STONE, M_STONE, 8); kBlob(0, 0, ye + (R + .02) * (org ? 1 : .8) + .035, .02, .015, '#c9a447', 0); } }
+  else if (rk === 'pyramid') { KF.rk = 'pyramid'; kRoofAlt(-R, R, -R, R, ye, R * .9, st.roof); KF.rk = null; }
+  else { kCone(0, 0, ye - .035, R + ov + .01, .035, shade(st.roof, .85), n, -1, R + ov); kCone(0, 0, ye, R + ov, R * 1.15 + .05, st.roof, n); if (lod) kBox(0, 0, ye + R * 1.15 + .05, .007, .007, .05, '#8c8f94'); }
+  if (t <= 4 && rk !== 'flat' && rk !== 'garden') { const [sc, sm] = hStack(wm, wc); kChim(R * .45, -R * .3, ye, ye + R * .9 + .12, .028, .028, sc, sm); }
+  if (org && t <= 4) { const a = hk(B, 8) < .5 ? 1.9 : -1.9; kRot(a, () => { kCyl(0, R + .06, 0, .12, H * .55, wc, wm, n, 0); kDome(0, R + .06, H * .55, .13, .12, st.roof, M_SLATE); kWin(0, R + .17, .06, .03, .08, 77, { ty: 'case', arch: 'round', back: 1 }); }); } // a domed annex
+  if (t <= 3) { kPath(-.03, R, .03, .5, '#b8ad9c'); if (lod) { for (let q = 0; q < 6; q++) { const a = q / 6 * TAU + .5; if (Math.abs(Math.sin(a / 2)) > .3) kFlowers(Math.cos(a) * (R + .08), Math.sin(a) * (R + .08), 0, (q + B.id) / 7); } kButt(-R - .03, -.08); if (hk(B, 14) < .5) kBench(.22, R + .08, 0, 1); }
+    const fr = .44, nf = lod ? 28 : 10, pts = []; for (let q = 0; q <= nf; q++) { const a = Math.PI / 2 + .25 + q / nf * (TAU - .5); pts.push([Math.cos(a) * fr, Math.sin(a) * fr]); } kFence(pts, .05, org ? '#8a6d57' : '#ede6d8', org ? 'hedge' : 'picket'); } // a round fence, the gate at the front
+}
+
+/* ---------- tiered houses: stepped terraces, a planted ledge at every step, windows all round, the style's roof on top ---------- */
+function hTiered(B, st) {
+  kSetB(B); const t = B.tier, v = B.var || 0, lod = KF.lod, [wc, wm] = kWall(B, st), wty = kWinTy(), glassy = t >= 6;
+  const steps = [0, 0, 2, 3, 3, 4, 5][t], w0 = [0, 0, .32, .36, .4, .42, .4][t], h0 = ([0, 0, 3.4, 4.4, 5.8, 7.5, 18][t] + ((v * 3) % 1) * (t === 6 ? 3 : 1)) * ZS, k0 = .76;
+  let y = 0, w = w0;
+  kPlinth(-w0, w0, -w0, w0, .025, '#a59c8e');
+  for (let k = 0; k < steps; k++) { const hh = k ? h0 : h0 + .03, fl = Math.max(1, Math.round(hh / .24)), col = glassy && k % 2 ? st.glass : wc;
+    kBox(0, 0, y, w, w, hh, col, glassy && k % 2 ? 0 : wm, glassy && k % 2 ? .02 : 0);
+    kWalls(-w, w, -w, w, (a, b, ff, q) => kWins(a, b, ff, y, hh / fl, fl, Math.max(2, Math.round(w * 2 / .14)), { ty: glassy ? 'glass' : wty, hk: .55 }, (c, f) => k === 0 && q === 0 && f === 0 && c === 1, k * 40 + q * 9));
+    y += hh;
+    if (k < steps - 1) { const nw = w * k0; kBox(0, 0, y, w + .008, w + .008, .016, K_STONE, M_STONE); kBox(0, 0, y + .016, w - .005, w - .005, .012, '#7cc47f', M_GRASS); // the ledge, planted
+      if (lod) { for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) kBox(a * (w - .01), b * (w - .01), y + .016, a ? .01 : w - .01, b ? .01 : w - .01, .03, leafC('#4f8a45'), M_LEAF);
+        for (const [a, b] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) kTree(a * (w + nw) / 2, b * (w + nw) / 2, y + .028, (k * 3 + a + b) * .17 % 1, .4, ['#5f9a4d', '#ee9fbe', '#6aa556'][(k + a + 3) % 3]); }
+      w = nw; y += .028; } }
+  kDoor(-w0 + w0 * 2 * 1.5 / Math.max(2, Math.round(w0 * 2 / .14)), w0, .04, Math.min(.17, h0 * .7), WH_DOOR[(hk(B, 21) * WH_DOOR.length) | 0], { steps: 1, hood: 'canopy', roof: st.accent });
+  const rk = st.roofK; if (rk === 'dome') kDome(0, 0, y, w * .95, w * .7, st.roof, M_SLATE); else if (rk === 'flat' || rk === 'garden') kFlat(-w, w, -w, w, y, wc, .03, { wm }); else kHip(-w, w, -w, w, y, w * .6, st.roof, { ov: .03, fin: 1 });
+  if (!glassy && rk !== 'flat' && rk !== 'garden' && t <= 4) { const [sc, sm] = hStack(wm, wc); kChim(w * .5, -w * .4, y, y + w * .6 + .1, .025, .025, sc, sm); }
+  if (glassy) { kBox(0, 0, y + (rk === 'dome' ? w * .7 : w * .6), .006, .006, .4, '#9aa3ad'); kBox(0, 0, y + (rk === 'dome' ? w * .7 : w * .6) + .4, .012, .012, .02, '#ff5a5a', 0, 3); }
 }

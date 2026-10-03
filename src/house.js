@@ -8,7 +8,7 @@
 // market quarter. The near version of a chunk (GLB.lod) gets all of it; the far one keeps the shapes and the windows.
 // Everything is in world units: s along the street, f out towards it, y up from the ground.
 const WH_DOOR = ['#2f4f3f', '#6b2a2a', '#2a3a5a', '#2a2a2e', '#5a3a28', '#3f6b6b'], WH_TRIM = '#efe9dc', WH_STONE = '#cfc6b4';
-function whFits(B, st) { return B.tier === 4 && rowStyleOK(B) && !dsFlat() && !hasTech('computing') && (SHAPE_HM[st.shape] || 1) === 1; }
+function whFits(B, st) { return B.tier === 4 && rowStyleOK(B) && !dsFlat() && !hasTech('computing') && !KF.rk; } // (a tall or low style stretches it afterwards: homes.js hScale)
 function glWorkerHouse(B, st) { // (homes.js hands it the rowhouse; st is already tinted)
   const J = houseJoin(B), U = (J ? J.a : houseAx(B)) === 'u', X = GLB.x, Z = GLB.y, y0 = GLB.base, lod = GLB.lod;
   const fx = U ? 0 : 1, fz = U ? 1 : 0, sg = inb(X + fx, Z + fz) && netTile(idx(X + fx, Z + fz)) ? 1 : inb(X - fx, Z - fz) && netTile(idx(X - fx, Z - fz)) ? -1 : 1; // the street side
