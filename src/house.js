@@ -20,7 +20,8 @@ function glWorkerHouse(B, st) { // (homes.js hands it the rowhouse; st is alread
   const fB = -.3, fD = .37, fc = (fB + fD) / 2; // back wall, front wall, the ridge between
   const r = hash2(U ? B.y : B.x, 4 * 7 + B.sid, 57), H = (18 + ((r * 5) % 1) * 5 + (hk(B, 9) < .25 ? 3 : 0)) * ZS; // (the same roofline as the shared terrace art, so mixed rows line up)
   const floors = H > 1 ? 3 : 2, g0 = .05, fh0 = (H - g0) / floors * 1.08, fhU = floors > 1 ? (H - g0 - fh0) / (floors - 1) : 0, fl = k => k ? g0 + fh0 + (k - 1) * fhU : g0; // floor k's sill line
-  const wall = st.wall, wm = glWallMat(B) === M_PLASTER ? M_BRICK : glWallMat(B), wallC = wm === M_BRICK ? mix(wall, '#a5573f', .55) : wall, sv = GLB.wall; GLB.wall = wm; GLB.wallC = gcol(wallC);
+  const wall = st.wall, wm = st.painted ? M_PLASTER : glWallMat(B) === M_PLASTER ? M_BRICK : glWallMat(B), wallC = wm === M_BRICK ? mix(wall, '#a5573f', .55) : wall, // (painted houses: rendered over)
+    stC = st.painted ? '#a0604a' : wallC, stM = st.painted ? M_BRICK : wm, sv = GLB.wall; GLB.wall = wm; GLB.wallC = gcol(wallC);
   const shop = shopfront(B), nb = L > .75 ? 3 : 2, bay = k => s0 + (k + .5) * L / nb, dk = hk(B, 20) < .5 ? 0 : nb - 1, door = WH_DOOR[(hk(B, 21) * WH_DOOR.length) | 0];
   const lit = k => .03 + .94 * hash2(B.id * 7 + k, B.x + B.y, 71); // which windows are lit at night
   // the body: plinth, walls, string course, cornice
@@ -109,8 +110,8 @@ function glWorkerHouse(B, st) { // (homes.js hands it the rowhouse; st is alread
   // chimney stacks on the party walls (one each: the lower house of a pair builds it) and at the ends of a row
   const stacks = [hi ? s1 : s1 - .05]; if (!lo) stacks.push(s0 + .05);
   for (const s of stacks) { const p = P(s, fc - .02, 0), sw = U ? .042 : .085, sd = U ? .085 : .042, top = y0 + ye + rh + .17;
-    glChimney(p[0], y0 + ye + rh * .4, p[2], sw, sd, top, wallC, wm);
-    if (lod) { GLB.mat = wm; glOBox([p[0], top - .03, p[2]], [sw + .012, 0, 0], [0, 0, sd + .012], [0, .014, 0], wallC); } } // corbelled out near the top
+    glChimney(p[0], y0 + ye + rh * .4, p[2], sw, sd, top, stC, stM);
+    if (lod) { GLB.mat = stM; glOBox([p[0], top - .03, p[2]], [sw + .012, 0, 0], [0, 0, sd + .012], [0, .014, 0], stC); } } // corbelled out near the top
   // a back range: a lower wing out the back with a lean-to roof
   if (hk(B, 22) < .55) { const s = hk(B, 25) < .5 ? s0 + .16 : s1 - .16, w = .13, f1 = -.47, h2 = fh0 + fhU * .8;
     bx(s, (fB + f1) / 2, 0, w, (fB - f1) / 2, h2, wallC, wm); if (lod) win(s, f1, g0 + fh0 * .2, .035, fh0 * .27, 70, false, true);

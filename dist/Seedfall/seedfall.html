@@ -1072,7 +1072,7 @@ function markDirty(i) { if (GL3.on) glDirty(i); } // (the 3D chunk round this ti
 function markDirtyXY(x, y) { if (inb(x, y)) markDirty(idx(x, y)); }
 
 function renderAll() { // a new or loaded world: the light from scratch, every chunk rebuilt
-  LIGHT.sun = sunNow(); LIGHT.season = LIGHT.forceSeason || seasonNow(); LIGHT.seasonT = 300;
+  LIGHT.sun = sunNow(); LIGHT.season = seasonFor(); LIGHT.seasonT = 300;
   LIGHT.cur = LT = mkLight(envNow()); LIGHT.artKey = null; LIGHT.chk = 0;
   if (GL3.on) for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k);
 }
@@ -1185,6 +1185,7 @@ function tileVerge(i, x, y) {
   refreshOwn();
   const sf = M.road[i], T = OWN[i] ? S.T[OWN[i]] : null, inT = T && dist(x, y, T.x, T.y) <= townRadius(T) + 1, z = zoneAt(i), grass = leafC(shade(BIO_COL[M.bio[i]] || '#94d4a6', .72));
   const nb = roadNeighbors(M.road, x, y), wood = '#8a6d57';
+  if (inT && LVV.deco && LVV.deco !== 'flower_boxes') tileDeco(x, y, nb, T);
   for (const [u, v, k] of [[-.37, -.37, 0], [-.38, .37, 1], [.37, .38, 2]]) {
     const h = hash2(x, y, 300 + k);
     if (!inT) { // country roads: tufts, flowers, a bit of fence, a milestone, a road sign
@@ -1221,6 +1222,20 @@ function tileVerge(i, x, y) {
     else if (h < .62) { post(u, v, 7, .006, '#dfe7ef'); GLB.mat = 0; glOBox(gp(u, v, 7.5), [.016, 0, 0], [0, 0, .016], [0, .016, 0], '#8fe3ec', 2); }
     else if (h < .7) benchAt(u, v, '#cfd8e0');
   }
+}
+// streets dressed for the custom the Watcher's words began: bunting or paper lanterns strung across, flags on poles
+const BUNT = ['#d9534f', '#f2c14e', '#4a8fd0', '#5fae5f', '#f4f1ea', '#e070a8'], PLANT_C = ['#ffb45e', '#ff8a5e', '#ffd27a', '#ff9ad0'];
+function tileDeco(x, y, nb, T) {
+  const ew = nb.some(d => d[0]) && !nb.some(d => d[1]), ns = nb.some(d => d[1]) && !nb.some(d => d[0]), h = hash2(x, y, 707); if (!ew && !ns) return;
+  const d = LVV.deco, lod = GLB.lod, P = t => ew ? [0, -.48 + t * .96] : [-.48 + t * .96, 0];
+  if (d === 'flags') { if (h > .5) return; for (const sg of [-1, 1]) { const [u, v] = ew ? [sg * .1, -.44 * sg] : [-.44 * sg, sg * .1]; post(u, v, 15, .005, '#8c9199'); GLB.mat = 0; glOBox(gp(u + (ew ? .035 : 0), v + (ew ? 0 : .035), 13.6), ew ? [.032, 0, 0] : [.002, 0, 0], ew ? [0, 0, .002] : [0, 0, .032], [0, .022, 0], [BUNT[(x + y + (sg > 0 ? 1 : 0)) % BUNT.length], S.styles[S.styleIdx] ? S.styles[S.styleIdx].accent : '#d9534f'][h < .25 ? 1 : 0]); } return; }
+  if (h > .75) return;
+  const zt = 12 + h * 3, sag = 2.2, at = t => { const [u, v] = P(t); return gp(u, v, zt - Math.sin(t * Math.PI) * sag); }, n = 6;
+  for (let q = 0; q < n; q++) gBeam(at(q / n), at((q + 1) / n), .0012, '#d8d2c4'); // the string across the street
+  const m = lod ? 14 : 5;
+  for (let q = 1; q < m; q++) { const t = q / m, p = at(t);
+    if (d === 'bunting') { GLB.mat = 0; const a = ew ? [0, 0, .014] : [.014, 0, 0], nx = ew ? [.1, 0, 0] : [0, 0, .1], c = gcol(BUNT[(q + x + y) % BUNT.length]); for (const sg of [-1, 1]) { GLB.ctr = V3a(p, V3s(nx, sg)); gtri(V3a(p, V3s(a, -1)), V3a(p, a), [p[0], p[1] - .03, p[2]], c); } } // (both faces)
+    else { GLB.mat = 0; glOBox([p[0], p[1] - .016, p[2]], [.011, 0, 0], [0, 0, .011], [0, .013, 0], PLANT_C[(q + x) % PLANT_C.length], 3); } } // paper lanterns, glowing
 }
 // open grass: tufts, clover and wildflowers, thicker on lush ground
 function tileGround(i, x, y) {
@@ -1351,7 +1366,12 @@ function tieredBody(hw, hd, h, st, wc, glass) {
 }
 const hk = (B, n) => hash2(B.id, n, 131); // a house's own dice, the same on every reload
 const HTINT = new Map();
-function houseTint(st, B) { // a little colour of its own: limewash, ochre, a door-colour wash...
+const HPAL = { rainbow: ['#d9534f', '#e8973a', '#e8cf4a', '#5fae5f', '#4a8fd0', '#8a62c8', '#e070a8', '#3fb0a8'], pastel: ['#f4c6d4', '#c6dff4', '#d2f0c6', '#f6ecbc', '#e0d0f4', '#f7d6bc', '#c8efe8'],
+  whitewash: ['#f6f3ec', '#efeae0', '#faf8f3'], earthy: ['#c9a27a', '#a8785a', '#d8c09a', '#8f7050', '#b89070', '#9a8a60'], bold: ['#a8303a', '#2f5f9a', '#2f7a4a', '#d0902a', '#5a2f7a', '#1f6a6a', '#2a2a3a'] };
+function houseTint(st, B) { // a little colour of its own: limewash, ochre, a door-colour wash... or the colours the Watcher's words asked for
+  const pal = HPAL[LVV.housecol];
+  if (pal) { const j = (hk(B, 33) * pal.length) | 0, key = st.wall + st.roof + LVV.housecol + j; let o = HTINT.get(key); if (o) return o;
+    o = Object.assign({}, st, { wall: mix(st.wall, pal[j], .82), painted: 1 }); if (HTINT.size > 600) HTINT.clear(); HTINT.set(key, o); return o; }
   const k = (hk(B, 3) * 7) | 0; if (!k) return st;
   const key = st.wall + st.roof + st.accent + k; let o = HTINT.get(key); if (o) return o;
   const [col, f] = [null, ['#ffffff', .24], [st.accent, .17], ['#e6c393', .22], [st.roof, .13], ['#8f857f', .16], ['#f3d9c4', .2]][k];
@@ -1611,9 +1631,11 @@ function seasonNow(ms) {
   return { autumn: bump(290, 55), winter: bump(15, 62), spring: bump(115, 50) };
 }
 function lightEra() { return !S || !S.tech ? 0 : hasTech('hover') ? 2 : hasTech('electric') ? 1 : 0; }
+const LV_SEASON = { spring: { autumn: 0, winter: 0, spring: 1 }, summer: { autumn: 0, winter: 0, spring: 0 }, autumn: { autumn: 1, winter: 0, spring: 0 }, winter: { autumn: 0, winter: 1, spring: 0 } };
+function seasonFor() { return LIGHT.forceSeason || LV_SEASON[LVV.seasons] || seasonNow(); } // (a season the Watcher's words asked to stay)
 function litFrac(hr, el) {
   if (el > 4) return 0;
-  const f = hr >= 16 && hr < 23 ? .8 : (hr >= 23 || hr < 1) ? .6 : hr < 4.5 ? .3 : .5;
+  const bt = LVV.bedtime, f = bt === 'never' ? .85 : bt === 'early' ? (hr >= 16 && hr < 21 ? .7 : .12) : bt === 'late' ? (hr >= 16 || hr < 3 ? .85 : .55) : hr >= 16 && hr < 23 ? .8 : (hr >= 23 || hr < 1) ? .6 : hr < 4.5 ? .3 : .5;
   return f * sstep(4, -4, el);
 }
 
@@ -1672,14 +1694,14 @@ function leafC(col, f) { let c = LT.leaf[1] ? mix(col, LT.leaf[0], LT.leaf[1]) :
 function lightTick(dt) {
   if (!S) return;
   LIGHT.sun = sunNow();
-  if (!LIGHT.season || (LIGHT.seasonT -= dt) <= 0) { LIGHT.season = LIGHT.forceSeason || seasonNow(); LIGHT.seasonT = 300; }
+  if (!LIGHT.season || (LIGHT.seasonT -= dt) <= 0) { LIGHT.season = seasonFor(); LIGHT.seasonT = 300; }
   stepWeather(dt);
   const el = LIGHT.sun.el, fx = LIGHT.sun.fixed;
   LIGHT.emK = fx ? 0 : sstep(4, -6, el);
   LIGHT.nightK = fx ? 0 : sstep(0, -9, el);
   LIGHT.dayK = fx ? 1 : sstep(-6, 4, el);
   if ((LIGHT.chk -= dt) <= 0) { // what the art takes from the light (the era's lamps, the night's custom, gardens) changed: rebuild the view
-    LIGHT.chk = 1.5; const env = envNow(), k = [env.era, env.nl || '', env.gd || 0].join('|');
+    LIGHT.chk = 1.5; const env = envNow(), k = [env.era, env.nl || '', env.gd || 0, LVA].join('|'); // (and the customs the buildings show: house colours, trees, decorations)
     if (!LIGHT.cur || k !== LIGHT.artKey) { LIGHT.cur = LT = mkLight(env); if (LIGHT.artKey != null && GL3.on) for (let n = 0; n < GNC * GNC; n++) GL3.dirty.add(n); LIGHT.artKey = k; }
   }
   const night = LIGHT.nightK > .5 || S.wx && S.wx.storm > .6 && LIGHT.dayK < 1;
@@ -1952,6 +1974,7 @@ function recalcTown(T) {
 }
 
 /* ---------- geometry helpers ---------- */
+const paceK = () => { const p = lever('pace'); return p === 'industrious' ? 1.15 : p === 'leisurely' ? .85 : 1; }; // (how hard the Watcher's words have them working)
 function townRadius(T) { const g = lever('growth'), m = g === 'spread_out' ? 1.3 : g === 'compact' ? .82 : 1; return clamp((2.2 + Math.sqrt(T.pop) * 0.4) * m, 2.6, 13 * m); } // (lanes take a little more room than the old grid did)
 function ownerOf(x, y) {
   let best = null, bd = 1e9;
@@ -2399,7 +2422,7 @@ function buildTown(T) {
   if (!active.length) return;
   const share = laborOf(T) / active.length;
   for (const B of active) {
-    const dp = Math.min(share / workFor(B), 1 - B.prog);
+    const dp = Math.min(share * paceK() / workFor(B), 1 - B.prog);
     B.prog = Math.min(1, B.prog + dp * payFor(T, B, dp)); // short of materials: slower, never stopped
     if (B.prog > .9999) B.prog = 1;
     const stage = B.prog >= 1 ? 9 : Math.floor(B.prog * 5);
@@ -3605,7 +3628,7 @@ function stepTrade() {
     const rich = ts.filter(A => A !== B && (roadLinked(A, B) || seaLinked(A, B))).map(T => [T, T.res[r] - econCap(T) * .55]).filter(a => a[1] > 0).sort((a, b) => b[1] - a[1]);
     if (!rich.length) continue;
     const [A, sur] = rich[0];
-    const n = Math.min(sur, def, 30 + (seaLinked(A, B) ? 20 * (yardN(A) + yardN(B)) : 0)); if (n < 3) continue; // shipyards: bigger holds
+    const tl = lever('trade'), n = Math.min(sur, def, (30 + (seaLinked(A, B) ? 20 * (yardN(A) + yardN(B)) : 0)) * (tl === 'open' ? 1.6 : tl === 'closed' ? .35 : 1)); if (n < 3) continue; // shipyards: bigger holds; the custom opens or shuts the roads
     A.res[r] -= n; B.res[r] += n;
     A.exp[r] = (A.exp[r] || 0) + n;
     moves.push([A, B, r, n]);
@@ -3748,7 +3771,7 @@ function needValues(T, n, radios) {
 
 /* ---------- smoke: the works and power houses of the steam age dirty the air until clean power comes ---------- */
 const SMOKY = { works: 3, power: 4, glassworks: 1 };
-const sootK = () => !hasTech('steam') ? 0 : hasTech('climate') ? 0 : hasTech('solar') ? .2 : 1;
+const sootK = () => (!hasTech('steam') ? 0 : hasTech('climate') ? 0 : hasTech('solar') ? .2 : 1) * (lever('smoke') === 'clean' ? .3 : lever('smoke') === 'smoky' ? 1.3 : 1); // (the custom can keep the air clean)
 function pollution(T, n) {
   n = n || townCounts(T); let s = 0;
   for (const k in SMOKY) s += (n[k] || 0) * SMOKY[k];
@@ -4715,15 +4738,36 @@ const AI_BUILDINGS = ['park', 'dome', 'market', 'library', 'school', 'observator
 const AI_EVENTS = ['festival', 'art', 'song', 'invent', 'book', 'harvest', 'herd', 'rivalry', 'swallows', 'meteors', 'wedding', 'climb'];
 const AI_MONUMENTS = ['statue', 'lantern', 'spire', 'harp', 'gardens', 'colossus', 'hall', 'clock', 'obelisk', 'orchard'];
 const AI_SHUNNABLE = ['works', 'power', 'mine', 'mast', 'turbine', 'airfield', 'stadium', 'mill', 'market', 'solar', 'antenna', 'clinic', 'school', 'workshop'];
-const LV_KEYS = { nature: ['protect', 'plant', 'clear', 'wild', 'gardens'], growth: ['taller', 'spread_out', 'compact', 'more_towns', 'stay_small'], lights: ['warm', 'cool', 'colourful', 'candlelight', 'dark_sky'], weather: ['sunny', 'rainy', 'snowy', 'foggy', 'stormy', 'mild'], material: ['timber', 'stone', 'brick', 'local'], streets: ['winding', 'planned'] };
-const LV_TXT = {
-  nature: { protect: 'forests are left alone, towns build around them', plant: 'trees get planted in and around the towns', clear: 'woods near towns are cleared for fields', wild: 'the meadows go back to forest', gardens: 'flowers and parks everywhere' },
-  growth: { taller: 'towns build upward sooner', spread_out: 'towns spread out wider', compact: 'towns stay compact and dense', more_towns: 'more new towns get founded', stay_small: 'towns grow slowly and stay small' },
-  lights: { warm: 'warm golden window light', cool: 'cool white light at night', colourful: 'every window and lamp a different colour', candlelight: 'candlelight: dim, orange nights', dark_sky: 'lights out at night, for the stars' },
-  streets: { winding: 'new streets wind along the land, like an old village', planned: 'new quarters are laid out in straight, square grids' },
-  material: { timber: 'houses are built of timber wherever it can be had', stone: 'houses are built of stone, even if it has to be carted in', brick: 'brick and clay for everything', local: 'every town builds with what its own land gives' },
-  weather: { sunny: 'more sunshine', rainy: 'more rain', snowy: 'snow, whatever the season', foggy: 'more fog', stormy: 'more thunderstorms', mild: 'gentle weather, no storms' }
-};
+// The levers the Watcher's words can pull: each is a custom the towns take up (it fades as the teaching does). k: its name in
+// CULT.lv, f: the tool's field, o: the choices and what each does (shown in the Voice tab and the Customs list), n: what the
+// Customs list calls it, d: the tool's description, art: buildings or ground change with it (the view is rebuilt)
+const LEVERS = [
+  { k: 'nature', f: 'nature', n: 'Nature', d: 'how they treat the land. protect: leave forests alone and build around them. plant: plant trees in and around towns. clear: clear woods for fields. wild: let meadows turn back to forest. gardens: flowers and parks everywhere.', o: { protect: 'forests are left alone, towns build around them', plant: 'trees get planted in and around the towns', clear: 'woods near towns are cleared for fields', wild: 'the meadows go back to forest', gardens: 'flowers and parks everywhere' } },
+  { k: 'growth', f: 'growth', n: 'Growth', d: 'how the towns grow.', o: { taller: 'towns build upward sooner', spread_out: 'towns spread out wider', compact: 'towns stay compact and dense', more_towns: 'more new towns get founded', stay_small: 'towns grow slowly and stay small' } },
+  { k: 'streets', f: 'street_layout', n: 'Streets', d: 'how new streets are laid out. winding: crooked lanes that follow the land. planned: straight grid quarters.', o: { winding: 'new streets wind along the land, like an old village', planned: 'new quarters are laid out in straight, square grids' } },
+  { k: 'material', f: 'building_material', n: 'Materials', d: 'what they prefer to build houses from. timber, stone or brick; local means each town uses whatever its own land gives. Towns cut, quarry and trade to get it.', o: { timber: 'houses are built of timber wherever it can be had', stone: 'houses are built of stone, even if it has to be carted in', brick: 'brick and clay for everything', local: 'every town builds with what its own land gives' } },
+  { k: 'lights', f: 'night_lights', n: 'Nights', d: 'how the towns light their nights.', o: { warm: 'warm golden window light', cool: 'cool white light at night', colourful: 'every window and lamp a different colour', candlelight: 'candlelight: dim, orange nights', dark_sky: 'lights out at night, for the stars' } },
+  { k: 'weather', f: 'weather_wish', n: 'Weather wish', d: 'if the words ask for weather, the sky starts to listen.', o: { sunny: 'more sunshine', rainy: 'more rain', snowy: 'snow, whatever the season', foggy: 'more fog', stormy: 'more thunderstorms', mild: 'gentle weather, no storms' } },
+  { k: 'seasons', f: 'season', n: 'Season', d: 'if the words ask for a season to stay (an endless summer, an eternal spring), the valley keeps it whatever the calendar says. natural lets the calendar back in.', o: { spring: 'an endless spring: blossom and fresh green', summer: 'an endless summer', autumn: 'an endless autumn: red and gold leaves', winter: 'an endless winter: white trees and pale fields', natural: 'the seasons follow the calendar again' } },
+  { k: 'sky', f: 'sky_colour', n: 'Sky', d: 'the colour of the sky itself, or an aurora dancing over the valley at night.', o: { golden: 'a golden sky', rosy: 'a rose-tinted sky', violet: 'a violet sky', green: 'a green-tinted sky', aurora: 'an aurora dances over the valley every night' } },
+  { k: 'housecol', f: 'house_colours', n: 'House colours', d: 'how people paint their houses.', o: { rainbow: 'every house painted a different bright colour', pastel: 'houses in soft pastels', whitewash: 'all the houses whitewashed', earthy: 'houses in earthy browns and ochres', bold: 'houses in deep, bold colours' }, art: 1 },
+  { k: 'trees', f: 'trees', n: 'Trees', d: 'which trees they love: the woods and the garden and street trees slowly look that way.', o: { oaks: 'round green oaks everywhere', pines: 'dark pines everywhere', birches: 'white birches everywhere', blossom: 'blossom trees everywhere, pink all year', maples: 'red maples everywhere' }, art: 1 },
+  { k: 'deco', f: 'street_decorations', n: 'Streets dressed with', d: 'how the streets are decorated: bunting strung across them, paper lanterns, flags on poles, or flower boxes under every window.', o: { bunting: 'bunting strung across the streets', paper_lanterns: 'strings of paper lanterns across the streets', flags: 'flags flying along the streets', flower_boxes: 'flower boxes under every window' }, art: 1 },
+  { k: 'bedtime', f: 'bedtime', n: 'Bedtime', d: 'when the towns go to bed, so how many windows are lit at night.', o: { early: 'early to bed: dark windows by nine', late: 'late nights: windows lit till the small hours', never: 'nobody sleeps: windows lit all night' } },
+  { k: 'clothes', f: 'clothes', n: 'Clothes', d: 'what people wear.', o: { colourful: 'everyone in bright colours', white: 'everyone in white', dark: 'everyone in black and dark grey', earthy: 'browns, greens and homespun', matching: 'everyone in the colour of the town style' } },
+  { k: 'hats', f: 'hats', n: 'Hats', d: 'a fashion in hats.', o: { tall_hats: 'tall hats are the fashion', flower_crowns: 'flower crowns on everyone', no_hats: 'nobody wears a hat', everyone: 'everyone wears the hat of the age' } },
+  { k: 'pets', f: 'pets', n: 'Pets', d: 'the animals people keep.', o: { dogs: 'everyone has a dog', cats: 'cats follow people about', none: 'no pets in town' } },
+  { k: 'bustle', f: 'street_life', n: 'Street life', d: 'how busy the streets are.', o: { bustling: 'the streets are always bustling', quiet: 'quiet streets, people keep indoors' } },
+  { k: 'birds', f: 'birds', n: 'Birds', d: 'birds over the valley.', o: { flocks: 'great flocks of birds over the valley', none: 'the birds keep away' } },
+  { k: 'fireworks', f: 'fireworks', n: 'Fireworks', d: 'fireworks: often (some town lets them off most nights) or never.', o: { often: 'fireworks most nights', never: 'no more fireworks' } },
+  { k: 'pace', f: 'work_pace', n: 'Work', d: 'how hard they work: industrious builds faster, leisurely slower (and they mind it less).', o: { industrious: 'hard workers: buildings go up faster', leisurely: 'an easy pace: buildings go up slower' } },
+  { k: 'trade', f: 'trade', n: 'Trade', d: 'open: the towns trade eagerly, closed: each keeps to itself.', o: { open: 'the towns trade eagerly with each other', closed: 'each town keeps to itself and trades little' } },
+  { k: 'sea', f: 'seafaring', n: 'The sea', d: 'how they feel about the sea.', o: { seafaring: 'a seafaring people: more ships on the water', landlubbers: 'landlubbers: few ships put out' } },
+  { k: 'faith', f: 'faith', n: 'Faith', d: 'devout: they revere the Watcher more (Reverence gathers faster, shrines go up), secular: less.', o: { devout: 'devout: Reverence gathers faster', secular: 'secular: Reverence gathers slower' } },
+  { k: 'smoke', f: 'smoke', n: 'Smoke', d: 'clean: works and power houses burn clean, the air stays clear. smoky: they don’t mind the smoke.', o: { clean: 'clean air: the works hardly smoke', smoky: 'they don’t mind smoke: the works smoke harder' } }
+];
+const LV_KEYS = Object.fromEntries(LEVERS.map(L => [L.k, Object.keys(L.o)])), LV_TXT = Object.fromEntries(LEVERS.map(L => [L.k, L.o]));
+let LVV = {}, LVA = ''; // the levers in force (for the view, which reads them every frame) and those the buildings' art depends on
 let CULT = { tb: {}, bld: {}, ev: {}, lv: {}, shun: {}, rs: 0, bs: 0 };
 function lever(k) { const x = CULT.lv && CULT.lv[k]; return x && x.w >= .25 ? x.v : null; }
 function leverW(k) { const x = CULT.lv && CULT.lv[k]; return x && x.w >= .25 ? Math.min(1, x.w) : 0; }
@@ -4865,22 +4909,17 @@ const TOOL_WORDS = {
         roof_color: { type: 'string', description: 'Hex colour.' },
         accent_color: { type: 'string', description: 'Hex colour.' },
         fields: { type: 'string', enum: ['rows', 'round', 'stripes', 'flowers', 'orchard'], description: 'How farm fields are laid out.' } } },
-      nature: { type: 'string', enum: LV_KEYS.nature, description: 'Optional: how they treat the land. protect: leave forests alone and build around them. plant: plant trees in and around towns. clear: clear woods for fields. wild: let meadows turn back to forest. gardens: flowers and parks everywhere.' },
-      growth: { type: 'string', enum: LV_KEYS.growth, description: 'Optional: how the towns grow.' },
-      street_layout: { type: 'string', enum: LV_KEYS.streets, description: 'Optional: how new streets are laid out. winding: crooked lanes that follow the land. planned: straight grid quarters.' },
-      building_material: { type: 'string', enum: LV_KEYS.material, description: 'Optional: what they prefer to build houses from. timber, stone or brick; local means each town uses whatever its own land gives. Towns cut, quarry and trade to get it.' },
       new_town: { type: 'object', description: 'Optional: settlers leave to found a new town with this name.', properties: { name: { type: 'string' } } },
       names: { type: 'array', maxItems: 3, description: 'Optional: things that get (re)named because of the words. Only if the words ask for it or it clearly fits. river, sea, peak and forest names are written on the map.', items: { type: 'object', properties: {
         kind: { type: 'string', enum: ['planet', 'town', 'moon', 'river', 'sea', 'peak', 'forest'] },
         current: { type: 'string', description: 'For a town or moon: its current name.' },
         name: { type: 'string' } }, required: ['kind', 'name'] } },
-      night_lights: { type: 'string', enum: LV_KEYS.lights, description: 'Optional: how the towns light their nights.' },
       sky_lanterns: { type: 'boolean', description: 'Optional: true if they start releasing floating lanterns into the night sky.' },
-      weather_wish: { type: 'string', enum: LV_KEYS.weather, description: 'Optional: if the words ask for weather, the sky starts to listen.' },
       crop: { type: 'string', enum: CROPS.map(c => c.n), description: 'Optional: a crop every town switches to.' },
       shunned_buildings: { type: 'array', maxItems: 3, items: { type: 'string', enum: AI_SHUNNABLE }, description: 'Optional: kinds of buildings the towns refuse to build any more.' },
       research: { type: 'integer', minimum: -1, maximum: 1, description: 'Optional: -1 they turn away from new ideas (slower discoveries), 1 they chase them.' },
-      births: { type: 'integer', minimum: -1, maximum: 1, description: 'Optional: -1 fewer children, 1 more.' }
+      births: { type: 'integer', minimum: -1, maximum: 1, description: 'Optional: -1 fewer children, 1 more.' },
+      ...Object.fromEntries(LEVERS.map(L => [L.f, { type: 'string', enum: Object.keys(L.o), description: 'Optional: ' + L.d }]))
     },
     required: ['doctrine_name', 'interpretation', 'chronicle']
   }
@@ -4964,7 +5003,7 @@ THE WATCHER HAS JUST SPOKEN THESE WORDS (they reach the colonists as an omen: a 
 """${words}"""
 
 Interpret them. The colonists take the words seriously, but they may misunderstand, argue, split into schools of thought, or turn them into customs, festivals and fashions. If the words are unkind or ask for harm, the colonists find a gentle, harmless reading instead. Use the named people and towns above where it fits.
-Besides the story, you can change how the world looks and behaves: architecture (shape, roofs, colours, fields), building materials, street layout, nature, growth, names, night lights, sky lanterns, a weather wish, crops, shunned buildings, research and births. Use those levers when the words clearly touch on them, and take the words fairly literally when that's fun (e.g. "only circles" means round buildings and round fields). Leave levers out when the words don't touch on them. Story effects should still be modest; this nudges a culture, it doesn't rewrite it.`, TOOL_WORDS, 2000, 'words', words);
+Besides the story, you can change how the world looks and behaves: architecture (shape, roofs, colours, fields), building materials, street layout, nature, growth, names, night lights, sky lanterns, a weather wish, a season that stays, the colour of the sky or an aurora, house colours, the kind of trees, street decorations, bedtime, clothes, hats, pets, how busy the streets are, birds, fireworks, how hard they work, trade, the sea, faith, smoke, crops, shunned buildings, research and births. Use those levers when the words touch on them (several at once is fine when the words are about a way of life), and take the words fairly literally when that's fun (e.g. "only circles" means round buildings and round fields). Leave levers out when the words don't touch on them. Story effects should still be modest; this nudges a culture, it doesn't rewrite it.`, TOOL_WORDS, 2000, 'words', words);
     applyWords(d, r, log);
     toast(`They call it ${d.name}.`);
   } catch (e) {
@@ -5054,10 +5093,13 @@ function recomputeCulture() {
   }
   for (const k in c.tb) c.tb[k] = clamp(c.tb[k], -3, 3);
   c.rs = clamp(c.rs, -1, 1); c.bs = clamp(c.bs, -1, 1);
+  if (c.lv.faith && c.lv.faith.v === 'devout' && c.lv.faith.w >= .25) c.bld.shrine = (c.bld.shrine || 0) + c.lv.faith.w; // (a devout people put up shrines)
   const lk = JSON.stringify(c.lv && Object.fromEntries(Object.entries(c.lv).map(([k, x]) => [k, x.w >= .25 ? x.v : null])));
-  if (CULT.lk !== lk && typeof LIGHT !== 'undefined') LIGHT.chk = 0;
+  if (CULT.lk !== lk && typeof LIGHT !== 'undefined') { LIGHT.chk = 0; LIGHT.seasonT = 0; } // (the art, the season and the sky look again)
   c.lk = lk;
   CULT = c;
+  LVV = {}; for (const L of LEVERS) { const v = lever(L.k); if (v) LVV[L.k] = v; } // (the view reads these every frame)
+  LVA = LEVERS.filter(L => L.art).map(L => LVV[L.k] || '').join('|');
 }
 function stepCulture() {
   for (const d of S.doctrines || []) {
@@ -5196,6 +5238,8 @@ function hexOk(s) {
   if (/^#[0-9a-f]{3}$/.test(s)) return '#' + s.slice(1).split('').map(c => c + c).join('');
   return null;
 }
+const LV_MORE = { material: v => v !== 'local' ? '. Old houses get rebuilt that way, a few a year' : '', weather: () => '. The sky starts to listen within a minute or so',
+  housecol: () => '. Houses are repainted as the custom spreads', trees: () => '. The woods and gardens change over', faith: v => v === 'devout' ? ' (and more shrines go up)' : '' };
 function applyLevers(d, r, fx) {
   const lv = {};
   const a = r.architecture;
@@ -5217,16 +5261,9 @@ function applyLevers(d, r, fx) {
     fx.push(`New building style “${st.name}”${bits.length ? ': ' + bits.join(', ') : ''}. Everything new is built this way, and old buildings are renovated into it over the next decades`);
     chron('🎨', `A new way of building spreads from ${biggestTown().name}: the ${st.name} style.`, { T: biggestTown() });
   }
-  if (LV_KEYS.nature.includes(r.nature)) { lv.nature = r.nature; fx.push(`Nature: ${LV_TXT.nature[r.nature]}`); }
-  if (LV_KEYS.growth.includes(r.growth)) { lv.growth = r.growth; fx.push(`Growth: ${LV_TXT.growth[r.growth]}`); }
-  if (LV_KEYS.streets.includes(r.street_layout)) { lv.streets = r.street_layout; fx.push(`Streets: ${LV_TXT.streets[r.street_layout]}`); }
-  if (LV_KEYS.material.includes(r.building_material)) { lv.material = r.building_material; fx.push(`Materials: ${LV_TXT.material[r.building_material]}${r.building_material !== 'local' ? '. Old houses get rebuilt that way, a few a year' : ''}`); }
-  if (LV_KEYS.lights.includes(r.night_lights)) { lv.lights = r.night_lights; fx.push(`Night: ${LV_TXT.lights[r.night_lights]}`); }
+  for (const L of LEVERS) { const v = r[L.f]; if (typeof v !== 'string' || !Object.hasOwn(L.o, v)) continue; lv[L.k] = v; fx.push(`${L.n}: ${L.o[v]}${LV_MORE[L.k] ? LV_MORE[L.k](v) : ''}`); }
   if (r.sky_lanterns === true) { lv.lanterns = 1; fx.push('Sky lanterns drift up from the towns after dark'); }
-  if (LV_KEYS.weather.includes(r.weather_wish)) {
-    lv.weather = r.weather_wish; fx.push(`Weather wish: ${LV_TXT.weather[r.weather_wish]}. The sky starts to listen within a minute or so`);
-    if (S.wx) S.wx.left = Math.min(S.wx.left, rf(20, 60));
-  }
+  if (lv.weather && S.wx) S.wx.left = Math.min(S.wx.left, rf(20, 60));
   if (Object.keys(lv).length) d.lv = lv;
   if (r.new_town && r.new_town.name) {
     const n = clean(r.new_town.name, 30);
@@ -5299,7 +5336,7 @@ function applyName(o) {
 function customsBrief() {
   const out = [], st = S.styles[S.styleIdx];
   if (st && (st.shape || st.roofK || st.fields || st.cult)) out.push(`building style ${st.name} (${[st.shape, st.roofK && st.roofK + ' roofs', st.fields && st.fields + ' fields'].filter(Boolean).join(', ') || 'custom colours'})`);
-  for (const k of ['nature', 'growth', 'streets', 'material', 'lights', 'weather']) { const v = lever(k); if (v) out.push(`${k}: ${v}`); }
+  for (const L of LEVERS) { const v = lever(L.k); if (v) out.push(`${L.f}: ${v}`); }
   if (lever('lanterns')) out.push('sky lanterns at night');
   const sh = Object.keys(CULT.shun || {}).filter(b => CULT.shun[b] >= .3); if (sh.length) out.push(`shunned: ${sh.join(', ')}`);
   if ((S.names || []).length) out.push('named places: ' + S.names.map(f => `${f.n} (${f.k})`).join(', '));
@@ -5309,8 +5346,7 @@ function customsBrief() {
 function customsList() {
   const out = [], st = S.styles[S.styleIdx];
   if (st && st.cult) out.push(['Building style', `${st.name}${[st.shape, st.roofK && st.roofK + ' roofs', st.fields && st.fields + ' fields'].filter(Boolean).length ? ': ' + [st.shape, st.roofK && st.roofK + ' roofs', st.fields && st.fields + ' fields'].filter(Boolean).join(', ') : ''}`]);
-  const nm = { nature: 'Nature', growth: 'Growth', streets: 'Streets', material: 'Materials', lights: 'Nights', weather: 'Weather wish' };
-  for (const k in nm) { const v = lever(k); if (v) out.push([nm[k], `${LV_TXT[k][v]} (${Math.round(leverW(k) * 100)}%)`]); }
+  for (const L of LEVERS) { const v = lever(L.k); if (v) out.push([L.n, `${L.o[v]} (${Math.round(leverW(L.k) * 100)}%)`]); }
   if (lever('lanterns')) out.push(['Sky lanterns', `released after dark (${Math.round(leverW('lanterns') * 100)}%)`]);
   const sh = Object.keys(CULT.shun || {}).filter(b => CULT.shun[b] >= .3); if (sh.length) out.push(['Shunned', sh.map(b => BT[b] ? plural(BT[b].n) : b).join(', ')]);
   if (Math.abs(CULT.rs || 0) > .1) out.push(['Discoveries', CULT.rs > 0 ? 'a little faster' : 'a little slower']);
@@ -5640,7 +5676,7 @@ function faithRecalc() {
   const shrines = wcount('shrine') + wcount('watchstone') * 3;
   FAITH.max = Math.round(120 + Math.min(12, shrines) * 12 + Math.min(80, Object.keys(S.tech.done).length * 2) + Math.min(60, (S.prayOk || 0) * 3));
   let dv = 0; for (const d of S.doctrines || []) dv += d.str;
-  FAITH.rate = 1.2 + .6 * Math.log10(totalPop() + 1) + .3 * Math.min(8, shrines) + Math.min(2, dv * .5) + Math.min(1.5, (S.prayOk || 0) * .05) + cultureFaith();
+  FAITH.rate = (1.2 + .6 * Math.log10(totalPop() + 1) + .3 * Math.min(8, shrines) + Math.min(2, dv * .5) + Math.min(1.5, (S.prayOk || 0) * .05) + cultureFaith()) * (lever('faith') === 'devout' ? 1.3 : lever('faith') === 'secular' ? .75 : 1);
 }
 function gainRev(n, why) {
   if (!S || S.flags.intro) return;
@@ -5884,10 +5920,10 @@ function processFX() {
     const f = FXQ.shift();
     switch (f.k) {
       case 'caption': if (S.settings.captions) addCaption(f); break;
-      case 'fireworks': DYN.fireworks = (DYN.fireworks || []); DYN.fireworks.push({ x: f.x, y: f.y, t: 0, life: 9, next: 0 }); camHint(f.x, f.y, '🎆 Fireworks'); break;
+      case 'fireworks': if (LVV.fireworks === 'never') break; DYN.fireworks = (DYN.fireworks || []); DYN.fireworks.push({ x: f.x, y: f.y, t: 0, life: 9, next: 0 }); camHint(f.x, f.y, '🎆 Fireworks'); break;
       case 'rain': DYN.rains.push({ x: f.x, y: f.y, t: 0, life: f.big ? 16 : 10 }); break;
       case 'herd': spawnHerd(f.x, f.y, true); break;
-      case 'birds': spawnBirds(f.x, f.y); break;
+      case 'birds': if (LVV.birds !== 'none') spawnBirds(f.x, f.y); break;
       case 'giant': spawnGiant(); break;
       case 'meteors': DYN.meteorShower = 20; break;
       case 'comet': DYN.comet = { az: rf(-1.2, 1.2), el: rf(.45, .8), t: 0, life: 80 }; break;
@@ -5989,6 +6025,10 @@ function launchRocket(bid, seed) {
 function updateDyn(dt) {
   DYN.t += dt;
   stepIntro(dt);
+  if (!FAST && S && !S.flags.intro) { // customs from the Watcher's words: flocks of birds, fireworks most nights
+    if (LVV.birds === 'flocks' && chance(dt * .025)) spawnBirds();
+    if (LVV.fireworks === 'often' && (LIGHT.emK || 0) > .6 && chance(dt * .012)) { const T = pick(towns()); if (T) (DYN.fireworks = DYN.fireworks || []).push({ x: T.x + rf(-1.5, 1.5), y: T.y + rf(-1.5, 1.5), t: 0, life: 9, next: 0 }); }
+  }
   stepAgents(dt);
   stepBoats(dt); stepShips(dt); stepFerries(dt); stepPlanes(dt);
   for (const tr of DYN.trains) {
@@ -6336,7 +6376,7 @@ function stepTraders(dt) {
 
 /* ---------- keeping the right number of people and vehicles around ---------- */
 function syncPeople() {
-  let total = 0; const crowd = 2.5; // (the 3D view draws people cheaply enough to fill the streets)
+  let total = 0; const crowd = 2.5 * (LVV.bustle === 'bustling' ? 1.4 : LVV.bustle === 'quiet' ? .45 : 1); // (the 3D view draws people cheaply enough to fill the streets; the custom makes them busier or quieter)
   const vt = hasTech('hover') ? 'hover' : hasTech('motor') ? 'car' : hasTech('wheel') ? 'cart' : null;
   for (const T of towns()) {
     const want = Math.round(Math.min(56 * crowd, (T.id === 1 && S.year < 20 ? 0 : 4) + Math.sqrt(T.pop) * 2.3 * crowd));
@@ -6470,7 +6510,7 @@ function edgeWater(from) { // somewhere out past the edge of the map, on the sam
 function edgeOut(i) { const x = i % W, y = (i / W) | 0; return x === 0 ? [-1, 0] : x === W - 1 ? [1, 0] : y === 0 ? [0, -1] : [0, 1]; }
 
 /* ---------- ships ---------- */
-const shipCap = () => 7 + Math.min(3, builtOf('shipyard').length); // shipyards put more ships on the water
+const shipCap = () => Math.round((7 + Math.min(3, builtOf('shipyard').length)) * (LVV.sea === 'seafaring' ? 1.6 : LVV.sea === 'landlubbers' ? .4 : 1)); // shipyards put more ships on the water (and a seafaring people more)
 function shipKind() { return hasTech('hover') ? 'hover' : hasTech('computing') ? 'boxship' : hasTech('electric') ? 'freighter' : hasTech('steam') ? 'steamer' : 'sail'; }
 function spawnShip(fromB, toB, r) {
   if (DYN.ships.length >= shipCap()) return null;
@@ -7173,14 +7213,15 @@ function glRoad(i, x, y) {
   if (sf === R_GLOW && !br) for (const [dx, dy] of nb) seg(dx ? Math.min(0, dx * .5) : -.015, dx ? Math.max(0, dx * .5) : .015, dy ? Math.min(0, dy * .5) : -.015, dy ? Math.max(0, dy * .5) : .015, gcol('#8fe3ec'), h + .003);
 }
 const G_PUFF = ['#5f8f45', '#6a9a4a', '#557f3f', '#739f52', '#4f7f3c']; // oak greens
+const TREE_LV = { oaks: 1, pines: 2, birches: 3, blossom: 5, maples: 6 }, T_BLOSSOM = ['#f2a6c8', '#f7c1d9', '#e98fb8', '#fbd3e3'], T_MAPLE = ['#c8402a', '#d8602a', '#b83a30', '#e07a30'];
 function glTrees(i, x, y) {
-  const n = M.tree[i], tt = M.ttype[i], b = GT(i);
-  for (let k = 0; k < n; k++) {
+  const n = M.tree[i], b = GT(i), lt = TREE_LV[LVV.trees];
+  for (let k = 0; k < n; k++) { const tt = lt && hash2(x, y, 55 + k) < .82 ? lt : M.ttype[i]; // (the trees the custom loves, and a few others)
     let u = (hash2(x, y, k * 3 + 1) - .5) * .6, v = (hash2(x, y, k * 3 + 2) - .5) * .6; if (n === 1) { u *= .4; v *= .4; }
     const s = .8 + hash2(x, y, k * 3 + 3) * .45, hv = hash2(x, y, 90 + k), X = x + u, Z = y + v;
     if (tt === 2) { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 4 * s * ZS, '#6b5a55'); GLB.mat = M_NEEDLE; const c = gcol(leafC(hv < .5 ? '#3f6f4a' : '#35604a')); const A = [X, b + 18 * s * ZS, Z]; GLB.ctr = [X, b, Z]; for (let j = 0; j < 8; j++) { const a0 = j / 8 * TAU, a1 = (j + 1) / 8 * TAU, r = .2 * s; gtri([X + Math.cos(a0) * r, b + 3 * s * ZS, Z + Math.sin(a0) * r], [X + Math.cos(a1) * r, b + 3 * s * ZS, Z + Math.sin(a1) * r], A, c); } }
     else if (tt === 3) { GLB.mat = 0; glBoxW(X, Z, .022 * s, b, 12 * s * ZS, '#ece8df'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .14 * s, 13 * s, 5.5 * s, leafC(hv < .5 ? '#8fb35a' : '#9dbb62'), 0, M_LEAF); } // birch
-    else { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 7 * s * ZS, tt === 4 ? '#7b5e4e' : '#6b5040'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .2 * s, 10 * s, 4.6 * s, leafC(tt === 4 ? '#6db873' : G_PUFF[(hv * G_PUFF.length) | 0]), 0, M_LEAF); }
+    else { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 7 * s * ZS, tt === 4 ? '#7b5e4e' : '#6b5040'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .2 * s, 10 * s, 4.6 * s, leafC(tt === 5 ? T_BLOSSOM[(hv * 4) | 0] : tt === 6 ? T_MAPLE[(hv * 4) | 0] : tt === 4 ? '#6db873' : G_PUFF[(hv * G_PUFF.length) | 0]), 0, M_LEAF); }
   }
   GLB.base = surfZ(i) * ZS;
 }
@@ -7199,6 +7240,7 @@ function glFlowersUV(u, v, z, h) { // a clump of stems and blooms
   for (let k = 0; k < 3; k++) { const du = (k - 1) * .05, dv = ((k % 2) - .5) * .05; glBoxW(GLB.x + u + du, GLB.y + v + dv, .006, GLB.base + z * ZS, 1.4 * ZS, '#4f8a45'); glBlob(u + du, v + dv, .022, z + 1.6, .6, FLOWERS[(((h * 17) | 0) + k) % FLOWERS.length], 0); }
 }
 function glSmallTree(u, v, z, h, s, col) { // street, garden and park trees: a trunk and a leafy crown
+  const lt = LVV.trees; if (lt === 'blossom') col = T_BLOSSOM[((h * 7) | 0) % 4]; else if (lt === 'maples') col = T_MAPLE[((h * 7) | 0) % 4]; else if (lt === 'birches') col = '#9dbb62';
   GLB.mat = M_BARK; glBoxW(GLB.x + u, GLB.y + v, .022 * s, GLB.base + z * ZS, 5 * s * ZS, '#6b5040');
   glBlob(u, v, .15 * s, z + 7 * s, 3.4 * s, leafC(col)); glBlob(u + .05 * s, v - .04 * s, .1 * s, z + 9 * s, 2.4 * s, leafC(col));
 }
@@ -7354,7 +7396,7 @@ function glDirty(i) { const x = i % W, y = (i / W) | 0; for (const [dx, dy] of [
 /* ---------- shaders ---------- */
 /* ---------- the sky: blue overhead, pale at the horizon, gold and rose round a low sun; the haze takes the same colour ---------- */
 const GL_SKY = `
-uniform vec3 uSunD; uniform float uSunY, uCover;
+uniform vec3 uSunD; uniform float uSunY, uCover; uniform vec4 uTint;
 vec3 skyCol(vec3 v){ // in screen colour (after the tone curve)
   float day=smoothstep(-.1,.2,uSunY), gold=smoothstep(-.16,.02,uSunY)*(1.-smoothstep(.05,.42,uSunY));
   float mu=dot(v,uSunD), m=max(mu,0.), toward=pow(mu*.5+.5,4.), h=clamp(v.y,0.,1.);
@@ -7363,13 +7405,15 @@ vec3 skyCol(vec3 v){ // in screen colour (after the tone curve)
   vec3 c=mix(hor,zen,pow(h,.5)); if(v.y<0.) c=hor*mix(1.,.86,clamp(-v.y*4.,0.,1.));
   c+=vec3(1.,.84,.6)*(pow(m,10.)*.26*(day*.5+gold)+pow(m,900.)*.4*day);
   c=mix(c,vec3(dot(c,vec3(.3,.59,.11)))*mix(.4,1.03,day),uCover*.72);
+  c=mix(c,c*uTint.rgb,uTint.a); // (a sky the Watcher's words coloured)
   return clamp(c,0.,1.);
 }
 vec3 untone(vec3 c){ return -log(1.-min(c,vec3(.97)))/1.45; }`;
 const GL_KVS = `#version 300 es
 out vec2 vU; void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2)); vU=p*2.-1.; gl_Position=vec4(vU,0.,1.); }`;
+const SKY_TINT0 = [1, 1, 1, 0], SKY_TINT = { golden: [1.18, .98, .66, .6], rosy: [1.15, .84, .92, .6], violet: [.9, .78, 1.18, .6], green: [.84, 1.12, .9, .55] };
 const GL_KFS = `#version 300 es
-precision highp float; in vec2 vU; out vec4 o; uniform vec3 uF, uR, uU; uniform float uCT, uLo;` + GL_SKY + `
+precision highp float; in vec2 vU; out vec4 o; uniform vec3 uF, uR, uU; uniform float uCT, uLo, uAur;` + GL_SKY + `
 float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
 float fb(vec2 p){ return vn(p)*.5+vn(p*2.03+3.1)*.27+vn(p*4.1+7.7)*.15+vn(p*8.3+1.3)*.08; }
@@ -7379,6 +7423,10 @@ void main(){
   vec3 q=v*420., qc=floor(q); float st=fract(sin(dot(qc,vec3(12.9898,78.233,37.719)))*43758.5453); // stars: small round points, out once the sun is well down
   float night=1.-smoothstep(-.2,-.06,uSunY), pt=smoothstep(.34,.08,length(fract(q)-.5));
   c+=vec3(.9,.92,1.)*step(.9975,st)*pt*night*(1.-uCover)*smoothstep(0.,.2,v.y)*(.45+.55*fract(st*97.));
+  if(uAur>0. && v.y>.04){ // an aurora: curtains of green and rose, swaying slowly
+    vec2 p=v.xz/(v.y+.35); float w=fb(p*1.1+vec2(uCT*.01,uCT*.004)), b1=smoothstep(.55,0.,abs(sin(p.x*1.3+p.y*.5+w*4.+uCT*.03))), b2=smoothstep(.4,0.,abs(sin(p.y*1.1-p.x*.4+w*3.+uCT*.025+1.7)));
+    float band=max(b1,b2*.7)*smoothstep(.03,.18,v.y)*(1.-smoothstep(.45,.85,v.y))*(.55+.45*vn(vec2(atan(v.z,v.x)*60.,uCT*.15))); // curtains with rays down them
+    vec3 ac=mix(vec3(.25,1.,.55),vec3(.85,.35,.95),smoothstep(.22,.6,v.y)); c+=ac*band*(.45+.35*fb(p*5.+uCT*.03))*.8*uAur*night*(1.-uCover*.8); }
   if(v.y>.01 && uLo<.5){ // clouds on a high layer, drifting; lit gold and rose at sunset, grey and heavy when it's overcast
     vec2 q=v.xz/(v.y+.08)*1.6+vec2(uCT*.004,uCT*.0015); float cl=fb(q), th=mix(.62,.18,uCover), a=smoothstep(th,th+.22,cl)*smoothstep(.01,.12,v.y);
     float sunny=pow(max(mu,0.)*.5+.5,3.), lit=mix(.55,1.,day);
@@ -7795,10 +7843,10 @@ function glFrame(dt) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, GL3.post ? post.msF : null); gl.viewport(0, 0, w, h);
   gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   // the sky, behind everything
-  const sd0 = [Math.cos(el * DEG) * Math.cos(t), Math.sin(el * DEG), Math.cos(el * DEG) * Math.sin(t)], skyU = U => { gl.uniform3fv(U.uSunD, sd0); gl.uniform1f(U.uSunY, sd0[1]); gl.uniform1f(U.uCover, cover); };
+  const sd0 = [Math.cos(el * DEG) * Math.cos(t), Math.sin(el * DEG), Math.cos(el * DEG) * Math.sin(t)], skyU = U => { gl.uniform3fv(U.uSunD, sd0); gl.uniform1f(U.uSunY, sd0[1]); gl.uniform1f(U.uCover, cover); gl.uniform4fv(U.uTint, SKY_TINT[LVV.sky] || SKY_TINT0); };
   { const K = GL3.sky, f = [-dir[0], -dir[1], -dir[2]], tn = Math.tan(fov / 2), r0 = [f[2], 0, -f[0]], rl = Math.hypot(r0[0], r0[2]) || 1, r = [-r0[0] / rl, 0, -r0[2] / rl], u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
     for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
-    gl.useProgram(K.p); skyU(K.u); gl.uniform1f(K.u.uCT, GL3.t); gl.uniform1f(K.u.uLo, GL3.lo ? 1 : 0); gl.uniform3fv(K.u.uF, f); gl.uniform3fv(K.u.uR, r.map(q => q * tn * aspect)); gl.uniform3fv(K.u.uU, u.map(q => q * tn));
+    gl.useProgram(K.p); skyU(K.u); gl.uniform1f(K.u.uCT, GL3.t); gl.uniform1f(K.u.uLo, GL3.lo ? 1 : 0); gl.uniform1f(K.u.uAur, LVV.sky === 'aurora' ? 1 : 0); gl.uniform3fv(K.u.uF, f); gl.uniform3fv(K.u.uR, r.map(q => q * tn * aspect)); gl.uniform3fv(K.u.uU, u.map(q => q * tn));
     gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.depthMask(true); gl.enable(gl.DEPTH_TEST); }
   const P = GL3.main, U = P.u; gl.useProgram(P.p); skyU(U);
   gl.uniformMatrix4fv(U.uVP, false, VP); gl.uniformMatrix4fv(U.uSVP, false, SVP);
@@ -7948,29 +7996,47 @@ function glHeading(o, dx, dy) { // turn smoothly towards the way they're going
   if (dx || dy) { const t = Math.atan2(dy, dx); if (o._gh == null) o._gh = t; let d = t - o._gh; d = Math.atan2(Math.sin(d), Math.cos(d)); o._gh += d * Math.min(1, (GL3.dt || .016) * 9); }
   return o._gh || 0;
 }
+const CLOTH_LV = { colourful: ['#e0453a', '#f2b632', '#3f8fd8', '#4fb85f', '#d85fb0', '#8a5fd8', '#f07a2a'], white: ['#f4f1ea', '#ece6da', '#faf8f2'], dark: ['#26282c', '#3a3440', '#1f2a33', '#2f2f2f'], earthy: ['#8a6a4a', '#6b5a3a', '#a8885a', '#5a6a3a', '#7a5040'] };
+function clothOf(o) { // what the Watcher's words have people wearing (kept on the person until the fashion changes)
+  const c = LVV.clothes; if (!c || o.kind === 'founder' || o.kind === 'wk') return o.col;
+  if (o._cl !== c) { o._cl = c; const L = CLOTH_LV[c]; o._cc = L ? L[((o.ph || 0) * 997 | 0) % L.length] : (S.styles[S.styleIdx] || STYLES0[0]).accent; }
+  return o._cc;
+}
+function glCat(d, f, r, y0, dph, moving, col) { // a cat at someone's heel, tail up
+  for (const [lf, lr, q] of [[.016, .008, 0], [.016, -.008, Math.PI], [-.016, .008, Math.PI], [-.016, -.008, 0]]) glLimb([d[0] + f[0] * lf + r[0] * lr, y0 + .018, d[2] + f[2] * lf + r[2] * lr], f, r, moving ? Math.sin(dph + q) * .6 : 0, .018, .0035, col);
+  glOBox([d[0], y0 + .024, d[2]], V3(f, .022), V3(r, .008), [0, .007, 0], col);
+  const hd = [d[0] + f[0] * .025, y0 + .036, d[2] + f[2] * .025]; glOBox(hd, V3(f, .008), V3(r, .008), [0, .008, 0], col);
+  for (const sg of [1, -1]) glOBox([hd[0] + r[0] * sg * .005, hd[1] + .01, hd[2] + r[2] * sg * .005], V3(f, .002), V3(r, .002), [0, .004, 0], col);
+  glLimb([d[0] - f[0] * .02, y0 + .03, d[2] - f[2] * .02], V3(f, -1), r, -2.7 + Math.sin(GL3.t * 2 + dph) * .2, .03, .003, col);
+}
 function glPerson(o, X, Z, y0, h, moving, carryLamp) {
   const e0 = GL3.eye, far = e0 ? Math.hypot(X - e0[0], y0 - e0[1], Z - e0[2]) : 0;
   if (far > 30) { // a speck in the distance: a body and a head
-    GLB.ctr = [X, y0 + .1, Z]; glOBox([X, y0 + .11, Z], [.02, 0, 0], [0, 0, .02], [0, .11, 0], o.col || '#e5874f'); glOBox([X, y0 + .245, Z], [.018, 0, 0], [0, 0, .018], [0, .022, 0], o.skin || '#e0b090'); return;
+    GLB.ctr = [X, y0 + .1, Z]; glOBox([X, y0 + .11, Z], [.02, 0, 0], [0, 0, .02], [0, .11, 0], clothOf(o) || '#e5874f'); glOBox([X, y0 + .245, Z], [.018, 0, 0], [0, 0, .018], [0, .022, 0], o.skin || '#e0b090'); return;
   }
   const s = o.kid ? .72 : 1, f = [Math.cos(h), 0, Math.sin(h)], r = [-Math.sin(h), 0, Math.cos(h)], ph = o.ph || 0;
   const sw = moving ? Math.sin(ph) : 0, bob = moving ? Math.abs(Math.cos(ph)) * .007 * s : Math.sin(GL3.t * 1.6 + ph) * .0015; // a step's bob, or breathing
   const hip = y0 + .105 * s + bob, sh = y0 + .21 * s + bob, B = (dx, dr, y) => [X + f[0] * dx + r[0] * dr, y, Z + f[2] * dx + r[2] * dr];
   for (const sg of [1, -1]) glLimb(B(0, sg * .016 * s, hip), f, r, sw * sg * .55, .105 * s, .012 * s, o.pants || '#555'); // legs
-  glOBox(B(0, 0, (hip + sh) / 2 + .006 * s), V3(f, .02 * s), V3(r, .033 * s), [0, (sh - hip) / 2 + .01 * s, 0], o.col || '#e5874f'); // body
+  const col = clothOf(o) || '#e5874f'; glOBox(B(0, 0, (hip + sh) / 2 + .006 * s), V3(f, .02 * s), V3(r, .033 * s), [0, (sh - hip) / 2 + .01 * s, 0], col); // body
   if (o.kind === 'founder') glOBox(B(.001, 0, hip + .045 * s), V3(f, .0205 * s), V3(r, .0335 * s), [0, .006 * s, 0], '#f2f0ea'); // the founder's sash
   let hand = null, hand2 = null; const arms = o.arms; // (o.arms: [right, left] held in a pose, for folk at work)
-  for (const sg of [1, -1]) { const e = glLimb(B(0, sg * .043 * s, sh), f, r, arms ? arms[sg > 0 ? 0 : 1] : -sw * sg * .45 + (carryLamp && sg > 0 ? .5 : 0), .095 * s, .0095 * s, sg > 0 ? o.col : shade(o.col || '#e5874f', .85)); if (sg > 0) hand = e; else hand2 = e; } // arms swing against the legs
+  for (const sg of [1, -1]) { const e = glLimb(B(0, sg * .043 * s, sh), f, r, arms ? arms[sg > 0 ? 0 : 1] : -sw * sg * .45 + (carryLamp && sg > 0 ? .5 : 0), .095 * s, .0095 * s, sg > 0 ? col : shade(col, .85)); if (sg > 0) hand = e; else hand2 = e; } // arms swing against the legs
   glOBox(B(0, 0, sh + .012 * s), V3(f, .01 * s), V3(r, .01 * s), [0, .012 * s, 0], o.skin || '#e0b090'); // neck
   const hy = sh + .045 * s, hc = B(0, 0, hy), u = hc[0], v = hc[2];
   glOBox(hc, V3(f, .022 * s), V3(r, .021 * s), [0, .025 * s, 0], o.skin || '#e0b090'); // head
   glOBox(B(-.005 * s, 0, hy + .012 * s), V3(f, .02 * s), V3(r, .023 * s), [0, .016 * s, 0], o.hair || '#5a3a28'); // hair, sitting back on the head
   if (carryLamp && hand) { glOBox([hand[0], hand[1] - .012, hand[2]], [.008, 0, 0], [0, 0, .008], [0, .012, 0], '#ffd08a', 2); GL3.carry.push([hand[0], hand[1], hand[2]]); } // a lantern
   if (far > 12) return [hand, hand2];
-  if (!o.kid && (o.hat || 1) < .22) { const era = S.era;
+  const hl = LVV.hats, hr = o.hat == null ? 1 : o.hat;
+  if (hl === 'tall_hats' && !o.kid && hr < .7) { glOBox([u, hy + .024 * s, v], V3(f, .034 * s), V3(r, .034 * s), [0, .002, 0], '#2a2a2e'); glOBox([u, hy + .052 * s, v], V3(f, .021 * s), V3(r, .021 * s), [0, .028 * s, 0], '#2a2a2e'); } // a top hat
+  else if (hl === 'flower_crowns' && hr < .8) for (let q = 0; q < 6; q++) { const a = q / 6 * TAU; glBlob(u + Math.cos(a) * .02 * s, v + Math.sin(a) * .02 * s, .008 * s, (hy + .028 * s) / ZS, .3 * s, FLOWER_C[(q + ((hr * 9) | 0)) % FLOWER_C.length], 0); } // a crown of flowers
+  else if (hl !== 'no_hats' && !o.kid && (hl === 'everyone' || hr < .22)) { const era = S.era;
     if (era <= 3) { glOBox([u, hy + .024 * s, v], V3(f, .046 * s), V3(r, .046 * s), [0, .003, 0], '#d8b86a'); glBlob(u, v, .026 * s, (hy + .026 * s) / ZS, .5 * s, '#caa458', 0); } // a straw hat
     else if (era <= 6) { glBlob(u, v, .028 * s, (hy + .012 * s) / ZS, .55 * s, shade(o.pants || '#555', .8), 0); glOBox(B(.028 * s, 0, hy + .012 * s), V3(f, .014 * s), V3(r, .022 * s), [0, .002, 0], shade(o.pants || '#555', .8)); } } // a cap
-  if (o.pet) glDog(B(-.07, .05, y0), f, r, y0, ph * 1.35, moving); // the dog trots at their heel
+  const pl = LVV.pets, pq = ((o.ln || 0) * 7) % 1; // (the custom decides who has a pet)
+  if (pl === 'cats' ? !o.kid && pq < .35 : false) glCat(B(-.06, .05, y0), f, r, y0, ph * 1.35, moving, ['#e0903a', '#5a5a5e', '#2a2a2e', '#f2ece0'][((pq * 40) | 0) % 4]);
+  else if (pl !== 'none' && (o.pet || pl === 'dogs' && pq < .45)) glDog(B(-.07, .05, y0), f, r, y0, ph * 1.35, moving, ['#9a7a5c', '#3a3430', '#d8c4a0', '#7a5040'][((pq * 40) | 0) % 4]); // the dog trots at their heel
   return [hand, hand2];
 }
 function glDog(d, f, r, y0, dph, moving, col = '#9a7a5c') { // d: where it stands; dph: its stride
@@ -8435,7 +8501,7 @@ function kAlongU() { return Math.abs(KF.A[0]) > .5; }
 const K_TRIM = '#efe9dc', K_STONE = '#cfc6b4', K_IRON = '#33363b', K_DARK = '#2c3440', K_WOOD = '#4a3426';
 function kWinTy() { return hasTech('computing') ? 'glass' : hasTech('concrete') ? 'modern' : hasTech('masonry') ? 'sash' : 'case'; } // casements, then sashes, then steel, then glass
 function kWall(B, st) { // a wall's colour and what it is made of
-  const wm = glWallMat(B);
+  const wm = glWallMat(B); if (st.painted) return [st.wall, wm === M_PLANK ? M_PLANK : M_PLASTER]; // (painted houses: rendered over, or painted boards)
   return wm === M_BRICK ? [mix(st.wall, '#a5573f', .55), M_BRICK] : wm === M_STONE ? [mix(st.wall, '#cdbfa6', .35), M_STONE] : wm === M_PLANK ? [mix(st.wall, '#8a6a4c', .45), M_PLANK] : [st.wall, wm];
 }
 
@@ -8464,7 +8530,7 @@ function kWin(s, ff, y, hw, h, k, o = K_NO) {
   else if (o.ped) { kBox(s, ff + g * .008, y + h + .004, hw * 1.3, .008, .012, stn, M_STONE); kCtr(s, ff - g * .1, y + h); kT([s - hw * 1.35, ff + g * .012, y + h + .016], [s + hw * 1.35, ff + g * .012, y + h + .016], [s, ff + g * .012, y + h + .05], stn, M_STONE); } // a little pediment
   else if (ty !== 'glass' && !back) kBox(s, ff + g * .005, y + h + .002, hw * 1.15, .005, .014, ty === 'case' ? K_WOOD : stn, ty === 'case' ? M_PLANK : M_STONE); // a plain lintel
   if (o.shut) for (const d of [-1, 1]) { F(s + d * (hw + hw * .5), y, hw * .48, h, o.shut, .006, M_PLANK); for (let t = .2; t < .9; t += .2) F(s + d * (hw + hw * .5), y + h * t, hw * .44, .003, shade(o.shut, .8), .008); } // shutters, louvred
-  if (o.box) { kBox(s, ff + g * .03, y - .034, hw * 1.1, .016, .022, '#6b4a32', M_PLANK); kBox(s, ff + g * .03, y - .014, hw * 1.02, .014, .008, '#4f8a45');
+  if (o.box || LVV.deco === 'flower_boxes' && !back && ty !== 'glass' && kLit(k + 3) < .6) { kBox(s, ff + g * .03, y - .034, hw * 1.1, .016, .022, '#6b4a32', M_PLANK); kBox(s, ff + g * .03, y - .014, hw * 1.02, .014, .008, '#4f8a45');
     for (let q = 0; q < 3; q++) kBlob(s + (q - 1) * hw * .62, ff + g * .03, y - .004, .013, .012, FLOWER_C[(q + KF.id + k) % FLOWER_C.length], 0); }
 }
 const K_NO = {};
@@ -8694,7 +8760,8 @@ function glWorkerHouse(B, st) { // (homes.js hands it the rowhouse; st is alread
   const fB = -.3, fD = .37, fc = (fB + fD) / 2; // back wall, front wall, the ridge between
   const r = hash2(U ? B.y : B.x, 4 * 7 + B.sid, 57), H = (18 + ((r * 5) % 1) * 5 + (hk(B, 9) < .25 ? 3 : 0)) * ZS; // (the same roofline as the shared terrace art, so mixed rows line up)
   const floors = H > 1 ? 3 : 2, g0 = .05, fh0 = (H - g0) / floors * 1.08, fhU = floors > 1 ? (H - g0 - fh0) / (floors - 1) : 0, fl = k => k ? g0 + fh0 + (k - 1) * fhU : g0; // floor k's sill line
-  const wall = st.wall, wm = glWallMat(B) === M_PLASTER ? M_BRICK : glWallMat(B), wallC = wm === M_BRICK ? mix(wall, '#a5573f', .55) : wall, sv = GLB.wall; GLB.wall = wm; GLB.wallC = gcol(wallC);
+  const wall = st.wall, wm = st.painted ? M_PLASTER : glWallMat(B) === M_PLASTER ? M_BRICK : glWallMat(B), wallC = wm === M_BRICK ? mix(wall, '#a5573f', .55) : wall, // (painted houses: rendered over)
+    stC = st.painted ? '#a0604a' : wallC, stM = st.painted ? M_BRICK : wm, sv = GLB.wall; GLB.wall = wm; GLB.wallC = gcol(wallC);
   const shop = shopfront(B), nb = L > .75 ? 3 : 2, bay = k => s0 + (k + .5) * L / nb, dk = hk(B, 20) < .5 ? 0 : nb - 1, door = WH_DOOR[(hk(B, 21) * WH_DOOR.length) | 0];
   const lit = k => .03 + .94 * hash2(B.id * 7 + k, B.x + B.y, 71); // which windows are lit at night
   // the body: plinth, walls, string course, cornice
@@ -8783,8 +8850,8 @@ function glWorkerHouse(B, st) { // (homes.js hands it the rowhouse; st is alread
   // chimney stacks on the party walls (one each: the lower house of a pair builds it) and at the ends of a row
   const stacks = [hi ? s1 : s1 - .05]; if (!lo) stacks.push(s0 + .05);
   for (const s of stacks) { const p = P(s, fc - .02, 0), sw = U ? .042 : .085, sd = U ? .085 : .042, top = y0 + ye + rh + .17;
-    glChimney(p[0], y0 + ye + rh * .4, p[2], sw, sd, top, wallC, wm);
-    if (lod) { GLB.mat = wm; glOBox([p[0], top - .03, p[2]], [sw + .012, 0, 0], [0, 0, sd + .012], [0, .014, 0], wallC); } } // corbelled out near the top
+    glChimney(p[0], y0 + ye + rh * .4, p[2], sw, sd, top, stC, stM);
+    if (lod) { GLB.mat = stM; glOBox([p[0], top - .03, p[2]], [sw + .012, 0, 0], [0, 0, sd + .012], [0, .014, 0], stC); } } // corbelled out near the top
   // a back range: a lower wing out the back with a lean-to roof
   if (hk(B, 22) < .55) { const s = hk(B, 25) < .5 ? s0 + .16 : s1 - .16, w = .13, f1 = -.47, h2 = fh0 + fhU * .8;
     bx(s, (fB + f1) / 2, 0, w, (fB - f1) / 2, h2, wallC, wm); if (lod) win(s, f1, g0 + fh0 * .2, .035, fh0 * .27, 70, false, true);
@@ -8816,7 +8883,7 @@ function hSet(B) { // the frame: along the street, out towards it (kept as the w
   kSet(X, Z, U ? [1, 0, 0] : [0, 0, 1], [fx * sg, 0, fz * sg], B.id); return J;
 }
 const hRoofline = (B, t) => hash2(houseAx(B) === 'u' ? B.y : B.x, t * 7 + B.sid, 57); // one street, one roofline (more or less)
-function hStack(wm, wc) { return wm === M_PLASTER || wm === M_PLANK ? [mix(wc, '#9a8f84', .25), M_PLASTER] : wm === M_STONE ? [wc, M_STONE] : ['#a0604a', M_BRICK]; }
+function hStack(wm, wc) { if (LVV.housecol) return ['#a0604a', M_BRICK]; return wm === M_PLASTER || wm === M_PLANK ? [mix(wc, '#9a8f84', .25), M_PLASTER] : wm === M_STONE ? [wc, M_STONE] : ['#a0604a', M_BRICK]; }
 function hSmoke(s, f, y) { if (!GLB.lod && GLB.smk) GLB.smk.push(kP(s, f, y)); }
 
 /* ---------- tier 0: a shelter of salvaged canvas on crossed poles, a fire before it ---------- */

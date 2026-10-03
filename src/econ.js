@@ -340,7 +340,7 @@ function stepTrade() {
     const rich = ts.filter(A => A !== B && (roadLinked(A, B) || seaLinked(A, B))).map(T => [T, T.res[r] - econCap(T) * .55]).filter(a => a[1] > 0).sort((a, b) => b[1] - a[1]);
     if (!rich.length) continue;
     const [A, sur] = rich[0];
-    const n = Math.min(sur, def, 30 + (seaLinked(A, B) ? 20 * (yardN(A) + yardN(B)) : 0)); if (n < 3) continue; // shipyards: bigger holds
+    const tl = lever('trade'), n = Math.min(sur, def, (30 + (seaLinked(A, B) ? 20 * (yardN(A) + yardN(B)) : 0)) * (tl === 'open' ? 1.6 : tl === 'closed' ? .35 : 1)); if (n < 3) continue; // shipyards: bigger holds; the custom opens or shuts the roads
     A.res[r] -= n; B.res[r] += n;
     A.exp[r] = (A.exp[r] || 0) + n;
     moves.push([A, B, r, n]);

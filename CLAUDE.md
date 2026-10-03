@@ -156,6 +156,7 @@ slow catch-ups. Tests of the sim, the panels and saves (`hover`, `needs`, `away`
 | `incidents` | All six kinds come along on their own (together about every 4 years) and always end; a wedding marries its couple; a flood costs a little; a fire starts at a house and ends saved or burnt down with a chronicle line; an incident under way survives a reload; every kind draws in 3D with no WebGL errors. |
 | `mapsize` | Valley or wide lands: the welcome card and New world offer both, choosing the other size reloads at it, a plain reload remembers it, a world opened at the wrong size reloads at its own, and a 128 world by 1800 has more towns spread further with the same techs. Needs `npm run serve`. |
 | `roads` | Road surfaces by era and material: dirt and gravel early, cobbles or bricks with Masonry, asphalt and concrete with Motorcars, glowlanes with Hovercraft, the market quarter keeping its cobbles, chronicle firsts, the tooltip, and an older save's roads converted. |
+| `levers` | Words that pull every voice lever at once (mocked voice): each takes effect (an endless season, painted houses, faster building, more ships, Reverence, clean air, lit windows...), the Customs list and the brief show them, a bogus choice is ignored, a save keeps them. |
 | `cloud` | Cloud mode against the real Worker (`wrangler dev` on :8787 with fresh KV, fake user, mock Anthropic; it starts and stops them itself). Welcome-card save.json import, save round trip, two-device conflict and take-over, newer local save (same revision and diverged), signed out (302 and 401), voice proxy (no key in the browser, model allowlist), footer save.json load, kept worlds (new, switch, forget), a `?fresh` scratch tab saving nothing, and file:// staying cloud-free. Needs the root `npm install`. |
 
 **Inspection tools:**
@@ -242,8 +243,8 @@ slow catch-ups. Tests of the sim, the panels and saves (`hover`, `needs`, `away`
 | zones.js | Zones each town draws for itself (`M.zone`: market core, homes, works quarter, greens) in `drawZones`, redrawn every 20 years or when outgrown (`yearlyZones`); `ZONE_OF`/`ZSC`/`zoneScore` feed `findSite`'s `zt` argument. Redevelopment (`redevelop`, `clearFields`, `tendGreens`), the `shops` building (`shopKind`; drawn in modern.js); the Z overlay is drawn in fx3d.js |
 | incidents.js | Incidents you can watch: `INC` (the sim part: begin, end, outcome), `stepIncidents`/`startIncident`, `INC_VIEW` (the 3D part: flames, smoke, bucket chains, a flock and the people chasing it), `glIncidents` |
 | people.js | Person model: traits, quirks, families, relationships |
-| ai.js | Claude API (`aiFetch`, daily cap 80), world brief, tool schemas, `CULT` doctrines, `lever(k)`, `LV_KEYS`/`LV_TXT` |
-| levers.js | `applyLevers` (style, nature, growth, streets, materials, lights, weather, names...), customs lists, sky lanterns (`stepLanterns`: glowing particles after dark) |
+| ai.js | Claude API (`aiFetch`, daily cap 80), world brief, tool schemas, `LEVERS` (every lever the words can pull) and `LVV`/`LVA`, `CULT` doctrines, `lever(k)` |
+| levers.js | `applyLevers` (the style, every lever in `LEVERS`, names, a new town, crops, shunned buildings...), customs lists, sky lanterns (`stepLanterns`: glowing particles after dark) |
 | prayers.js | The words of prayers: `prayCtx` (era band, season, weather, drought, smoke, needs, family, age), `PRAY_OPEN` + `PRAYERS[kind]` + `PRAY_CLOSE` pieces (each returns null when it doesn't fit), `OUTCOME`/`EXPIRE`, and `prayText`/`prayEnd`, which skip recently used pieces (`S.prayRecent`) |
 | faith.js | Reverence (costs replace cooldowns), prayers (templated or Claude-written), answering |
 | dyn.js | `DYN` (everything that moves, never saved), FX dispatch (`processFX`: the sim's `FXQ` into things to see), captions, walkers' upkeep (`syncWalkers`), herds, birds, Longstriders, rockets, and `updateDyn` (each frame) |
@@ -281,8 +282,16 @@ slow catch-ups. Tests of the sim, the panels and saves (`hover`, `needs`, `away`
 - **Chronicle.** `chron(icon, text, { T | x,y, k: 'major', cap })`. Rate-limit ambient lines: the
   economy and streets use `S.econYr`, `T.swYr` and similar.
 - **Voice levers.** The flow is: Claude's tool call, then `applyLevers`, then doctrine `d.lv`, then
-  `recomputeCulture`, then `lever(k)`. To add a lever, put it in `LV_KEYS`, `LV_TXT` and the schema in
-  ai.js, then in `applyLevers` and the customs lists in levers.js.
+  `recomputeCulture`, then `lever(k)` (the sim, deterministic: it reads saved doctrines) or `LVV[k]` (the view, every
+  frame). Every lever is one entry in `LEVERS` (ai.js): `k` its name, `f` the tool's field, `o` the choices and what
+  each does, `n` its Customs label, `d` the tool's description, `art: 1` if buildings or ground show it. The tool schema,
+  `LV_KEYS`/`LV_TXT`, `applyLevers`, the brief and the Customs list all come from that table, so adding a lever is the entry
+  plus whatever reads it. Art levers go into `LVA`, which is part of light.js's art key, so the view rebuilds when they
+  change. In force: nature, growth, streets, material, lights, weather, seasons (`seasonFor`), sky (`SKY_TINT`, the aurora
+  in `GL_KFS`), housecol (`HPAL` in `houseTint`; painted houses render over brick and stone), trees (`TREE_LV` in
+  `glTrees`/`glSmallTree`), deco (`tileDeco`; flower boxes in `kWin`), bedtime (`litFrac`), clothes (`clothOf`), hats, pets
+  (`glCat`), bustle (`syncPeople`), birds and fireworks (`updateDyn`), pace (`paceK`), trade (`stepTrade`), sea (`shipCap`),
+  faith (`faithRecalc`, shrines in `CULT.bld`), smoke (`sootK`). `test/levers.mjs` pulls them all at once.
 - **Towns.**
   - `townRadius` caps at 13. `findSite` caches failures in `T._fail`, so clear it after adding streets.
   - Houses need street frontage (`fronts()`). `growStreets` has a 12-month cooldown when a town is full.

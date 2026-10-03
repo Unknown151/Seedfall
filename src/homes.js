@@ -22,7 +22,7 @@ function hSet(B) { // the frame: along the street, out towards it (kept as the w
   kSet(X, Z, U ? [1, 0, 0] : [0, 0, 1], [fx * sg, 0, fz * sg], B.id); return J;
 }
 const hRoofline = (B, t) => hash2(houseAx(B) === 'u' ? B.y : B.x, t * 7 + B.sid, 57); // one street, one roofline (more or less)
-function hStack(wm, wc) { return wm === M_PLASTER || wm === M_PLANK ? [mix(wc, '#9a8f84', .25), M_PLASTER] : wm === M_STONE ? [wc, M_STONE] : ['#a0604a', M_BRICK]; }
+function hStack(wm, wc) { if (LVV.housecol) return ['#a0604a', M_BRICK]; return wm === M_PLASTER || wm === M_PLANK ? [mix(wc, '#9a8f84', .25), M_PLASTER] : wm === M_STONE ? [wc, M_STONE] : ['#a0604a', M_BRICK]; }
 function hSmoke(s, f, y) { if (!GLB.lod && GLB.smk) GLB.smk.push(kP(s, f, y)); }
 
 /* ---------- tier 0: a shelter of salvaged canvas on crossed poles, a fire before it ---------- */

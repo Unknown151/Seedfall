@@ -402,14 +402,15 @@ function glRoad(i, x, y) {
   if (sf === R_GLOW && !br) for (const [dx, dy] of nb) seg(dx ? Math.min(0, dx * .5) : -.015, dx ? Math.max(0, dx * .5) : .015, dy ? Math.min(0, dy * .5) : -.015, dy ? Math.max(0, dy * .5) : .015, gcol('#8fe3ec'), h + .003);
 }
 const G_PUFF = ['#5f8f45', '#6a9a4a', '#557f3f', '#739f52', '#4f7f3c']; // oak greens
+const TREE_LV = { oaks: 1, pines: 2, birches: 3, blossom: 5, maples: 6 }, T_BLOSSOM = ['#f2a6c8', '#f7c1d9', '#e98fb8', '#fbd3e3'], T_MAPLE = ['#c8402a', '#d8602a', '#b83a30', '#e07a30'];
 function glTrees(i, x, y) {
-  const n = M.tree[i], tt = M.ttype[i], b = GT(i);
-  for (let k = 0; k < n; k++) {
+  const n = M.tree[i], b = GT(i), lt = TREE_LV[LVV.trees];
+  for (let k = 0; k < n; k++) { const tt = lt && hash2(x, y, 55 + k) < .82 ? lt : M.ttype[i]; // (the trees the custom loves, and a few others)
     let u = (hash2(x, y, k * 3 + 1) - .5) * .6, v = (hash2(x, y, k * 3 + 2) - .5) * .6; if (n === 1) { u *= .4; v *= .4; }
     const s = .8 + hash2(x, y, k * 3 + 3) * .45, hv = hash2(x, y, 90 + k), X = x + u, Z = y + v;
     if (tt === 2) { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 4 * s * ZS, '#6b5a55'); GLB.mat = M_NEEDLE; const c = gcol(leafC(hv < .5 ? '#3f6f4a' : '#35604a')); const A = [X, b + 18 * s * ZS, Z]; GLB.ctr = [X, b, Z]; for (let j = 0; j < 8; j++) { const a0 = j / 8 * TAU, a1 = (j + 1) / 8 * TAU, r = .2 * s; gtri([X + Math.cos(a0) * r, b + 3 * s * ZS, Z + Math.sin(a0) * r], [X + Math.cos(a1) * r, b + 3 * s * ZS, Z + Math.sin(a1) * r], A, c); } }
     else if (tt === 3) { GLB.mat = 0; glBoxW(X, Z, .022 * s, b, 12 * s * ZS, '#ece8df'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .14 * s, 13 * s, 5.5 * s, leafC(hv < .5 ? '#8fb35a' : '#9dbb62'), 0, M_LEAF); } // birch
-    else { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 7 * s * ZS, tt === 4 ? '#7b5e4e' : '#6b5040'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .2 * s, 10 * s, 4.6 * s, leafC(tt === 4 ? '#6db873' : G_PUFF[(hv * G_PUFF.length) | 0]), 0, M_LEAF); }
+    else { GLB.mat = M_BARK; glBoxW(X, Z, .03 * s, b, 7 * s * ZS, tt === 4 ? '#7b5e4e' : '#6b5040'); GLB.base = b; glBall(X - GLB.x, Z - GLB.y, .2 * s, 10 * s, 4.6 * s, leafC(tt === 5 ? T_BLOSSOM[(hv * 4) | 0] : tt === 6 ? T_MAPLE[(hv * 4) | 0] : tt === 4 ? '#6db873' : G_PUFF[(hv * G_PUFF.length) | 0]), 0, M_LEAF); }
   }
   GLB.base = surfZ(i) * ZS;
 }
@@ -428,6 +429,7 @@ function glFlowersUV(u, v, z, h) { // a clump of stems and blooms
   for (let k = 0; k < 3; k++) { const du = (k - 1) * .05, dv = ((k % 2) - .5) * .05; glBoxW(GLB.x + u + du, GLB.y + v + dv, .006, GLB.base + z * ZS, 1.4 * ZS, '#4f8a45'); glBlob(u + du, v + dv, .022, z + 1.6, .6, FLOWERS[(((h * 17) | 0) + k) % FLOWERS.length], 0); }
 }
 function glSmallTree(u, v, z, h, s, col) { // street, garden and park trees: a trunk and a leafy crown
+  const lt = LVV.trees; if (lt === 'blossom') col = T_BLOSSOM[((h * 7) | 0) % 4]; else if (lt === 'maples') col = T_MAPLE[((h * 7) | 0) % 4]; else if (lt === 'birches') col = '#9dbb62';
   GLB.mat = M_BARK; glBoxW(GLB.x + u, GLB.y + v, .022 * s, GLB.base + z * ZS, 5 * s * ZS, '#6b5040');
   glBlob(u, v, .15 * s, z + 7 * s, 3.4 * s, leafC(col)); glBlob(u + .05 * s, v - .04 * s, .1 * s, z + 9 * s, 2.4 * s, leafC(col));
 }
@@ -583,7 +585,7 @@ function glDirty(i) { const x = i % W, y = (i / W) | 0; for (const [dx, dy] of [
 /* ---------- shaders ---------- */
 /* ---------- the sky: blue overhead, pale at the horizon, gold and rose round a low sun; the haze takes the same colour ---------- */
 const GL_SKY = `
-uniform vec3 uSunD; uniform float uSunY, uCover;
+uniform vec3 uSunD; uniform float uSunY, uCover; uniform vec4 uTint;
 vec3 skyCol(vec3 v){ // in screen colour (after the tone curve)
   float day=smoothstep(-.1,.2,uSunY), gold=smoothstep(-.16,.02,uSunY)*(1.-smoothstep(.05,.42,uSunY));
   float mu=dot(v,uSunD), m=max(mu,0.), toward=pow(mu*.5+.5,4.), h=clamp(v.y,0.,1.);
@@ -592,13 +594,15 @@ vec3 skyCol(vec3 v){ // in screen colour (after the tone curve)
   vec3 c=mix(hor,zen,pow(h,.5)); if(v.y<0.) c=hor*mix(1.,.86,clamp(-v.y*4.,0.,1.));
   c+=vec3(1.,.84,.6)*(pow(m,10.)*.26*(day*.5+gold)+pow(m,900.)*.4*day);
   c=mix(c,vec3(dot(c,vec3(.3,.59,.11)))*mix(.4,1.03,day),uCover*.72);
+  c=mix(c,c*uTint.rgb,uTint.a); // (a sky the Watcher's words coloured)
   return clamp(c,0.,1.);
 }
 vec3 untone(vec3 c){ return -log(1.-min(c,vec3(.97)))/1.45; }`;
 const GL_KVS = `#version 300 es
 out vec2 vU; void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2)); vU=p*2.-1.; gl_Position=vec4(vU,0.,1.); }`;
+const SKY_TINT0 = [1, 1, 1, 0], SKY_TINT = { golden: [1.18, .98, .66, .6], rosy: [1.15, .84, .92, .6], violet: [.9, .78, 1.18, .6], green: [.84, 1.12, .9, .55] };
 const GL_KFS = `#version 300 es
-precision highp float; in vec2 vU; out vec4 o; uniform vec3 uF, uR, uU; uniform float uCT, uLo;` + GL_SKY + `
+precision highp float; in vec2 vU; out vec4 o; uniform vec3 uF, uR, uU; uniform float uCT, uLo, uAur;` + GL_SKY + `
 float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
 float fb(vec2 p){ return vn(p)*.5+vn(p*2.03+3.1)*.27+vn(p*4.1+7.7)*.15+vn(p*8.3+1.3)*.08; }
@@ -608,6 +612,10 @@ void main(){
   vec3 q=v*420., qc=floor(q); float st=fract(sin(dot(qc,vec3(12.9898,78.233,37.719)))*43758.5453); // stars: small round points, out once the sun is well down
   float night=1.-smoothstep(-.2,-.06,uSunY), pt=smoothstep(.34,.08,length(fract(q)-.5));
   c+=vec3(.9,.92,1.)*step(.9975,st)*pt*night*(1.-uCover)*smoothstep(0.,.2,v.y)*(.45+.55*fract(st*97.));
+  if(uAur>0. && v.y>.04){ // an aurora: curtains of green and rose, swaying slowly
+    vec2 p=v.xz/(v.y+.35); float w=fb(p*1.1+vec2(uCT*.01,uCT*.004)), b1=smoothstep(.55,0.,abs(sin(p.x*1.3+p.y*.5+w*4.+uCT*.03))), b2=smoothstep(.4,0.,abs(sin(p.y*1.1-p.x*.4+w*3.+uCT*.025+1.7)));
+    float band=max(b1,b2*.7)*smoothstep(.03,.18,v.y)*(1.-smoothstep(.45,.85,v.y))*(.55+.45*vn(vec2(atan(v.z,v.x)*60.,uCT*.15))); // curtains with rays down them
+    vec3 ac=mix(vec3(.25,1.,.55),vec3(.85,.35,.95),smoothstep(.22,.6,v.y)); c+=ac*band*(.45+.35*fb(p*5.+uCT*.03))*.8*uAur*night*(1.-uCover*.8); }
   if(v.y>.01 && uLo<.5){ // clouds on a high layer, drifting; lit gold and rose at sunset, grey and heavy when it's overcast
     vec2 q=v.xz/(v.y+.08)*1.6+vec2(uCT*.004,uCT*.0015); float cl=fb(q), th=mix(.62,.18,uCover), a=smoothstep(th,th+.22,cl)*smoothstep(.01,.12,v.y);
     float sunny=pow(max(mu,0.)*.5+.5,3.), lit=mix(.55,1.,day);
@@ -1024,10 +1032,10 @@ function glFrame(dt) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, GL3.post ? post.msF : null); gl.viewport(0, 0, w, h);
   gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   // the sky, behind everything
-  const sd0 = [Math.cos(el * DEG) * Math.cos(t), Math.sin(el * DEG), Math.cos(el * DEG) * Math.sin(t)], skyU = U => { gl.uniform3fv(U.uSunD, sd0); gl.uniform1f(U.uSunY, sd0[1]); gl.uniform1f(U.uCover, cover); };
+  const sd0 = [Math.cos(el * DEG) * Math.cos(t), Math.sin(el * DEG), Math.cos(el * DEG) * Math.sin(t)], skyU = U => { gl.uniform3fv(U.uSunD, sd0); gl.uniform1f(U.uSunY, sd0[1]); gl.uniform1f(U.uCover, cover); gl.uniform4fv(U.uTint, SKY_TINT[LVV.sky] || SKY_TINT0); };
   { const K = GL3.sky, f = [-dir[0], -dir[1], -dir[2]], tn = Math.tan(fov / 2), r0 = [f[2], 0, -f[0]], rl = Math.hypot(r0[0], r0[2]) || 1, r = [-r0[0] / rl, 0, -r0[2] / rl], u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
     for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
-    gl.useProgram(K.p); skyU(K.u); gl.uniform1f(K.u.uCT, GL3.t); gl.uniform1f(K.u.uLo, GL3.lo ? 1 : 0); gl.uniform3fv(K.u.uF, f); gl.uniform3fv(K.u.uR, r.map(q => q * tn * aspect)); gl.uniform3fv(K.u.uU, u.map(q => q * tn));
+    gl.useProgram(K.p); skyU(K.u); gl.uniform1f(K.u.uCT, GL3.t); gl.uniform1f(K.u.uLo, GL3.lo ? 1 : 0); gl.uniform1f(K.u.uAur, LVV.sky === 'aurora' ? 1 : 0); gl.uniform3fv(K.u.uF, f); gl.uniform3fv(K.u.uR, r.map(q => q * tn * aspect)); gl.uniform3fv(K.u.uU, u.map(q => q * tn));
     gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.depthMask(true); gl.enable(gl.DEPTH_TEST); }
   const P = GL3.main, U = P.u; gl.useProgram(P.p); skyU(U);
   gl.uniformMatrix4fv(U.uVP, false, VP); gl.uniformMatrix4fv(U.uSVP, false, SVP);
@@ -1177,29 +1185,47 @@ function glHeading(o, dx, dy) { // turn smoothly towards the way they're going
   if (dx || dy) { const t = Math.atan2(dy, dx); if (o._gh == null) o._gh = t; let d = t - o._gh; d = Math.atan2(Math.sin(d), Math.cos(d)); o._gh += d * Math.min(1, (GL3.dt || .016) * 9); }
   return o._gh || 0;
 }
+const CLOTH_LV = { colourful: ['#e0453a', '#f2b632', '#3f8fd8', '#4fb85f', '#d85fb0', '#8a5fd8', '#f07a2a'], white: ['#f4f1ea', '#ece6da', '#faf8f2'], dark: ['#26282c', '#3a3440', '#1f2a33', '#2f2f2f'], earthy: ['#8a6a4a', '#6b5a3a', '#a8885a', '#5a6a3a', '#7a5040'] };
+function clothOf(o) { // what the Watcher's words have people wearing (kept on the person until the fashion changes)
+  const c = LVV.clothes; if (!c || o.kind === 'founder' || o.kind === 'wk') return o.col;
+  if (o._cl !== c) { o._cl = c; const L = CLOTH_LV[c]; o._cc = L ? L[((o.ph || 0) * 997 | 0) % L.length] : (S.styles[S.styleIdx] || STYLES0[0]).accent; }
+  return o._cc;
+}
+function glCat(d, f, r, y0, dph, moving, col) { // a cat at someone's heel, tail up
+  for (const [lf, lr, q] of [[.016, .008, 0], [.016, -.008, Math.PI], [-.016, .008, Math.PI], [-.016, -.008, 0]]) glLimb([d[0] + f[0] * lf + r[0] * lr, y0 + .018, d[2] + f[2] * lf + r[2] * lr], f, r, moving ? Math.sin(dph + q) * .6 : 0, .018, .0035, col);
+  glOBox([d[0], y0 + .024, d[2]], V3(f, .022), V3(r, .008), [0, .007, 0], col);
+  const hd = [d[0] + f[0] * .025, y0 + .036, d[2] + f[2] * .025]; glOBox(hd, V3(f, .008), V3(r, .008), [0, .008, 0], col);
+  for (const sg of [1, -1]) glOBox([hd[0] + r[0] * sg * .005, hd[1] + .01, hd[2] + r[2] * sg * .005], V3(f, .002), V3(r, .002), [0, .004, 0], col);
+  glLimb([d[0] - f[0] * .02, y0 + .03, d[2] - f[2] * .02], V3(f, -1), r, -2.7 + Math.sin(GL3.t * 2 + dph) * .2, .03, .003, col);
+}
 function glPerson(o, X, Z, y0, h, moving, carryLamp) {
   const e0 = GL3.eye, far = e0 ? Math.hypot(X - e0[0], y0 - e0[1], Z - e0[2]) : 0;
   if (far > 30) { // a speck in the distance: a body and a head
-    GLB.ctr = [X, y0 + .1, Z]; glOBox([X, y0 + .11, Z], [.02, 0, 0], [0, 0, .02], [0, .11, 0], o.col || '#e5874f'); glOBox([X, y0 + .245, Z], [.018, 0, 0], [0, 0, .018], [0, .022, 0], o.skin || '#e0b090'); return;
+    GLB.ctr = [X, y0 + .1, Z]; glOBox([X, y0 + .11, Z], [.02, 0, 0], [0, 0, .02], [0, .11, 0], clothOf(o) || '#e5874f'); glOBox([X, y0 + .245, Z], [.018, 0, 0], [0, 0, .018], [0, .022, 0], o.skin || '#e0b090'); return;
   }
   const s = o.kid ? .72 : 1, f = [Math.cos(h), 0, Math.sin(h)], r = [-Math.sin(h), 0, Math.cos(h)], ph = o.ph || 0;
   const sw = moving ? Math.sin(ph) : 0, bob = moving ? Math.abs(Math.cos(ph)) * .007 * s : Math.sin(GL3.t * 1.6 + ph) * .0015; // a step's bob, or breathing
   const hip = y0 + .105 * s + bob, sh = y0 + .21 * s + bob, B = (dx, dr, y) => [X + f[0] * dx + r[0] * dr, y, Z + f[2] * dx + r[2] * dr];
   for (const sg of [1, -1]) glLimb(B(0, sg * .016 * s, hip), f, r, sw * sg * .55, .105 * s, .012 * s, o.pants || '#555'); // legs
-  glOBox(B(0, 0, (hip + sh) / 2 + .006 * s), V3(f, .02 * s), V3(r, .033 * s), [0, (sh - hip) / 2 + .01 * s, 0], o.col || '#e5874f'); // body
+  const col = clothOf(o) || '#e5874f'; glOBox(B(0, 0, (hip + sh) / 2 + .006 * s), V3(f, .02 * s), V3(r, .033 * s), [0, (sh - hip) / 2 + .01 * s, 0], col); // body
   if (o.kind === 'founder') glOBox(B(.001, 0, hip + .045 * s), V3(f, .0205 * s), V3(r, .0335 * s), [0, .006 * s, 0], '#f2f0ea'); // the founder's sash
   let hand = null, hand2 = null; const arms = o.arms; // (o.arms: [right, left] held in a pose, for folk at work)
-  for (const sg of [1, -1]) { const e = glLimb(B(0, sg * .043 * s, sh), f, r, arms ? arms[sg > 0 ? 0 : 1] : -sw * sg * .45 + (carryLamp && sg > 0 ? .5 : 0), .095 * s, .0095 * s, sg > 0 ? o.col : shade(o.col || '#e5874f', .85)); if (sg > 0) hand = e; else hand2 = e; } // arms swing against the legs
+  for (const sg of [1, -1]) { const e = glLimb(B(0, sg * .043 * s, sh), f, r, arms ? arms[sg > 0 ? 0 : 1] : -sw * sg * .45 + (carryLamp && sg > 0 ? .5 : 0), .095 * s, .0095 * s, sg > 0 ? col : shade(col, .85)); if (sg > 0) hand = e; else hand2 = e; } // arms swing against the legs
   glOBox(B(0, 0, sh + .012 * s), V3(f, .01 * s), V3(r, .01 * s), [0, .012 * s, 0], o.skin || '#e0b090'); // neck
   const hy = sh + .045 * s, hc = B(0, 0, hy), u = hc[0], v = hc[2];
   glOBox(hc, V3(f, .022 * s), V3(r, .021 * s), [0, .025 * s, 0], o.skin || '#e0b090'); // head
   glOBox(B(-.005 * s, 0, hy + .012 * s), V3(f, .02 * s), V3(r, .023 * s), [0, .016 * s, 0], o.hair || '#5a3a28'); // hair, sitting back on the head
   if (carryLamp && hand) { glOBox([hand[0], hand[1] - .012, hand[2]], [.008, 0, 0], [0, 0, .008], [0, .012, 0], '#ffd08a', 2); GL3.carry.push([hand[0], hand[1], hand[2]]); } // a lantern
   if (far > 12) return [hand, hand2];
-  if (!o.kid && (o.hat || 1) < .22) { const era = S.era;
+  const hl = LVV.hats, hr = o.hat == null ? 1 : o.hat;
+  if (hl === 'tall_hats' && !o.kid && hr < .7) { glOBox([u, hy + .024 * s, v], V3(f, .034 * s), V3(r, .034 * s), [0, .002, 0], '#2a2a2e'); glOBox([u, hy + .052 * s, v], V3(f, .021 * s), V3(r, .021 * s), [0, .028 * s, 0], '#2a2a2e'); } // a top hat
+  else if (hl === 'flower_crowns' && hr < .8) for (let q = 0; q < 6; q++) { const a = q / 6 * TAU; glBlob(u + Math.cos(a) * .02 * s, v + Math.sin(a) * .02 * s, .008 * s, (hy + .028 * s) / ZS, .3 * s, FLOWER_C[(q + ((hr * 9) | 0)) % FLOWER_C.length], 0); } // a crown of flowers
+  else if (hl !== 'no_hats' && !o.kid && (hl === 'everyone' || hr < .22)) { const era = S.era;
     if (era <= 3) { glOBox([u, hy + .024 * s, v], V3(f, .046 * s), V3(r, .046 * s), [0, .003, 0], '#d8b86a'); glBlob(u, v, .026 * s, (hy + .026 * s) / ZS, .5 * s, '#caa458', 0); } // a straw hat
     else if (era <= 6) { glBlob(u, v, .028 * s, (hy + .012 * s) / ZS, .55 * s, shade(o.pants || '#555', .8), 0); glOBox(B(.028 * s, 0, hy + .012 * s), V3(f, .014 * s), V3(r, .022 * s), [0, .002, 0], shade(o.pants || '#555', .8)); } } // a cap
-  if (o.pet) glDog(B(-.07, .05, y0), f, r, y0, ph * 1.35, moving); // the dog trots at their heel
+  const pl = LVV.pets, pq = ((o.ln || 0) * 7) % 1; // (the custom decides who has a pet)
+  if (pl === 'cats' ? !o.kid && pq < .35 : false) glCat(B(-.06, .05, y0), f, r, y0, ph * 1.35, moving, ['#e0903a', '#5a5a5e', '#2a2a2e', '#f2ece0'][((pq * 40) | 0) % 4]);
+  else if (pl !== 'none' && (o.pet || pl === 'dogs' && pq < .45)) glDog(B(-.07, .05, y0), f, r, y0, ph * 1.35, moving, ['#9a7a5c', '#3a3430', '#d8c4a0', '#7a5040'][((pq * 40) | 0) % 4]); // the dog trots at their heel
   return [hand, hand2];
 }
 function glDog(d, f, r, y0, dph, moving, col = '#9a7a5c') { // d: where it stands; dph: its stride

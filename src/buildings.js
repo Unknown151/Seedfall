@@ -80,7 +80,12 @@ function tieredBody(hw, hd, h, st, wc, glass) {
 }
 const hk = (B, n) => hash2(B.id, n, 131); // a house's own dice, the same on every reload
 const HTINT = new Map();
-function houseTint(st, B) { // a little colour of its own: limewash, ochre, a door-colour wash...
+const HPAL = { rainbow: ['#d9534f', '#e8973a', '#e8cf4a', '#5fae5f', '#4a8fd0', '#8a62c8', '#e070a8', '#3fb0a8'], pastel: ['#f4c6d4', '#c6dff4', '#d2f0c6', '#f6ecbc', '#e0d0f4', '#f7d6bc', '#c8efe8'],
+  whitewash: ['#f6f3ec', '#efeae0', '#faf8f3'], earthy: ['#c9a27a', '#a8785a', '#d8c09a', '#8f7050', '#b89070', '#9a8a60'], bold: ['#a8303a', '#2f5f9a', '#2f7a4a', '#d0902a', '#5a2f7a', '#1f6a6a', '#2a2a3a'] };
+function houseTint(st, B) { // a little colour of its own: limewash, ochre, a door-colour wash... or the colours the Watcher's words asked for
+  const pal = HPAL[LVV.housecol];
+  if (pal) { const j = (hk(B, 33) * pal.length) | 0, key = st.wall + st.roof + LVV.housecol + j; let o = HTINT.get(key); if (o) return o;
+    o = Object.assign({}, st, { wall: mix(st.wall, pal[j], .82), painted: 1 }); if (HTINT.size > 600) HTINT.clear(); HTINT.set(key, o); return o; }
   const k = (hk(B, 3) * 7) | 0; if (!k) return st;
   const key = st.wall + st.roof + st.accent + k; let o = HTINT.get(key); if (o) return o;
   const [col, f] = [null, ['#ffffff', .24], [st.accent, .17], ['#e6c393', .22], [st.roof, .13], ['#8f857f', .16], ['#f3d9c4', .2]][k];

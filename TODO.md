@@ -93,6 +93,9 @@ only, or a few invited emails.
   farmhouses, the reshaping styles' houses: round, organic, tiered, tall, low), and more own-colour glows at night.
 - Done: incidents (incidents.js): a house fire, sheep loose in the market, a wedding procession, a river flood, a
   runaway cabbage cart and a whale on the beach.
+- Done: many more voice levers, all from one table (`LEVERS`): a season that stays, the sky's colour or an aurora, house
+  colours, trees, street decorations, bedtime, clothes, hats, pets, street life, birds, fireworks, work pace, trade, the
+  sea, faith and smoke.
 - Next: more incidents (a storm tearing tiles off roofs, a hot-air balloon that drifts off with the mayor, a mine
   collapse and rescue, a shipwreck and the lifeboat, a strike march in the works era, a harvest fair with a pig race),
   and prayers that react to them (townsfolk praying for rain during a fire, say).

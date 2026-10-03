@@ -47,9 +47,11 @@ function seasonNow(ms) {
   return { autumn: bump(290, 55), winter: bump(15, 62), spring: bump(115, 50) };
 }
 function lightEra() { return !S || !S.tech ? 0 : hasTech('hover') ? 2 : hasTech('electric') ? 1 : 0; }
+const LV_SEASON = { spring: { autumn: 0, winter: 0, spring: 1 }, summer: { autumn: 0, winter: 0, spring: 0 }, autumn: { autumn: 1, winter: 0, spring: 0 }, winter: { autumn: 0, winter: 1, spring: 0 } };
+function seasonFor() { return LIGHT.forceSeason || LV_SEASON[LVV.seasons] || seasonNow(); } // (a season the Watcher's words asked to stay)
 function litFrac(hr, el) {
   if (el > 4) return 0;
-  const f = hr >= 16 && hr < 23 ? .8 : (hr >= 23 || hr < 1) ? .6 : hr < 4.5 ? .3 : .5;
+  const bt = LVV.bedtime, f = bt === 'never' ? .85 : bt === 'early' ? (hr >= 16 && hr < 21 ? .7 : .12) : bt === 'late' ? (hr >= 16 || hr < 3 ? .85 : .55) : hr >= 16 && hr < 23 ? .8 : (hr >= 23 || hr < 1) ? .6 : hr < 4.5 ? .3 : .5;
   return f * sstep(4, -4, el);
 }
 
@@ -108,14 +110,14 @@ function leafC(col, f) { let c = LT.leaf[1] ? mix(col, LT.leaf[0], LT.leaf[1]) :
 function lightTick(dt) {
   if (!S) return;
   LIGHT.sun = sunNow();
-  if (!LIGHT.season || (LIGHT.seasonT -= dt) <= 0) { LIGHT.season = LIGHT.forceSeason || seasonNow(); LIGHT.seasonT = 300; }
+  if (!LIGHT.season || (LIGHT.seasonT -= dt) <= 0) { LIGHT.season = seasonFor(); LIGHT.seasonT = 300; }
   stepWeather(dt);
   const el = LIGHT.sun.el, fx = LIGHT.sun.fixed;
   LIGHT.emK = fx ? 0 : sstep(4, -6, el);
   LIGHT.nightK = fx ? 0 : sstep(0, -9, el);
   LIGHT.dayK = fx ? 1 : sstep(-6, 4, el);
   if ((LIGHT.chk -= dt) <= 0) { // what the art takes from the light (the era's lamps, the night's custom, gardens) changed: rebuild the view
-    LIGHT.chk = 1.5; const env = envNow(), k = [env.era, env.nl || '', env.gd || 0].join('|');
+    LIGHT.chk = 1.5; const env = envNow(), k = [env.era, env.nl || '', env.gd || 0, LVA].join('|'); // (and the customs the buildings show: house colours, trees, decorations)
     if (!LIGHT.cur || k !== LIGHT.artKey) { LIGHT.cur = LT = mkLight(env); if (LIGHT.artKey != null && GL3.on) for (let n = 0; n < GNC * GNC; n++) GL3.dirty.add(n); LIGHT.artKey = k; }
   }
   const night = LIGHT.nightK > .5 || S.wx && S.wx.storm > .6 && LIGHT.dayK < 1;
