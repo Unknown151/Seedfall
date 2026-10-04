@@ -122,7 +122,7 @@ function updateDyn(dt) {
   }
   stepAgents(dt);
   stepBoats(dt); stepShips(dt); stepFerries(dt); stepPlanes(dt);
-  stepTrains(dt); // (rail.js)
+  stepTrains(dt); stepTrams(dt); // (rail.js)
   for (const h of DYN.herds) {
     h.age += dt;
     for (const m of h.members) { if (m.pause > 0) { m.pause -= dt; continue; } stepAgent(m, dt, a => herdNext(a, h)); if (chance(dt * .15)) m.pause = rf(2, 7); }

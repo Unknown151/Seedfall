@@ -54,7 +54,7 @@ function newState(seed) { S = { rs: (seed * 2654435761) >>> 0 }; return simRun((
 function newState0(seed) {
   const g = genWorld(seed), rs = S.rs;
   S = {
-    v: 1, roadV: 2, railV: 2, size: W, rs, seed, created: Date.now(), savedAt: 0, playSec: 0,
+    v: 1, roadV: 2, railV: 3, size: W, rs, seed, created: Date.now(), savedAt: 0, playSec: 0,
     year: 0, month: 0, map: g.M, B: {}, nextB: 1, T: {}, nextT: 1, P: {}, nextP: 1,
     tech: { done: {}, cur: 0, pts: 0 }, era: 0, age: null, ageN: 0, ageUsed: {},
     styles: [Object.assign({}, STYLES0[0])], styleIdx: 0,
@@ -229,9 +229,10 @@ function nearWaterDir(x, y) {
 
 function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it can prefer the right quarter
   const R = townRadius(T);
-  const Rx = (kind === 'farm' || kind === 'fields' ? R + 4 : kind === 'ore' ? R + 5 : kind === 'shore' || kind === 'harbor' ? R + 3 : kind === 'wild' ? R + 7 : kind === 'forest' || kind === 'rock' || kind === 'clay' || kind === 'point' || kind === 'pasture' || kind === 'sand' || kind === 'spring' || kind === 'ruins' ? R + 6 : R + 1) + extra;
+  const Rx = (kind === 'farm' || kind === 'fields' ? R + 4 : kind === 'ore' ? R + 5 : kind === 'shore' || kind === 'harbor' ? R + 3 : kind === 'wild' ? R + 7 : kind === 'forest' || kind === 'rock' || kind === 'clay' || kind === 'point' || kind === 'pasture' || kind === 'sand' || kind === 'spring' || kind === 'ruins' ? R + 6 : kind === 'railhead' ? R + 3 : R + 1) + extra;
   const outer = kind === 'ore' || kind === 'shore' || kind === 'forest' || kind === 'rock' || kind === 'clay' || kind === 'harbor' || kind === 'point', high = kind === 'ore' || kind === 'rock';
-  const front = kind === 'house' || kind === 'center' || kind === 'mid' || kind === 'edge'; // must face a street
+  const front = kind === 'house' || kind === 'center' || kind === 'mid' || kind === 'edge'; // must face a street (a station brings its own road)
+  let rhA = null; if (kind === 'railhead') { let bd = 1e9; for (const O of towns()) { const d = O === T ? 1e9 : dist(O.x, O.y, T.x, T.y); if (d < bd) { bd = d; rhA = Math.atan2(O.y - T.y, O.x - T.x); } } } // (a station faces the nearest town)
   let best = null, bs = -1e9;
   const x0 = Math.max(0, Math.floor(T.x - Rx)), x1 = Math.min(W - 1, Math.ceil(T.x + Rx));
   const y0 = Math.max(0, Math.floor(T.y - Rx)), y1 = Math.min(H - 1, Math.ceil(T.y + Rx));
@@ -248,7 +249,9 @@ function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it c
     let replaceFarm = false;
     if (M.bld[i]) {
       const B = S.B[M.bld[i]];
-      if (allowFarmReplace && B && (B.type === 'farm' || B.type === 'pasture') && B.sid === T.id && d < farmR && B.prog >= 1) replaceFarm = true; else continue; // the town grows over its old fields
+      if (allowFarmReplace && B && (B.type === 'farm' || B.type === 'pasture') && B.sid === T.id && d < farmR && B.prog >= 1) replaceFarm = true; // the town grows over its old fields
+      else if (kind === 'railhead' && B && B.prog >= 1 && !fpBig(B) && d >= R * .6 && (B.type === 'farm' || B.type === 'pasture' || (B.type === 'house' && B.tier <= 3))) replaceFarm = true; // a station out on the fields, or where an old cottage stood
+      else continue;
     }
     if (OWN[i] !== T.id) continue;
     if (front && !fronts(x, y)) continue;
@@ -265,6 +268,7 @@ function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it c
       case 'center': s += -d * 2 + adjRoad * 1.5 - tree; break;
       case 'mid': s += -Math.abs(d - R * 0.5) * 1.2 + adjRoad - tree * .5; break;
       case 'edge': s += -Math.abs(d - R) * 1.2 + adjRoad * .5 - tree * .5; break;
+      case 'railhead': s += -Math.abs(d - R) * 1.2 + adjRoad * .5 - tree * .5 + (rhA == null ? 0 : Math.cos(Math.atan2(y - T.y, x - T.x) - rhA) * R * .5); break;
       case 'flatedge': { let fl = 0; for (const [dx, dy] of N8) { const nx = x + dx, ny = y + dy; if (inb(nx, ny) && M.elev[idx(nx, ny)] === M.elev[i] && !M.water[idx(nx, ny)]) fl++; } if (fl < 7) continue; s += -Math.abs(d - R) - tree; break; }
       case 'high': s += M.elev[i] * 1.6 - d * 0.5 - tree * .5; break;
       case 'fields': { const nf = around(x, y, 3, j => M.bld[j] && S.B[M.bld[j]] && S.B[M.bld[j]].type === 'farm' ? 1 : 0); if (nf < 2) continue; s += nf * .8 + M.elev[i] * .5 - d * .3 - tree; break; } // a windmill among the fields
@@ -289,7 +293,7 @@ function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it c
       default: s += -d;
     }
     if (zt) s += zoneScore(zt, i);
-    if (replaceFarm && kind !== 'house' && kind !== 'backlot') continue;
+    if (replaceFarm && kind !== 'house' && kind !== 'backlot' && kind !== 'railhead') continue;
     if (s > bs) { bs = s; best = { x, y, replaceFarm }; }
   }
   if (!best) T._fail[fk] = S.month + 4 + ri(0, 4);
@@ -341,7 +345,8 @@ function railCost(i, j) {
   if (M.water[j] === 2) return 6;
   const de = Math.abs(M.elev[j] - M.elev[i]);
   if (de > 1) return 1e9;
-  return (M.rail[j] ? 0.3 : 1.3) + de * 2 + (M.road[j] ? (M.road[i] ? 18 : 4) : 0) + (springAt(j) ? 8 : 0); // (crossing a street is fine; running along one is not)
+  const T = OWN[j] && S.T[OWN[j]], inTown = T && dist(j % W, (j / W) | 0, T.x, T.y) < townRadius(T) * .85 ? 7 : 0; // trains run between towns; trams do the streets
+  return (M.rail[j] ? 0.3 : 1.3) + de * 2 + inTown + (M.road[j] ? (M.road[i] ? 18 : 4) : 0) + (springAt(j) ? 8 : 0); // (crossing a street is fine; running along one is not)
 }
 function layRail(path) { // the line goes down; fields and cottages in its way give way (returns how many homes went)
   let homes = 0;
@@ -350,11 +355,55 @@ function layRail(path) { // the line goes down; fields and cottages in its way g
     M.rail[i] = 1; M.tree[i] = 0; M.wild[i] = 0; markDirty(i); }
   S.railGen = (S.railGen || 0) + 1; return homes;
 }
-function replanRails() { // older worlds laid their lines down the streets: lay them again the way they're laid now
-  S.railV = 2; delete S.railReplan;
+function stationOf(T) { return T && T.bl.map(id => S.B[id]).find(B => B && B.type === 'station') || null; }
+function relayRails() { // take every line up and lay it again from the stations where they stand now
   for (const r of S.rails || []) if (r.path) for (let k = 1; k < r.path.length - 1; k++) { const i = r.path[k]; if (M.rail[i]) { M.rail[i] = 0; markDirty(i); } }
-  for (const r of S.rails || []) if (r.path) { RAIL_TO = r.path[r.path.length - 1]; const p = astar(r.path[0], RAIL_TO, railCost); if (p) r.path = p; layRail(r.path); }
+  for (const r of S.rails || []) { const A = stationOf(S.T[r.a]), Bs = stationOf(S.T[r.b]); if (!A || !Bs) { r.path = null; continue; }
+    RAIL_TO = idx(Bs.x, Bs.y); const p = astar(idx(A.x, A.y), RAIL_TO, railCost); r.path = p || null; if (p) layRail(p); }
+  S.railGen = (S.railGen || 0) + 1;
 }
+function moveStation(T) { // the town has grown round its station: a new one goes up at the edge, the old one comes down
+  const B = stationOf(T); if (!B) return false; refreshOwn();
+  const s = findSite(T, 'railhead', 0, 'station'); if (!s || dist(s.x, s.y, T.x, T.y) < townRadius(T) * .75) return false;
+  removeBuilding(B); if (s.replaceFarm && M.bld[idx(s.x, s.y)]) removeBuilding(S.B[M.bld[idx(s.x, s.y)]]); const N = mkBuilding('station', s.x, s.y, T, { prog: 1 }); connectRoad(N); T._fail = {}; T._stY = S.year;
+  chron('🚉', `${T.name} has grown all round its old station, so a new one goes up out at the edge of town. The old one is pulled down, and the trams take folk the rest of the way.`, { x: s.x, y: s.y });
+  return true;
+}
+function replanRails() { // older worlds laid their lines through the towns: move the stations out to the edge and lay them again
+  S.railV = 3; delete S.railReplan; refreshOwn();
+  for (const T of towns()) { const B = stationOf(T); if (B && dist(B.x, B.y, T.x, T.y) < townRadius(T) * .7) moveStation(T); }
+  relayRails();
+}
+function yearlyStations() { // one town a year at most, and not too often for any town
+  if (!S.rails || !S.rails.some(r => r.path)) return;
+  for (const T of towns()) { const B = stationOf(T); if (!B || dist(B.x, B.y, T.x, T.y) >= townRadius(T) * .55 || S.year - (T._stY || B.built) < 60) continue;
+    if (moveStation(T)) { relayRails(); return; } T._stY = S.year; } // (no room at the edge: try again in a while)
+}
+// Trams: in a town of any size from Railways, a line along the streets from the station (or the edge) through the middle
+// to the far side. Worked out once a year from the streets (T._tram, saved), drawn in the road (rail.js), run by DYN.trams.
+function tramCost(i, j) { return M.road[j] ? 1 + (M.water[j] ? 1 : 0) : 1e9; }
+function tramRoute(T) {
+  const R = townRadius(T); refreshOwn();
+  let c = -1, bd = 1e9; for (let y = Math.max(0, T.y - 3); y <= Math.min(H - 1, T.y + 3); y++) for (let x = Math.max(0, T.x - 3); x <= Math.min(W - 1, T.x + 3); x++) { const i = idx(x, y); if (M.road[i] && !M.water[i] && dist(x, y, T.x, T.y) < bd) { bd = dist(x, y, T.x, T.y); c = i; } }
+  if (c < 0) return null;
+  const seen = new Set([c]), q = [c]; // the streets joined to the middle (a station's own lane may not be)
+  while (q.length) { const i = q.pop(), x = i % W, y = (i / W) | 0; for (const [dx, dy] of N4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (!seen.has(j) && M.road[j] && OWN[j] === T.id && dist(nx, ny, T.x, T.y) <= R + 1) { seen.add(j); q.push(j); } } }
+  const near = (x, y) => { let b = -1, d0 = 1e9; for (const i of seen) { const d = dist(i % W, (i / W) | 0, x, y); if (d < d0) { d0 = d; b = i; } } return b; };
+  const st = stationOf(T), s0 = st ? near(st.x, st.y) : c, sx = s0 % W, sy = (s0 / W) | 0; let e = -1, be = -1;
+  for (const i of seen) { const x = i % W, y = (i / W) | 0; if (M.water[i] || dist(x, y, T.x, T.y) > R * .9) continue; const sc = dist(x, y, sx, sy) - dist(x, y, T.x, T.y) * .3; if (sc > be) { be = sc; e = i; } } // the far end, across the middle
+  const p1 = s0 === c ? [c] : astar(s0, c, tramCost), p2 = e < 0 || e === c ? [c] : astar(c, e, tramCost); if (!p1 || !p2) return null;
+  const path = p1.concat(p2.slice(1));
+  return path.length >= 5 ? path : null;
+}
+function yearlyTrams() {
+  if (!hasTech('rail')) return;
+  for (const T of towns()) { if (T.pop < 400) continue;
+    const p = tramRoute(T), old = T._tram || null, same = old && p && old.length === p.length && old.every((v, k) => v === p[k]); if (same || (!p && !old)) continue;
+    for (const i of old || []) markDirty(i); for (const i of p || []) markDirty(i);
+    if (!old && p && !S.flags['tram' + T.id]) { S.flags['tram' + T.id] = 1; chron('🚋', hasTech('electric') ? `The first electric tram clangs down the high street of ${T.name}.` : `${T.name} gets a horse tram: one patient horse, two benches and a bell.`, { T }); }
+    T._tram = p; S.tramGen = (S.tramGen || 0) + 1; }
+}
+
 function planIntertownRoads() {
   if (!hasTech('wheel')) return;
   const linked = towns().filter(T => T.linked), un = towns().filter(T => !T.linked && S.year - T.founded > 3);
@@ -554,6 +603,7 @@ function tryService(T) {
     if (have >= want) continue;
     const s = findSite(T, sv.site === 'shore' ? 'shore' : sv.site === 'ore' ? 'ore' : sv.site, 0, sv.t) || landmarkSite(T, sv.t);
     if (!s) continue;
+    if (s.replaceFarm && M.bld[idx(s.x, s.y)]) removeBuilding(S.B[M.bld[idx(s.x, s.y)]]); // (a station out on the fields)
     const B = mkBuilding(sv.t, s.x, s.y, T, sv.t === 'dock' ? { dir: nearWaterDir(s.x, s.y) } : sv.t === 'harbor' ? { dir: harbourSite(s.x, s.y) } : sv.t === 'shops' ? { sub: shopKind() } : {});
     if (sv.t !== 'solar' && sv.t !== 'turbine') connectRoad(B);
     return true;
@@ -1165,6 +1215,7 @@ function simMonth0() {
     planIntertownRoads();
     worldProjects();
     if (hasTech('rail') && chance(.3)) planRails();
+    yearlyStations(); yearlyTrams();
     stepPeople();
     milestones();
     for (const T of towns()) if (S.year - T.lastElect > 45 && chance(.04) && S.year > 60) electAnnounce(T);

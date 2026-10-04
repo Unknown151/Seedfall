@@ -135,6 +135,7 @@ function tipFor(i) {
     if (springAt(i)) extra.push('a hot spring');
     if (M.road[i]) extra.push(w ? (rcls(i) >= 3 ? 'stone bridge' : 'bridge') : R_NAME[M.road[i]] || 'road');
     if (M.rail[i]) extra.push('railway');
+    if (M.road[i] && tramMap().has(i)) extra.push('tramline');
     if (M.wild[i] === 2) extra.push('starfall crater');
     if (M.wild[i] === 3 && !M.tree[i]) extra.push('tree stumps');
     if (inT) extra.push('near ' + esc(T.name));

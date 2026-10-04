@@ -104,13 +104,14 @@ function trainCars(tr) {
   const C = era === 2 ? [['nose', .78], ['mid', .7], ['mid', .7], ['nose', .78]] : era === 1 ? [['cab', .66], ['coach', .64], ['coach', .64], ['coach', .64], ['cab', .66]] : [['loco', .62], ['tender', .36], ['coach', .6], ['coach', .6], ['coach', .6]];
   const len = () => C.reduce((s, c) => s + c[1] + .04, -.04);
   while (C.length > 2 && len() > room) C.splice(C.length - 2, 1);
-  return { C, len: len(), era };
+  if (len() > room) C.splice(1); // (a short hop between neighbours: the engine alone, or a single car)
+  return { C, len: len(), era, fits: len() <= room };
 }
 const TRAIN_SP = [[.75, .16], [1.25, .3], [2.4, .5]]; // top speed (tiles a second) and how fast they get going, by age
 function stepTrains(dt) {
   const busy = DYN.railBusy || (DYN.railBusy = new Set()); busy.clear();
   for (const tr of DYN.trains) {
-    const P = tr.r.path, L = P.length - 1, { len, era } = trainCars(tr), [vm, ac] = TRAIN_SP[era];
+    const P = tr.r.path, L = P.length - 1, { len, era, fits } = trainCars(tr), [vm, ac] = TRAIN_SP[era]; if (!fits) { tr.lo = .5; continue; } // (too short a line for any train)
     if (tr.lo == null || tr.lo + len > L - .5 + 1e-6) { tr.lo = .5; tr.v = 0; }
     if (tr.wait > 0) { tr.wait -= dt; tr.v = 0; }
     else {
@@ -142,7 +143,7 @@ function glTrains() {
       if (want && (GL3.t * 2 + s) % 2 < 1) glOBox([piv[0], y + .2, piv[2]], [.014, 0, 0], [0, 0, .014], [0, .014, 0], '#ff4030', 3); }
   }
   for (const tr of DYN.trains) {
-    const P = tr.r.path, { C, len, era } = trainCars(tr), head = tr.dir > 0 ? tr.lo + len : tr.lo;
+    const P = tr.r.path, { C, len, era, fits } = trainCars(tr), head = tr.dir > 0 ? tr.lo + len : tr.lo; if (!fits) continue;
     const h0 = railPos(P, head); if (Math.hypot(h0[0] - eye[0], h0[2] - eye[2]) > 70) continue;
     let off = 0;
     for (let k = 0; k < C.length; k++) {
@@ -207,4 +208,74 @@ function glCar(kind, c, f, r, hl, tr, far, k) {
     if (!far) box(-hl + .02, hl - (kind === 'nose' ? .2 : .02), .118, .1, .112, '#3f7fd6'); // a blue stripe
     if (lit && kind === 'nose') glOBox(P(hl - .02, 0, .04), V3s(f, .006), V3s(r, .03), [0, .006, 0], '#e8f6ff', 2);
   }
+}
+
+/* ---------- trams: a line along the streets of each town (sim.js tramRoute, T._tram), the tracks set in the road ---------- */
+const TRAMX = { S: null, g: -1, m: null };
+function tramMap() { // road tile -> its pieces [[prev, next], ...]
+  const g = S.tramGen || 0; if (TRAMX.S === S && TRAMX.g === g) return TRAMX.m;
+  const m = new Map();
+  for (const T of towns()) { const P = T._tram; if (!P) continue; for (let k = 0; k < P.length; k++) { const i = P[k], a = P[Math.max(0, k - 1)], b = P[Math.min(P.length - 1, k + 1)]; let L = m.get(i); if (!L) m.set(i, L = []); L.push([a === i ? -1 : a, b === i ? -1 : b]); } }
+  TRAMX.S = S; TRAMX.g = g; TRAMX.m = m; return m;
+}
+const tramRoadY = i => M.water[i] ? bridgeZ(i) * ZS : GT(i) + .006;
+function tramPt(i, a, b, t) { // like railPt, on the road (an end of the line stops at the tile's middle)
+  const x = i % W, z = (i / W) | 0, E = a < 0 ? [x, z] : [(x + a % W) / 2, (z + ((a / W) | 0)) / 2], X = b < 0 ? [x, z] : [(x + b % W) / 2, (z + ((b / W) | 0)) / 2], u = 1 - t;
+  const hi = tramRoadY(i), hE = a < 0 ? hi : (hi + tramRoadY(a)) / 2, hX = b < 0 ? hi : (hi + tramRoadY(b)) / 2;
+  return [u * u * E[0] + 2 * u * t * x + t * t * X[0], hE + (hX - hE) * t, u * u * E[1] + 2 * u * t * z + t * t * X[1], 2 * (u * (x - E[0]) + t * (X[0] - x)) || (X[0] - E[0]), 2 * (u * (z - E[1]) + t * (X[1] - z)) || (X[1] - E[1])];
+}
+function tramPos(P, s) { const L = P.length - 1, j = clamp(Math.round(s), 0, L), t = clamp(s - j + .5, 0, 1); return tramPt(P[j], j > 0 ? P[j - 1] : -1, j < L ? P[j + 1] : -1, t); }
+function glTramTile(i, x, y) {
+  const L = tramMap().get(i); if (!L) return;
+  const lod = GLB.lod, el = hasTech('electric');
+  for (const [a, b] of L) {
+    const n = lod ? 6 : 2, P = []; for (let k = 0; k <= n; k++) { const p = tramPt(i, a, b, k / n), l = Math.hypot(p[3], p[4]) || 1; P.push([p[0], p[1], p[2], p[3] / l, p[4] / l]); }
+    const side = (p, d, yy) => [p[0] - p[4] * d, yy, p[2] + p[3] * d];
+    GLB.mat = 0; const c = gcol('#4d5054');
+    for (const d of [-.05, .05]) for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; GLB.ctr = [(A[0] + B[0]) / 2, A[1] - 1, (A[2] + B[2]) / 2]; gquad(side(A, d - .006, A[1] + .003), side(A, d + .006, A[1] + .003), side(B, d + .006, B[1] + .003), side(B, d - .006, B[1] + .003), c); } // the grooved rails, set in the road
+    if (el) { for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; gBeam(side(A, 0, A[1] + .5), side(B, 0, B[1] + .5), .003, '#3a3d41'); } // the wire
+      if ((x + y) % 2 === 0) { const m = P[(n / 2) | 0], s = hash2(x, y, 43) < .5 ? -1 : 1, base = side(m, s * .3, m[1]); gBeam(base, [base[0], m[1] + .56, base[2]], .009, '#5d6268'); gBeam([base[0], m[1] + .54, base[2]], side(m, 0, m[1] + .51), .004, '#5d6268'); } } // a pole and its arm, every other tile
+  }
+}
+const TRAM_COL = [['#2f5a3e', '#e9dcc0'], ['#7a2e2a', '#e9dcc0'], ['#2a4a6e', '#efe6d2'], ['#c8553d', '#efe6d2']];
+function stepTrams(dt) {
+  const D = DYN.trams || (DYN.trams = []); if (DYN.tramS !== S) { D.length = 0; DYN.tramS = S; }
+  for (const T of towns()) { const P = T._tram; let tm = D.find(o => o.sid === T.id); if (!P) { if (tm) D.splice(D.indexOf(tm), 1); continue; }
+    if (!tm) D.push(tm = { sid: T.id, P, s: 0, dir: 1, wait: rf(0, 4), v: 0, next: 5, dist: 0 }); if (tm.P !== P) Object.assign(tm, { P, s: clamp(tm.s, 0, P.length - 1) }); }
+  for (const tm of D) {
+    const L = tm.P.length - 1, vm = hasTech('electric') ? .6 : .32;
+    if (tm.wait > 0) { tm.wait -= dt; tm.v = 0; continue; }
+    tm.v = Math.min(vm, tm.v + .4 * dt); const d = tm.v * dt; tm.s += tm.dir * d; tm.dist += d;
+    if (tm.s >= L || tm.s <= 0) { tm.s = clamp(tm.s, 0, L); tm.dir = -tm.dir; tm.wait = rf(5, 9); tm.next = tm.s + tm.dir * 5; continue; }
+    if ((tm.dir > 0 && tm.s >= tm.next) || (tm.dir < 0 && tm.s <= tm.next)) { tm.wait = rf(2, 3.5); tm.next = tm.s + tm.dir * (4 + ((tm.s * 7) | 0) % 3); } // a stop: folk get on and off
+  }
+}
+function glTrams() {
+  const eye = GL3.eye || [0, 0, 0], era = hasTech('computing') ? 2 : hasTech('electric') ? 1 : 0;
+  for (const tm of DYN.trams || []) {
+    const hl = era === 2 ? .36 : era === 1 ? .26 : .19, A = tramPos(tm.P, tm.s + tm.dir * hl * .7), B = tramPos(tm.P, tm.s - tm.dir * hl * .7), c = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2 + .02, (A[2] + B[2]) / 2];
+    if (Math.hypot(c[0] - eye[0], c[2] - eye[2]) > 45) continue;
+    let fx = A[0] - B[0], fz = A[2] - B[2]; const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
+    glTram(era, c, [fx, 0, fz], [-fz, 0, fx], hl, tm, Math.hypot(c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]) > 16);
+  }
+}
+function glTram(era, c, f, r, hl, tm, far) {
+  const P = (s, t, y) => [c[0] + f[0] * s + r[0] * t, c[1] + y, c[2] + f[2] * s + r[2] * t], lit = GL3.litNow, [c1, c2] = TRAM_COL[tm.sid % TRAM_COL.length];
+  const box = (s0, s1, t, y0, y1, col, e = 0) => { GLB.mat = 0; glOBox(P((s0 + s1) / 2, 0, (y0 + y1) / 2), V3s(f, (s1 - s0) / 2), V3s(r, t), [0, (y1 - y0) / 2, 0], col, e); };
+  const wins = (s0, s1, y0, y1, m) => { for (const t of [-1, 1]) for (let q = 0; q < m; q++) { const s = s0 + (q + .5) / m * (s1 - s0); glOBox(P(s, t * .081, (y0 + y1) / 2), V3s(f, (s1 - s0) / m * .36), V3s(r, .003), [0, (y1 - y0) / 2, 0], '#3a4250', .25 + .6 * hash2(tm.sid, q, t + 5)); } };
+  const wheels = ss => { if (far) return; for (const s of ss) for (const t of [-1, 1]) trCyl(P(s, t * .06, .025), r, f, [0, 1, 0], .025, .008, 8, '#2a2a2c'); };
+  if (era === 0) { // a horse tram: a little car with a clerestory, a driver's platform, the horse in front
+    box(-hl, hl, .075, .03, .19, c1); box(-hl + .02, hl - .02, .077, .1, .17, c2); wins(-hl + .04, hl - .04, .11, .165, 4); box(-hl - .02, hl + .02, .085, .19, .2, '#4a4a4e'); box(-hl * .6, hl * .6, .04, .2, .225, '#4a4a4e'); wheels([-hl + .06, hl - .06]);
+    const hx = hl + .1, ph = (tm.dist || 0) * 22 * tm.dir; GLB.mat = 0; glOBox(P(hx, 0, .085), V3s(f, .055), V3s(r, .02), [0, .025, 0], '#6b4a34'); glOBox(P(hx + .06, 0, .125), V3s(f, .022), V3s(r, .012), [0, .02, 0], '#6b4a34');
+    if (!far) for (const [lf, lr, q] of [[.035, .012, 0], [.035, -.012, Math.PI], [-.035, .012, Math.PI], [-.035, -.012, 0]]) glLimb(P(hx + lf, lr, .07), f, r, tm.v > .02 ? Math.sin(ph + q) * .5 : 0, .065, .007, '#5a3e2c');
+    if (lit) glOBox(P(hl + .025, 0, .17), V3s(f, .006), V3s(r, .01), [0, .01, 0], '#ffe2a0', 2); return; }
+  if (era === 1) { // an electric tram: cream and colour, a row of windows, a trolley pole up to the wire
+    box(-hl, hl, .08, .025, .12, c1); box(-hl, hl, .08, .12, .22, c2); wins(-hl + .05, hl - .05, .13, .205, 6); box(-hl - .01, hl + .01, .084, .22, .235, '#5a5f66'); box(-hl * .7, hl * .7, .045, .235, .255, '#5a5f66'); wheels([-hl + .07, hl - .07]);
+    if (!far) { const base = P(-hl * .3, 0, .255), tip = P(-hl * .3 - .14 * 1, 0, .5); gBeam(base, tip, .004, '#3a3d41'); }
+    if (lit) for (const s of [1, -1]) glOBox(P(s * (hl + .004), 0, .1), V3s(f, .006), V3s(r, .014), [0, .012, 0], s > 0 ? '#fff4d6' : '#ff5a3c', 2); return; }
+  // a modern tram: two long low-floor sections, wide windows, a pantograph
+  for (const sg of [-1, 1]) { const s0 = sg < 0 ? -hl : .01, s1 = sg < 0 ? -.01 : hl; box(s0, s1, .085, .02, .24, '#f2f4f7'); box(s0, s1, .087, .06, .2, '#2c3e50', .55); box(s0, s1, .088, .028, .045, TRAM_COL[tm.sid % 4][0]); box(s0 + .01, s1 - .01, .08, .24, .26, '#c9cdd2'); }
+  box(-.012, .012, .07, .03, .23, '#3a3d41'); wheels([-hl + .08, -.08, .08, hl - .08]);
+  if (!far) { const tp = P(.12, 0, .5); gBeam(P(.06, 0, .26), tp, .004, '#3a3d41'); gBeam(P(.18, 0, .26), tp, .004, '#3a3d41'); glOBox(tp, V3s(f, .01), V3s(r, .05), [0, .003, 0], '#3a3d41'); }
+  if (lit) for (const s of [1, -1]) for (const t of [-1, 1]) glOBox(P(s * (hl + .004), t * .05, .07), V3s(f, .005), V3s(r, .01), [0, .008, 0], s > 0 ? '#fff4d6' : '#ff5a3c', 2);
 }

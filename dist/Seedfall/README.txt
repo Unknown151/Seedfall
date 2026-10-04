@@ -283,18 +283,24 @@ QUARTERS, TERRACES AND REBUILDING
   town hall, library, school, theatre and the rest each look the part, down
   to the clock on the tower.
 
-RAILWAYS
-  With Railways, towns that have a station are joined by a line. It crosses
-  the streets rather than running down them, and cuts across the fields;
-  now and then a cottage in the way has to come down. The track is ballast,
-  timber sleepers and two rails, curving round the corners, climbing on an
-  embankment and crossing rivers on an iron truss bridge. Where it crosses a
-  street there are crossbucks and barriers: they come down while a train
-  goes by, and the folk and carts wait. The first trains are steam engines
-  with a tender and three coaches, easing in and out of the stations. With
+RAILWAYS AND TRAMS
+  With Railways, towns get a station out at the edge, facing the next town,
+  and a line joins them across the fields; now and then a cottage in the way
+  has to come down. Trains run between towns and stay out of them. When a
+  town has grown all the way round its station, it builds a new one at the
+  edge and the line is laid again. The track is ballast, sleepers and two
+  rails, curving round the corners, climbing on an embankment and crossing
+  rivers on an iron truss bridge. Out in the country, where a road crosses,
+  there are crossbucks and barriers: they come down while a train goes by,
+  and the folk and carts wait. The first trains are steam engines with a
+  tender and three coaches, easing in and out of the stations. With
   Electricity come concrete sleepers, overhead wires and electric trains with
   a cab at each end, and with Maglev a concrete guideway on columns and long
   white trains that float along it.
+  In town, the trams take over: a line along the streets from the station
+  through the middle to the far side, stopping every few streets. First a
+  horse tram, then an electric tram under its wire, then a long low modern
+  tram.
 
 BOATS, SHIPS AND PLANES
   Fishing boats leave their piers in the morning, fish all day (you can see

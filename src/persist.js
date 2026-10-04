@@ -47,7 +47,7 @@ function deserialize(obj) {
   recomputeCulture();
   if (!o0.map.plan) legacyStreets(); // saved before towns planned their own streets
   if (typeof S.rs !== 'number') S.rs = (((S.seed | 0) * 2654435761) ^ (S.month | 0) * 40503) >>> 0; // saved before the sim had its own stream
-  if ((S.railV || 1) < 2 && (S.rails || []).some(r => r.path)) S.railReplan = 1; else S.railV = 2; // lines down the streets are laid again (sim.js replanRails)
+  if ((S.railV || 1) < 3 && (S.rails || []).some(r => r.path)) S.railReplan = 1; else S.railV = 3; // lines through the towns are laid again, from stations at the edge (sim.js replanRails)
   if ((S.roadV || 1) < 2) { for (let i = 0; i < W * H; i++) { const r = M.road[i]; if (r === 5) M.road[i] = R_GLOW; else if (r === 4) M.road[i] = R_ASPHALT; } S.roadV = 2; } // old road tiers become surfaces
   for (const k in S.P) ensurePerson(S.P[k]);
   if (S.P[S.founder]) S.P[S.founder].fl = 0;
