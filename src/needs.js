@@ -113,6 +113,11 @@ const RETIRE = [
   { t: 'watertower', tech: 'concrete', keep: 1, newest: 1, txt: T => `With mains water under every street, ${T.name} needs only one water tower. The others come down, and the town keeps the newest, painted with its name.` }
 ];
 function yearlyRetire() {
+  if (anycount('stadium') > 1 && chance(.3)) { // an older world with a stadium in every town: all but the host's close, one at a time
+    const H = stadiumHost(), B = Object.values(S.B).filter(B => B.type === 'stadium' && B.sid !== (H && H.id)).sort((a, b) => a.prog - b.prog)[0];
+    if (B) { const T = S.T[B.sid], x = B.x, y = B.y; removeBuilding(B); if (T) { mkBuilding('park', x, y, T, { prog: 1 }); T._fail = {}; }
+      if (T && H) chron('🏟️', `${T.name}'s stadium closes: the valley's teams all play at ${H.name} now, and the old ground becomes a park.`, { x, y }); }
+  }
   for (const r of RETIRE) {
     if (!hasTech(r.tech)) continue;
     for (const T of towns()) {
@@ -200,7 +205,7 @@ function tryNeeds(T) {
   if (v.word === 0 && T.pop >= 150 && !bcount(T, 'mast') && put('mast', ['high', 'edge'])) return true;
   if (v.culture != null && v.culture < .5 && T.pop > 120 && chance(.4)) {
     if (hasTech('net') && T.pop > 2000 && !bcount(T, 'museum') && put('museum', ['center', 'mid'])) return true;
-    if (hasTech('electric') && T.pop > 1500 && !bcount(T, 'stadium') && put('stadium', ['edge'])) return true;
+    if (hasTech('electric') && T.pop > 1500 && stadiumHere(T) && put('stadium', ['edge'])) return true;
     if (hasTech('concrete') && bcount(T, 'park') < 20 && put('park', ['mid'])) return true;
     if (bcount(T, 'shrine') < 2 && put('shrine', ['center', 'mid'])) return true;
   }

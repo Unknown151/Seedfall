@@ -91,8 +91,8 @@ THE WATCHER'S VOICE (optional, uses Claude)
   never end", "Dance, lights in the sky" or "Everyone loves cats and festivals".
   C > Lore lists the customs in force. Like the rest of a teaching they fade over
   the centuries unless you speak again.
-  "Town gossip" (off / hourly / every ~20 min) lets Claude write small vignettes about
-  your named people now and then.
+  "Town gossip" (off by default / hourly / every ~20 min) lets Claude write small
+  vignettes about your named people now and then. Each one spends a call.
   "Tone" is Cosy (family-friendly, the default) or Cheeky (rude jokes and odd customs
   welcome, still nothing explicit or cruel). It is kept in this browser, not the world.
   - Get a key at console.anthropic.com. A separate key with a low spend limit is smart.
@@ -259,6 +259,10 @@ BIG LANDMARKS
   town builds a far bigger one out at the edge and turns the old ground into
   a park. The big stadium has its gates, ticket booths, a scoreboard and
   flags round the rim.
+  The whole valley shares one stadium. When the time comes the towns pick a
+  host: a big town that is easy for everyone to reach, not the far-flung one.
+  In an older world with a stadium in every town, all but the host's close
+  over the years and become parks.
 
 QUARTERS, TERRACES AND REBUILDING
   Some landmarks take more room once they're built: a town hall, museum,

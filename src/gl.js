@@ -859,15 +859,15 @@ function glShot() { // choose what to look at next
   const z = (x, y) => surfZ(idx(clamp(Math.round(x), 0, W - 1), clamp(Math.round(y), 0, H - 1))) * ZS;
   const hn = GL3.hint; GL3.hint = null; if (hn && GL3.t - hn.t < 20) return { at: () => [hn.x, z(hn.x, hn.y), hn.y], zoom: hn.zoom, pitch: rf(.3, .45), cap: hn.cap, dur: 22, hint: true }; // something the world asked us to look at
   const inc = (S.inc || []).find(I => !GL3.incSeen.has(I.id)) || ((S.inc || []).length && chance(.5) ? pick1(S.inc) : null); // an incident beats everything, and gets a second look now and then
-  if (inc) { GL3.incSeen.add(inc.id); const T = S.T[inc.sid]; return { at: () => { const v = INCV.get(inc.id), x = v && v.fx != null ? v.fx : inc.x, y = v && v.fx != null ? v.fz : inc.y; return [x, z(x, y), y]; }, zoom: rf(2.2, 3), pitch: rf(.3, .42), cap: (INC_CAP[inc.k] || '') + (T ? ' in ' + T.name : ''), dur: 30 }; }
+  if (inc) { GL3.incSeen.add(inc.id); const T = S.T[inc.sid]; return { at: () => { const v = INCV.get(inc.id), x = v && v.fx != null ? v.fx : inc.x, y = v && v.fx != null ? v.fz : inc.y; return [x, z(x, y), y]; }, zoom: rf(2.2, 3), pitch: rf(.4, .52), cap: (INC_CAP[inc.k] || '') + (T ? ' in ' + T.name : ''), dur: 30 }; }
   if (ev) return { at: () => [ev.tx, z(ev.tx, ev.ty), ev.ty], zoom: rf(2.6, 4), pitch: rf(.34, .5), cap: ev.ic + ' ' + ev.t, sub: 'Year ' + Math.floor(ev.yr) };
   const opts = [];
   const sail = DYN.ships.filter(sh => sh.st === 'sail' && sh.to && sh.path && sh.s > sh.path.length - 14 && sh.s < sh.path.length - 3);
   if (sail.length) opts.push([3, () => { const sh = pick1(sail), B = S.B[sh.to], T = B && S.T[B.sid]; return { at: () => { const q = shipPos(sh); return q ? [q[0], SEAZ * ZS, q[1]] : null; }, zoom: rf(2.2, 3), pitch: rf(.2, .32), cap: '⛵ A ship coming in' + (T ? ' to ' + T.name : ''), dur: 26 }; }]);
   const ws = DYN.walkers.filter(w => w.pid && S.P[w.pid] && w.st !== 'in' && w.st !== 'idle' && walkerPos(w));
-  if (ws.length) opts.push([3, () => { const w = pick1(ws), P = S.P[w.pid], T = S.T[P.sid]; return { follow: w, at: () => { const q = walkerPos(w); return q ? [q[0], q[2] * ZS, q[1]] : null; }, zoom: rf(1.4, 2), pitch: rf(.3, .42), cap: P.name, sub: [P.role, T && T.name].filter(Boolean).join(' · ') }; }]);
-  if (DYN.trains.length) opts.push([1.5, () => { const tr = pick1(DYN.trains); return { at: () => { const p = trainPos(tr); return p ? [p[0], p[1], p[2]] : null; }, zoom: rf(2.2, 3.2), pitch: rf(.3, .45), cap: '🚂 The train' }; }]);
-  if ((DYN.trams || []).length) opts.push([1.5, () => { const tm = pick1(DYN.trams), T = S.T[tm.sid]; return { at: () => { const p = tramPos(tm.P, tm.s); return [p[0], p[1], p[2]]; }, zoom: rf(1.8, 2.6), pitch: rf(.3, .45), cap: '🚋 The tram' + (T ? ' in ' + T.name : '') }; }]);
+  if (ws.length) opts.push([3, () => { const w = pick1(ws), P = S.P[w.pid], T = S.T[P.sid]; return { follow: w, at: () => { const q = walkerPos(w); return q ? [q[0], q[2] * ZS, q[1]] : null; }, zoom: rf(1.4, 2), pitch: rf(.42, .55), cap: P.name, sub: [P.role, T && T.name].filter(Boolean).join(' · ') }; }]);
+  if (DYN.trains.length) opts.push([1.5, () => { const tr = pick1(DYN.trains); return { at: () => { const p = trainPos(tr); return p ? [p[0], p[1], p[2]] : null; }, zoom: rf(2.2, 3.2), pitch: rf(.45, .6), cap: '🚂 The train' }; }]);
+  if ((DYN.trams || []).length) opts.push([1.5, () => { const tm = pick1(DYN.trams), T = S.T[tm.sid]; return { at: () => { const p = tramPos(tm.P, tm.s); return [p[0], p[1], p[2]]; }, zoom: rf(1.8, 2.6), pitch: rf(.45, .6), cap: '🚋 The tram' + (T ? ' in ' + T.name : '') }; }]);
   const big = Object.values(S.B).filter(B => fpBig(B) && B.prog >= 1);
   if (big.length) opts.push([2, () => { const B = pick1(big), T = S.T[B.sid], [x, y] = glLot(B); return { at: () => [x, z(x, y), y], zoom: rf(2, 3), pitch: rf(.35, .55), cap: (B.name || (BT[B.type] ? BT[B.type].n : B.type)) + (T ? ' · ' + T.name : '') }; }]);
   opts.push([2, () => { const T = pick1(T0.slice().sort((a, b) => b.pop - a.pop).slice(0, 4)); return { at: () => [T.x, z(T.x, T.y), T.y], zoom: clamp(townRadius(T) * .8 + 3, 5, 14), pitch: rf(.4, .75), cap: T.name, sub: Math.round(T.pop).toLocaleString('en-GB') + ' people' }; }]);
@@ -940,12 +940,15 @@ function glFrame(dt) {
   // perspective: a 38° lens backed off so the zoom still means "how much ground fits"; isometric: an orthographic lens
   if (cam.persp) { const d0 = zz / Math.tan(19 * DEG); pit = Math.max(pit, Math.asin(Math.min(.95, 2.2 / d0))); dir[0] = Math.cos(pit) * Math.sin(cam.yaw); dir[1] = Math.sin(pit); dir[2] = Math.cos(pit) * Math.cos(cam.yaw); } // stay above the rooftops
   const fov = 38 * DEG, dist = cam.persp ? zz / Math.tan(fov / 2) : 90, tgt = [cam.tx, cam.ty, cam.tz]; let eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
+  const fm = cam.auto && GL3.shot ? 2 : 1; // (the film camera keeps a wider berth, so it starts rising before a tall block is upon it)
   if (cam.persp) for (let k = 0; k < 24; k++) { // tall buildings: tip the camera up until neither it nor the middle of its view line is inside one
-    let g = -9; for (const f of [1, .75, .5, .3]) g = Math.max(g, hfAt(tgt[0] + (eye[0] - tgt[0]) * f, tgt[2] + (eye[2] - tgt[2]) * f) - (tgt[1] + (eye[1] - tgt[1]) * f) + (f > .9 ? .6 : .25)); if (g < 0 || pit >= 1.45) break; // (a clear line, and the camera well above the roofs)
+    let g = -9; for (const f of [1, .75, .5, .3]) g = Math.max(g, hfAt(tgt[0] + (eye[0] - tgt[0]) * f, tgt[2] + (eye[2] - tgt[2]) * f) - (tgt[1] + (eye[1] - tgt[1]) * f) + (f > .9 ? .6 : .25) * fm); if (g < 0 || pit >= 1.45) break; // (a clear line, and the camera well above the roofs)
     pit = Math.min(1.45, pit + .04); dir = [Math.cos(pit) * Math.sin(cam.yaw), Math.sin(pit), Math.cos(pit) * Math.cos(cam.yaw)]; eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist];
   }
-  { // (only for this frame: the angle you chose stays underneath. Up at once, back down gently)
-    GL3.pe = !cam.persp || GL3.pe == null || pit > GL3.pe ? pit : GL3.pe + (pit - GL3.pe) * Math.min(1, dt * 3);
+  { // (only for this frame: the angle you chose stays underneath. Up at once, back down gently. The film camera glides up
+    // too and comes down slowly, so following something past tall buildings is a smooth rise rather than a jump and a bob)
+    const film = cam.auto && GL3.shot, up = film ? Math.min(1, dt * 4) : 1, dn = Math.min(1, dt * (film ? .4 : 3));
+    GL3.pe = !cam.persp || GL3.pe == null ? pit : GL3.pe + (pit - GL3.pe) * (pit > GL3.pe ? up : dn);
     if (GL3.pe !== pit) { pit = GL3.pe; dir = [Math.cos(pit) * Math.sin(cam.yaw), Math.sin(pit), Math.cos(pit) * Math.cos(cam.yaw)]; eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist]; }
   }
   GL3.eye = eye;

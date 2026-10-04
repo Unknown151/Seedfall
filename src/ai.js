@@ -1,6 +1,6 @@
 /* ============================== the Watcher's voice (Claude API) ============================== */
 // The key lives in this browser's IndexedDB only. It is never written to save.json, chronicle.md or any other file.
-const AI = { key: '', model: 'claude-haiku-4-5-20251001', narr: 'rare', tone: 'cosy', busy: false, calls: 0, day: '', lastNarr: 0, status: '', ok: null };
+const AI = { key: '', model: 'claude-haiku-4-5-20251001', narr: 'off', narrV: 1, tone: 'cosy', busy: false, calls: 0, day: '', lastNarr: 0, status: '', ok: null };
 const AI_MODELS = [['claude-haiku-4-5-20251001', 'Haiku 4.5 · fast and cheap'], ['claude-sonnet-5', 'Sonnet 5 · better writer'], ['claude-opus-5-5', 'Opus 5.5 · the good stuff']];
 const AI_DAY_CAP = 80;
 const NARR_MIN = { off: 0, rare: 60, often: 20 };
@@ -42,8 +42,9 @@ let CULT = { tb: {}, bld: {}, ev: {}, lv: {}, shun: {}, rs: 0, bs: 0 };
 function lever(k) { const x = CULT.lv && CULT.lv[k]; return x && x.w >= .25 ? x.v : null; }
 function leverW(k) { const x = CULT.lv && CULT.lv[k]; return x && x.w >= .25 ? Math.min(1, x.w) : 0; }
 
-async function aiLoad() { const c = await IDB.get('ai'); if (c) for (const k of ['key', 'model', 'narr', 'tone', 'calls', 'day', 'lastNarr']) if (c[k] != null) AI[k] = c[k]; }
-function aiStore() { return IDB.set('ai', { key: AI.key, model: AI.model, narr: AI.narr, tone: AI.tone, calls: AI.calls, day: AI.day, lastNarr: AI.lastNarr }); }
+async function aiLoad() { const c = await IDB.get('ai'); if (c) for (const k of ['key', 'model', 'narr', 'tone', 'calls', 'day', 'lastNarr']) if (c[k] != null) AI[k] = c[k];
+  if (c && !c.narrV) { AI.narr = 'off'; aiStore(); } } // gossip is off unless chosen again (it was 'rare' by default and spent tokens nobody read)
+function aiStore() { return IDB.set('ai', { key: AI.key, model: AI.model, narr: AI.narr, tone: AI.tone, calls: AI.calls, day: AI.day, lastNarr: AI.lastNarr, narrV: 1 }); }
 
 // voice available? In cloud mode the server holds the key, so there's nothing to set up here
 function aiOn() { return CLOUD.on || !!AI.key; }
