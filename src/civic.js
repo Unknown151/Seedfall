@@ -349,7 +349,7 @@ GL_BIG.market = function (B, st) {
 GL_BIG.university = function (B, st) {
   const [lx, lz] = glLot(B), { d } = glFacing(B); kSet(lx, lz, [d[1], 0, -d[0]], [d[0], 0, d[1]], B.id);
   const stone = hasTech('masonry'), wc = hasTech('brick') && !stone ? '#b8684f' : cStone(st), wm = stone ? M_STONE : M_BRICK, lod = KF.lod, rc = st.roof, wty = kWinTy() === 'glass' ? 'modern' : kWinTy(), H = .44, fh = (H - .03) / 3, D = .17;
-  const R = [[0, -.72, .88, 0], [0, .72, .88, 0], [-.72, 0, .55, 1], [.72, 0, .55, 1]]; // ranges: middle, half length, turned
+  const sc = fpW(B) / 2, R = [[0, -.72 * sc, .88 * sc, 0], [0, .72 * sc, .88 * sc, 0], [-.72 * sc, 0, .55 * sc, 1], [.72 * sc, 0, .55 * sc, 1]]; // ranges: middle, half length, turned (longer on a 3×3 lot)
   R.forEach(([cs, cf, hl, turn], k) => {
     const draw = () => { kPlinth(-hl, hl, -D, D, .03); kBox(0, 0, .03, hl, D, H - .03, wc, wm);
       for (const ff of [D, -D]) kWins(-hl + .04, hl - .04, ff, .03, fh, 3, Math.round(hl * 9), { ty: wty, hw: .03, key: wty === 'sash', back: ff < 0 }, null, k * 50 + (ff > 0 ? 0 : 25));
@@ -357,9 +357,9 @@ GL_BIG.university = function (B, st) {
     const sa = KF.A, sf = KF.F, sx = KF.X, sz = KF.Z, P = kP(cs, cf, 0); KF.X = P[0]; KF.Z = P[2]; if (turn) { KF.A = sf; KF.F = [-sa[0], 0, -sa[2]]; }
     try { draw(); } finally { KF.A = sa; KF.F = sf; KF.X = sx; KF.Z = sz; }
   });
-  kBox(0, 0, 0, .55, .55, .008, '#6f9a52', M_GRASS); kPath(-.04, -.55, .04, .55, '#c9bfae'); kPath(-.55, -.04, .55, .04, '#c9bfae');
-  kTree(-.28, .26, 0, .4, 1.1, '#5f9a4d'); kTree(.28, -.24, 0, .7, 1, '#6aa556'); if (lod) { kTree(.3, .3, 0, .2, .9, '#5f9a4d'); kBench(-.2, -.1, 0, 1); kBench(.15, .12, 0, 0); kCyl(0, 0, 0, .06, .03, '#cfc6b4', M_STONE, 12, '#7fc7de'); }
-  const tf = .72, tw = .12, tH = H + .36; kBox(0, tf, 0, tw, tw + .03, tH, wc, wm); kBox(0, tf + tw + .03, .03, .05, .004, .16, '#2a2420'); // the gate tower, its arch
+  const q = .55 * sc; kBox(0, 0, 0, q, q, .008, '#6f9a52', M_GRASS); kPath(-.04, -q, .04, q, '#c9bfae'); kPath(-q, -.04, q, .04, '#c9bfae');
+  kTree(-.28 * sc, .26 * sc, 0, .4, 1.1, '#5f9a4d'); kTree(.28 * sc, -.24 * sc, 0, .7, 1, '#6aa556'); if (sc > 1) { kTree(-.3 * sc, -.3 * sc, 0, .5, 1.1, '#5f9a4d'); kTree(.3 * sc, .3 * sc, 0, .3, 1.05, '#6aa556'); } if (lod) { kTree(.3, .3, 0, .2, .9, '#5f9a4d'); kBench(-.2, -.1, 0, 1); kBench(.15, .12, 0, 0); kCyl(0, 0, 0, .06, .03, '#cfc6b4', M_STONE, 12, '#7fc7de'); }
+  const tf = .72 * sc, tw = .12, tH = H + .36 + (sc - 1) * .3; kBox(0, tf, 0, tw, tw + .03, tH, wc, wm); kBox(0, tf + tw + .03, .03, .05, .004, .16, '#2a2420'); // the gate tower, its arch
   kWalls(-tw, tw, tf - tw - .03, tf + tw + .03, (a, b, ff) => kClock((a + b) / 2, ff + Math.sign(ff) * .002, tH - .1, .055), 5);
   kCornice(-tw, tw, tf - tw - .03, tf + tw + .03, tH, '#ece6da', { br: 0, ov: .015 }); kHip(-tw, tw, tf - tw - .03, tf + tw + .03, tH + .03, .32, rc, { ov: .005, noGut: 1, fin: 1 }); cFlag(0, tf, tH + .35, .12, st.accent);
 };

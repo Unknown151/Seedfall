@@ -260,22 +260,24 @@ function glTrams() {
   }
 }
 function glTram(era, c, f, r, hl, tm, far) {
-  const P = (s, t, y) => [c[0] + f[0] * s + r[0] * t, c[1] + y, c[2] + f[2] * s + r[2] * t], lit = GL3.litNow, [c1, c2] = TRAM_COL[tm.sid % TRAM_COL.length];
-  const box = (s0, s1, t, y0, y1, col, e = 0) => { GLB.mat = 0; glOBox(P((s0 + s1) / 2, 0, (y0 + y1) / 2), V3s(f, (s1 - s0) / 2), V3s(r, t), [0, (y1 - y0) / 2, 0], col, e); };
-  const wins = (s0, s1, y0, y1, m) => { for (const t of [-1, 1]) for (let q = 0; q < m; q++) { const s = s0 + (q + .5) / m * (s1 - s0); glOBox(P(s, t * .081, (y0 + y1) / 2), V3s(f, (s1 - s0) / m * .36), V3s(r, .003), [0, (y1 - y0) / 2, 0], '#3a4250', .25 + .6 * hash2(tm.sid, q, t + 5)); } };
-  const wheels = ss => { if (far) return; for (const s of ss) for (const t of [-1, 1]) trCyl(P(s, t * .06, .025), r, f, [0, 1, 0], .025, .008, 8, '#2a2a2c'); };
+  const K = 1.35, P = (s, t, y) => [c[0] + f[0] * s + r[0] * t, c[1] + y * K, c[2] + f[2] * s + r[2] * t], lit = GL3.litNow, [c1, c2] = TRAM_COL[tm.sid % TRAM_COL.length]; // (K: taller than the folk on the pavement)
+  const box = (s0, s1, t, y0, y1, col, e = 0) => { GLB.mat = 0; glOBox(P((s0 + s1) / 2, 0, (y0 + y1) / 2), V3s(f, (s1 - s0) / 2), V3s(r, t), [0, (y1 - y0) / 2 * K, 0], col, e); };
+  const wins = (s0, s1, y0, y1, m) => { for (const t of [-1, 1]) for (let q = 0; q < m; q++) { const s = s0 + (q + .5) / m * (s1 - s0); glOBox(P(s, t * .081, (y0 + y1) / 2), V3s(f, (s1 - s0) / m * .36), V3s(r, .003), [0, (y1 - y0) / 2 * K, 0], '#3a4250', .25 + .6 * hash2(tm.sid, q, t + 5)); } };
+  const wheels = ss => { if (far) return; for (const s of ss) for (const t of [-1, 1]) trCyl(P(s, t * .06, .025), r, f, [0, 1, 0], .025 * K, .008, 8, '#2a2a2c'); };
   if (era === 0) { // a horse tram: a little car with a clerestory, a driver's platform, the horse in front
     box(-hl, hl, .075, .03, .19, c1); box(-hl + .02, hl - .02, .077, .1, .17, c2); wins(-hl + .04, hl - .04, .11, .165, 4); box(-hl - .02, hl + .02, .085, .19, .2, '#4a4a4e'); box(-hl * .6, hl * .6, .04, .2, .225, '#4a4a4e'); wheels([-hl + .06, hl - .06]);
-    const hx = hl + .1, ph = (tm.dist || 0) * 22 * tm.dir; GLB.mat = 0; glOBox(P(hx, 0, .085), V3s(f, .055), V3s(r, .02), [0, .025, 0], '#6b4a34'); glOBox(P(hx + .06, 0, .125), V3s(f, .022), V3s(r, .012), [0, .02, 0], '#6b4a34');
-    if (!far) for (const [lf, lr, q] of [[.035, .012, 0], [.035, -.012, Math.PI], [-.035, .012, Math.PI], [-.035, -.012, 0]]) glLimb(P(hx + lf, lr, .07), f, r, tm.v > .02 ? Math.sin(ph + q) * .5 : 0, .065, .007, '#5a3e2c');
+    const hx = hl + .16, ph = (tm.dist || 0) * 14 * tm.dir, H = (s, t, y) => [c[0] + f[0] * s + r[0] * t, c[1] + y, c[2] + f[2] * s + r[2] * t], hc = '#6b4a34'; GLB.mat = 0; // a cart horse, a little bigger than life like everything here
+    glOBox(H(hx, 0, .2), V3s(f, .1), V3s(r, .04), [0, .05, 0], hc); glOBox(H(hx + .12, 0, .27), V3s(f, .035), V3s(r, .025), [0, .05, 0], hc); glOBox(H(hx + .16, 0, .31), V3s(f, .05), V3s(r, .022), [0, .025, 0], hc); glOBox(H(hx + .12, 0, .31), V3s(f, .03), V3s(r, .008), [0, .03, 0], '#2a1e16'); // body, neck, head, mane
+    for (const t of [-1, 1]) gBeam(H(hl, t * .05, .16), H(hx + .05, t * .045, .2), .005, '#5a4030'); // the shafts
+    if (!far) for (const [lf, lr, q] of [[.075, .025, 0], [.075, -.025, Math.PI], [-.075, .025, Math.PI], [-.075, -.025, 0]]) glLimb(H(hx + lf, lr, .16), f, r, tm.v > .02 ? Math.sin(ph + q) * .45 : 0, .16, .013, '#5a3e2c');
     if (lit) glOBox(P(hl + .025, 0, .17), V3s(f, .006), V3s(r, .01), [0, .01, 0], '#ffe2a0', 2); return; }
   if (era === 1) { // an electric tram: cream and colour, a row of windows, a trolley pole up to the wire
     box(-hl, hl, .08, .025, .12, c1); box(-hl, hl, .08, .12, .22, c2); wins(-hl + .05, hl - .05, .13, .205, 6); box(-hl - .01, hl + .01, .084, .22, .235, '#5a5f66'); box(-hl * .7, hl * .7, .045, .235, .255, '#5a5f66'); wheels([-hl + .07, hl - .07]);
-    if (!far) { const base = P(-hl * .3, 0, .255), tip = P(-hl * .3 - .14 * 1, 0, .5); gBeam(base, tip, .004, '#3a3d41'); }
+    if (!far) { const base = P(-hl * .3, 0, .255), tip = [base[0] - f[0] * .14, c[1] + .5, base[2] - f[2] * .14]; gBeam(base, tip, .004, '#3a3d41'); } // the trolley pole, up to the wire
     if (lit) for (const s of [1, -1]) glOBox(P(s * (hl + .004), 0, .1), V3s(f, .006), V3s(r, .014), [0, .012, 0], s > 0 ? '#fff4d6' : '#ff5a3c', 2); return; }
   // a modern tram: two long low-floor sections, wide windows, a pantograph
   for (const sg of [-1, 1]) { const s0 = sg < 0 ? -hl : .01, s1 = sg < 0 ? -.01 : hl; box(s0, s1, .085, .02, .24, '#f2f4f7'); box(s0, s1, .087, .06, .2, '#2c3e50', .55); box(s0, s1, .088, .028, .045, TRAM_COL[tm.sid % 4][0]); box(s0 + .01, s1 - .01, .08, .24, .26, '#c9cdd2'); }
   box(-.012, .012, .07, .03, .23, '#3a3d41'); wheels([-hl + .08, -.08, .08, hl - .08]);
-  if (!far) { const tp = P(.12, 0, .5); gBeam(P(.06, 0, .26), tp, .004, '#3a3d41'); gBeam(P(.18, 0, .26), tp, .004, '#3a3d41'); glOBox(tp, V3s(f, .01), V3s(r, .05), [0, .003, 0], '#3a3d41'); }
+  if (!far) { const b0 = P(.12, 0, .26), tp = [b0[0], c[1] + .5, b0[2]]; gBeam(P(.06, 0, .26), tp, .004, '#3a3d41'); gBeam(P(.18, 0, .26), tp, .004, '#3a3d41'); glOBox(tp, V3s(f, .01), V3s(r, .05), [0, .003, 0], '#3a3d41'); } // the pantograph, up to the wire
   if (lit) for (const s of [1, -1]) for (const t of [-1, 1]) glOBox(P(s * (hl + .004), t * .05, .07), V3s(f, .005), V3s(r, .01), [0, .008, 0], s > 0 ? '#fff4d6' : '#ff5a3c', 2);
 }

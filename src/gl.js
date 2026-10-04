@@ -270,7 +270,7 @@ function glDropNear(ch) { if (ch.nb) { GL3.gl.deleteBuffer(ch.nb); ch.nb = null;
 // the view's six planes, to skip chunks outside it
 function glFrustum(m) { const r = i => [m[i], m[4 + i], m[8 + i], m[12 + i]], R3 = r(3), o = []; for (let i = 0; i < 3; i++) { const Ri = r(i); o.push(R3.map((v, j) => v + Ri[j]), R3.map((v, j) => v - Ri[j])); } return o; }
 function glSees(P, ch, k) {
-  const x0 = (k % GNC) * GCH - 2.2, z0 = ((k / GNC) | 0) * GCH - 2.2, x1 = x0 + GCH + 3.4, z1 = z0 + GCH + 3.4, y0 = Math.min(ch.y0, 0) - .2, y1 = ch.y1 + .3; // (padded: big lots and piers reach past their chunk)
+  const x0 = (k % GNC) * GCH - 3.8, z0 = ((k / GNC) | 0) * GCH - 3.8, x1 = x0 + GCH + 5, z1 = z0 + GCH + 5, y0 = Math.min(ch.y0, 0) - .2, y1 = ch.y1 + .3; // (padded: big lots and piers reach past their chunk)
   for (const p of P) if (p[0] * (p[0] > 0 ? x1 : x0) + p[1] * (p[1] > 0 ? y1 : y0) + p[2] * (p[2] > 0 ? z1 : z0) + p[3] < 0) return false;
   return true;
 }

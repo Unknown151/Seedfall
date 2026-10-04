@@ -10,6 +10,7 @@ const netTile = j => (M.road[j] && !M.water[j]) || M.plan[j] === 1 || (M.bld[j] 
 function fronts(x, y) { for (const [dx, dy] of N4) { const nx = x + dx, ny = y + dy; if (inb(nx, ny) && netTile(idx(nx, ny))) return true; } return false; }
 
 // could a street go here? (a field can give way to a new street; the farmers plough a new one further out)
+const softAt = j => { const B = M.bld[j] && S.B[M.bld[j]]; return !!B && !fpBig(B) && B.prog >= 1 && (B.type === 'vfarm' || B.type === 'pasture'); }; // (a big lot's road may cross these too)
 const fieldAt = j => { const B = M.bld[j] && S.B[M.bld[j]]; return !!B && B.type === 'farm' && B.prog >= 1; };
 function streetFree(j) {
   if (M.water[j] || M.ruin[j] || M.rail[j] || M.road[j] || M.plan[j]) return false;
@@ -171,7 +172,19 @@ function connectRoad(B) {
   if (pavePath(start, 14, j => M.plan[j] === 1)) return;
   pavePath(start, 10, j => !M.water[j] && !M.bld[j] && !M.ruin[j] && !M.rail[j]); // no street near: a track across the fields
 }
-function pavePath(start, maxD, ok) {
+function lotReach(ax, ay, w, h) { // could a road be brought to a w×h lot here? (a dry run of connectBig's search)
+  for (let y = ay; y < ay + h; y++) for (let x = ax; x < ax + w; x++) { if (x !== ax && y !== ay && x !== ax + w - 1 && y !== ay + h - 1) continue; const j = idx(x, y), inLot = k => { const kx = k % W, ky = (k / W) | 0; return kx >= ax && ky >= ay && kx < ax + w && ky < ay + h; };
+    if (pavePath(j, 12, k => !inLot(k) && !M.water[k] && !M.ruin[k] && !M.rail[k] && (!M.bld[k] || fieldAt(k) || softAt(k)), true, true)) return true; }
+  return false;
+}
+function connectBig(B) { // a big lot: try from each tile round its edge, nearest the town first, until a road reaches it
+  const T = S.T[B.sid], edge = fpTiles(B).filter(j => { const x = j % W, y = (j / W) | 0; return x === B.x || y === B.y || x === B.x + fpW(B) - 1 || y === B.y + fpH(B) - 1; });
+  if (T) edge.sort((a, b) => dist(a % W, (a / W) | 0, T.x, T.y) - dist(b % W, (b / W) | 0, T.x, T.y));
+  for (const j of edge) if (pavePath(j, 14, k => M.plan[k] === 1)) return true;
+  for (const j of edge) if (pavePath(j, 12, k => !M.water[k] && !M.ruin[k] && !M.rail[k] && (!M.bld[k] || fieldAt(k) || softAt(k)), true)) return true; // (across the fields if it must)
+  return false;
+}
+function pavePath(start, maxD, ok, fields = false, dry = false) { // fields: a track may cross the fields (they give way); dry: only say whether it could
   const prev = new Map([[start, -1]]); let q = [start], found = -1;
   for (let d = 0; d < maxD && q.length && found < 0; d++) {
     const nq = [];
@@ -182,7 +195,7 @@ function pavePath(start, maxD, ok) {
         if (prev.has(j)) continue;
         if (j !== start && ((M.road[j] && !M.water[j]) || (M.bld[j] && isRoadAnchor(j)))) { prev.set(j, i); found = j; break; }
         if (M.water[j] || M.ruin[j] || !ok(j)) continue;
-        if (M.bld[j] && !(M.plan[j] && fieldAt(j))) continue;
+        if (M.bld[j] && !((M.plan[j] || fields) && fieldAt(j)) && !(fields && softAt(j))) continue;
         if (i !== start && Math.abs(M.elev[j] - M.elev[i]) > 1) continue;
         prev.set(j, i); nq.push(j);
       }
@@ -191,8 +204,9 @@ function pavePath(start, maxD, ok) {
     q = nq;
   }
   if (found < 0) return false;
+  if (dry) return true;
   const t = laySurf();
-  for (let i = prev.get(found); i !== start && i >= 0; i = prev.get(i)) { clearField(i); M.plan[i] = 1; if (!M.road[i]) { M.road[i] = t; M.tree[i] = 0; M.wild[i] = 0; markDirty(i); } }
+  for (let i = prev.get(found); i !== start && i >= 0; i = prev.get(i)) { clearField(i); if (fields && softAt(i)) removeBuilding(S.B[M.bld[i]]); M.plan[i] = 1; if (!M.road[i]) { M.road[i] = t; M.tree[i] = 0; M.wild[i] = 0; markDirty(i); } }
   return true;
 }
 

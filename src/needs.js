@@ -181,6 +181,7 @@ function tryNeeds(T) {
   const shun = k => CULT.shun && (CULT.shun[k] || 0) >= .3;
   const put = (type, kinds, rebuild) => { // rebuild: with no free plot, it goes up over an old house or field
     if (shun(type)) return null;
+    if (BIG_LOT(type)) { const B = placeBig(T, type); if (B) return B; } // (a fusion plant on its whole lot at the edge)
     for (const k of kinds) { const s = findSite(T, k, 0, type); if (s && !s.replaceFarm) { const B = mkBuilding(type, s.x, s.y, T); if (type !== 'solar' && type !== 'turbine') connectRoad(B); return B; } }
     return rebuild ? placeProject(T, type, []) : null;
   };
