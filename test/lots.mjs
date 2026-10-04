@@ -1,4 +1,5 @@
-// Bigger lots: landmarks spreading onto 2×1 / 2×2 lots, harbours growing along the shore with a berth per tile,
+// Bigger lots: landmarks spreading onto 2×1 lots, the big ones (a 4×4 stadium, 3×3 university and fusion plant) laid out on
+// cleared ground at the edge of town with no street through them (an older, smaller one grows or moves out), harbours growing along the shore with a berth per tile,
 // ships mooring at their berths, removal freeing the whole lot, and saves keeping it. Run from test/: `node lots.mjs`
 import { launch, ROOT } from './env.mjs';
 const SHOTS = !!process.env.SHOTS;
@@ -20,10 +21,27 @@ const check = () => p.evaluate(() => {
 await p.evaluate(() => SF.ff(1400));
 let r = await check();
 ok(r.bad === 0 && r.stray === 0, 'every tile of a big lot points at its building, and nothing else does', `${r.big} big lots: ${r.kinds}`);
+const p2 = await b.newPage(); p2.on('pageerror', e => errs.push(e.message)); await p2.goto(ROOT + 'seedfall.html?seed=' + (process.env.SEED || 999) + '&fresh&nointro&headless'); await p2.waitForTimeout(500); await p2.evaluate(() => SF.ff(1400)); // (a page of its own, so the main world grows on undisturbed)
+const mv = await p2.evaluate(() => { // an older world's stadium on one tile in the middle of town, hemmed in by tall blocks: it moves out to a 4×4 lot at the edge
+  const T = towns().sort((a, b) => b.pop - a.pop)[0], H0 = T.bl.map(id => S.B[id]).filter(B => B && B.type === 'house' && B.prog >= 1 && !fpBig(B)).sort((a, b) => dist(a.x, a.y, T.x, T.y) - dist(b.x, b.y, T.x, T.y))[0];
+  const ax = H0.x, ay = H0.y; removeBuilding(H0); const B = mkBuilding('stadium', ax, ay, T, { prog: 1 }); B.built = yr() - 100;
+  for (const [dx, dy] of N8) { const x = ax + dx, y = ay + dy, j = idx(x, y), o = M.bld[j] && S.B[M.bld[j]]; if (o && !fpBig(o)) { removeBuilding(o); mkBuilding('house', x, y, T, { prog: 1, tier: 6 }); } }
+  fpSettle(B);
+  return { w: fpW(B), h: fpH(B), moved: B.x !== ax || B.y !== ay, park: !!(M.bld[idx(ax, ay)] && S.B[M.bld[idx(ax, ay)]].type === 'park'), out: +(dist(B.x + 1.5, B.y + 1.5, T.x, T.y) / townRadius(T)).toFixed(2) };
+});
+ok(mv && mv.w === 4 && mv.h === 4 && mv.moved && mv.park, 'an older, smaller stadium hemmed in at the middle of town moves out to a 4×4 lot at the edge, and its old ground becomes a park', JSON.stringify(mv));
+await p2.close();
 await p.evaluate(() => SF.ff(1400));
 r = await check();
 ok(r.big >= 2 && /stadium|university|hall|museum|theatre/.test(r.kinds), 'landmarks spread onto bigger lots', r.kinds);
 ok(r.bad === 0 && r.stray === 0, 'lots stay whole as the towns keep changing', `${r.bad} bad, ${r.stray} stray`);
+const g = await p.evaluate(() => { // the big ones: full size, no street through them, a road beside them
+  const L = Object.values(S.B).filter(B => BIG_LOT(B.type) && B.prog >= 1), full = L.filter(B => fpW(B) === FP_BIG[B.type][0] && fpH(B) === FP_BIG[B.type][1]);
+  const clean = full.every(B => fpTiles(B).every(j => !M.road[j])), beside = full.every(B => { for (let y = B.y - 1; y <= B.y + fpH(B); y++) for (let x = B.x - 1; x <= B.x + fpW(B); x++) if (inb(x, y) && (x < B.x || y < B.y || x >= B.x + fpW(B) || y >= B.y + fpH(B)) && M.road[idx(x, y)]) return true; return false; });
+  return { n: L.length, full: full.length, kinds: full.map(B => B.type + ' ' + fpW(B) + '×' + fpH(B)).join(', '), clean, beside, stadium: full.some(B => B.type === 'stadium') };
+});
+ok(g.n > 0 && g.full >= Math.ceil(g.n * .75) && g.stadium, 'the big landmarks stand on their whole lots (a 4×4 stadium, 3×3 university and fusion plant)', `${g.full}/${g.n}: ${g.kinds}`);
+ok(g.clean && g.beside, 'no street runs through a big lot, and a road runs beside each');
 ok(r.harbours === '' || r.harbours.split(',').some(n => +n >= 2), 'harbours grow along the shore', `berths: ${r.harbours || 'no harbour'}`);
 // ships at their berths
 await p.evaluate(() => { for (const B of harbours()) for (let k = 0; k < berths(B); k++) { if (DYN.slot[bkey(B, k)]) continue; const sh = spawnShip(B, null); if (sh) { sh.bk = k; DYN.slot[bkey(B, k)] = sh; } } });

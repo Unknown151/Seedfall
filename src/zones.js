@@ -17,6 +17,7 @@ const ZONE_OF = {
 const ZSC = { [Z_CORE]: [0, 2.5, 0, -2, -3], [Z_HOME]: [0, .4, 1.2, -2.5, -4], [Z_WORKS]: [0, -2, -1.5, 3, -4], [Z_GREEN]: [0, -.5, 0, -2, 4] };
 const RD_WORKS = { workshop: 1, works: 1, warehouse: 1, weaver: 1 }; // what can move to the works quarter (not the power house, nor a glassworks tied to its sand)
 let FARM_ZP = .8; // how hard new fields avoid the town's quarters
+let RAIL_LEAN = .5; // (how much rail tiles pull the works quarter: the quarter follows the works that cannot move first)
 const WORKS_T = { workshop: 1, works: 1, power: 1, weaver: 1, glassworks: 1, warehouse: 1, fusion: 1 };
 function zoneScore(zt, i) { const w = ZONE_OF[zt]; return w ? ZSC[w][M.zone[i]] : 0; }
 function zoneAt(i) { return M.zone ? M.zone[i] : 0; }
@@ -35,9 +36,9 @@ function drawZones(T, quiet) {
     let bs = -1e9;
     for (let k = 0; k < 8; k++) {
       const a = k * Math.PI / 4 - Math.PI; let s = rnd() * .5 + (T.zsec != null && angD(a, T.zsec) < .1 ? 4 : 0);
-      for (const id of T.bl) { const B = S.B[id]; if (!B) continue; const d = dist(B.x, B.y, T.x, T.y); if (d < 1) continue; const on = angD(Math.atan2(B.y - T.y, B.x - T.x), a) < .6; if (!on) continue; if (WORKS_T[B.type]) s += 3; else if (B.type === 'house' && B.tier >= 3 && d > R * .45) s -= .3; else if (EXTRACT[B.type]) s += 1; }
+      for (const id of T.bl) { const B = S.B[id]; if (!B) continue; const d = dist(B.x, B.y, T.x, T.y); if (d < 1) continue; const on = angD(Math.atan2(B.y - T.y, B.x - T.x), a) < .6; if (!on) continue; if (WORKS_T[B.type]) s += RD_WORKS[B.type] ? 3 : 6; else if (B.type === 'house' && B.tier >= 3 && d > R * .45) s -= .3; else if (EXTRACT[B.type]) s += 1; }
       for (let r = R; r <= R + 5; r++) { const x = Math.round(T.x + Math.cos(a) * r), y = Math.round(T.y + Math.sin(a) * r); if (!inb(x, y)) { s -= 1; continue; } const i = idx(x, y); if (M.water[i]) s -= .4; else s += (M.ore[i] ? .6 : 0) + (rocky(i) || clayey(i) ? .25 : 0) + (M.tree[i] ? .1 : 0); }
-      for (let r = R * .45; r <= R + 3; r += .5) { const x = Math.round(T.x + Math.cos(a) * r), y = Math.round(T.y + Math.sin(a) * r); if (inb(x, y) && M.rail[idx(x, y)]) s += 1.2; } // works by the railway line (and the line has taken that edge land anyway)
+      for (let r = R * .45; r <= R + 3; r += .5) { const x = Math.round(T.x + Math.cos(a) * r), y = Math.round(T.y + Math.sin(a) * r); if (inb(x, y) && M.rail[idx(x, y)]) s += RAIL_LEAN; } // works by the railway line (and the line has taken that edge land anyway)
       for (const O of towns()) if (O !== T && dist(O.x, O.y, T.x, T.y) < R * 2.6 + 6 && angD(Math.atan2(O.y - T.y, O.x - T.x), a) < .7) s -= 5;
       if (s > bs) { bs = s; secA = a; }
     }

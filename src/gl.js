@@ -270,7 +270,7 @@ function glDropNear(ch) { if (ch.nb) { GL3.gl.deleteBuffer(ch.nb); ch.nb = null;
 // the view's six planes, to skip chunks outside it
 function glFrustum(m) { const r = i => [m[i], m[4 + i], m[8 + i], m[12 + i]], R3 = r(3), o = []; for (let i = 0; i < 3; i++) { const Ri = r(i); o.push(R3.map((v, j) => v + Ri[j]), R3.map((v, j) => v - Ri[j])); } return o; }
 function glSees(P, ch, k) {
-  const x0 = (k % GNC) * GCH - 2.2, z0 = ((k / GNC) | 0) * GCH - 2.2, x1 = x0 + GCH + 3.4, z1 = z0 + GCH + 3.4, y0 = Math.min(ch.y0, 0) - .2, y1 = ch.y1 + .3; // (padded: big lots and piers reach past their chunk)
+  const x0 = (k % GNC) * GCH - 3.8, z0 = ((k / GNC) | 0) * GCH - 3.8, x1 = x0 + GCH + 5, z1 = z0 + GCH + 5, y0 = Math.min(ch.y0, 0) - .2, y1 = ch.y1 + .3; // (padded: big lots and piers reach past their chunk)
   for (const p of P) if (p[0] * (p[0] > 0 ? x1 : x0) + p[1] * (p[1] > 0 ? y1 : y0) + p[2] * (p[2] > 0 ? z1 : z0) + p[3] < 0) return false;
   return true;
 }
@@ -867,6 +867,7 @@ function glShot() { // choose what to look at next
   const ws = DYN.walkers.filter(w => w.pid && S.P[w.pid] && w.st !== 'in' && w.st !== 'idle' && walkerPos(w));
   if (ws.length) opts.push([3, () => { const w = pick1(ws), P = S.P[w.pid], T = S.T[P.sid]; return { follow: w, at: () => { const q = walkerPos(w); return q ? [q[0], q[2] * ZS, q[1]] : null; }, zoom: rf(1.4, 2), pitch: rf(.3, .42), cap: P.name, sub: [P.role, T && T.name].filter(Boolean).join(' · ') }; }]);
   if (DYN.trains.length) opts.push([1.5, () => { const tr = pick1(DYN.trains); return { at: () => { const p = trainPos(tr); return p ? [p[0], p[1], p[2]] : null; }, zoom: rf(2.2, 3.2), pitch: rf(.3, .45), cap: '🚂 The train' }; }]);
+  if ((DYN.trams || []).length) opts.push([1.5, () => { const tm = pick1(DYN.trams), T = S.T[tm.sid]; return { at: () => { const p = tramPos(tm.P, tm.s); return [p[0], p[1], p[2]]; }, zoom: rf(1.8, 2.6), pitch: rf(.3, .45), cap: '🚋 The tram' + (T ? ' in ' + T.name : '') }; }]);
   const big = Object.values(S.B).filter(B => fpBig(B) && B.prog >= 1);
   if (big.length) opts.push([2, () => { const B = pick1(big), T = S.T[B.sid], [x, y] = glLot(B); return { at: () => [x, z(x, y), y], zoom: rf(2, 3), pitch: rf(.35, .55), cap: (B.name || (BT[B.type] ? BT[B.type].n : B.type)) + (T ? ' · ' + T.name : '') }; }]);
   opts.push([2, () => { const T = pick1(T0.slice().sort((a, b) => b.pop - a.pop).slice(0, 4)); return { at: () => [T.x, z(T.x, T.y), T.y], zoom: clamp(townRadius(T) * .8 + 3, 5, 14), pitch: rf(.4, .75), cap: T.name, sub: Math.round(T.pop).toLocaleString('en-GB') + ' people' }; }]);
@@ -1087,7 +1088,7 @@ function glTraffic() {
     if (!hasTech('wheel')) gBox([c[0], y - .01, c[2]], V3s(f, .12), V3s(r, .08), .02, '#8a6a4c', M_PLANK);
     else { const y1 = hull(c, f, r, .16, .07, .04, '#ece6da', '#9aa0a6'); gBox(at(c, f, r, 0, 0, y1), V3s(f, .06), V3s(r, .05), .045, '#3f6e8c'); }
   }
-  glTrains(); // the trains and the level crossings' barriers (rail.js)
+  glTrains(); glTrams(); // the trains, the level crossings' barriers and the trams (rail.js)
   const planes = DYN.planes.slice(); for (const B of airfields()) { const a = DYN.af[B.id]; if (a && a.parked && a.pp) planes.push(a.pp); }
   for (const pl of planes) { // planes: fuselage, wings and tail, on the apron or in the air
     const k = pl.kind || planeKind(), [f, r] = H3(pl.h || 0), c = [pl.x, (pl.z || 0) * ZS + .03, pl.y], sz = k === 'prop' ? .7 : k === 'jet' ? 1 : 1.15;

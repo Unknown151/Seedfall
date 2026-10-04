@@ -162,8 +162,20 @@ function mPitch(hx, hz) { for (let k = 0; k < 6; k++) kBox(-hx + (k + .5) * hx /
   if (KF.lod) { kBox(0, 0, .012, .003, hz, .001, '#f4f4f0'); kCyl(0, 0, .012, hz * .3, .001, '#f4f4f0', 0, 16, 0); for (const sg of [-1, 1]) { kBox(sg * hx, 0, .012, .003, hz, .001, '#f4f4f0'); kBox(sg * (hx - .002), 0, .012, .004, hz * .14, .05, '#f4f4f0'); } } }
 function mFloods(d, h) { if (!hasTech('electric')) return; for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { kBox(a * d, b * d, 0, .012, .012, h, '#8c9199'); kBox(a * d, b * d, h, .045, .015, .04, '#f2f4f7', 0, 2); } }
 GL_MODEL.stadium = function (B, st) { kSet(GLB.x, GLB.y, [1, 0, 0], [0, 0, 1], B.id); mPitch(.24, .15); mStands(.3, .46, .22, .46, .2, 20, hasTech('concrete')); mFloods(.44, .5); };
-GL_BIG.stadium = function (B) { const [lx, lz] = glLot(B); kSet(lx, lz, [1, 0, 0], [0, 0, 1], B.id); mPitch(.5, .34); mStands(.62, .95, .45, .95, .4, 28, hasTech('concrete')); mFloods(.82, 1.36);
-  if (KF.lod) for (const sg of [-1, 1]) { kBox(sg * .5, 0, 0, .006, .06, .06, '#f4f4f0'); } };
+GL_BIG.stadium = function (B, st) { // sized to its lot: a pitch, a bowl of stands, floodlights; on its 4×4 lot gates, a scoreboard, flags round the rim
+  const [lx, lz] = glLot(B), n = fpW(B), sc = n / 2, lod = KF.lod; kSet(lx, lz, [1, 0, 0], [0, 0, 1], B.id);
+  const R1 = n / 2 - (n > 2 ? .16 : .05), Rz1 = R1 * (n > 2 ? .82 : 1), y1 = .4 * (1 + (sc - 1) * .55);
+  if (n > 2) kBox(0, 0, 0, n / 2 - .02, n / 2 - .02, .008, '#bdb7ab', M_STONE); // the concourse round it
+  mPitch(R1 * .53, Rz1 * .36); mStands(R1 * .62, R1, Rz1 * .5, Rz1, y1, n > 2 ? 44 : 28, hasTech('concrete')); mFloods(R1 * .86, 1.36 * (n > 2 ? 1.25 : 1));
+  if (lod) for (const sg of [-1, 1]) kBox(sg * R1 * .53, 0, 0, .006, .06, .06, '#f4f4f0'); // the goals
+  if (n <= 2) return;
+  const acc = (st || {}).accent || '#c8553d';
+  for (const sg of [-1, 1]) { const s = sg * (R1 + .02); kBox(s, 0, 0, .06, .16, y1 + .14, '#c9c2b6', M_STONE); kBox(s + sg * .061, 0, .02, .002, .07, .16, '#2a2c30'); kBox(s, 0, y1 + .14, .07, .17, .02, acc); // the gates, end on
+    for (const t of [-.24, .24]) { kBox(s + sg * .14, t, 0, .03, .03, .07, '#e8e4dc'); kBox(s + sg * .14, t, .07, .036, .036, .01, acc); } } // ticket booths
+  kBox(0, -Rz1 - .03, y1 + .04, .3, .02, .16, '#2a2c30'); kBox(0, -Rz1 - .02, y1 + .07, .27, .002, .11, '#3a4250', hasTech('computing') ? .9 : .4); // the scoreboard over the north stand
+  for (let k = 0; k < 12; k++) { const t = k / 12 * TAU, x = Math.cos(t) * R1, z = Math.sin(t) * Rz1; kBox(x, z, y1 + .04, .004, .004, .16, '#8c9199'); if (lod || k % 3 === 0) kBox(x + .025, z, y1 + .16, .024, .002, .016, k % 2 ? acc : '#f2f2ee'); } // flags round the rim
+  if (lod) for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) kLantern(a * (n / 2 - .1), b * (n / 2 - .1), .2);
+};
 
 /* ---------- the launchpad: the scorched pad, a flame trench, the gantry and its arms, the rocket waiting (fx3d.js) ---------- */
 GL_MODEL.launchpad = function (B, st) {
@@ -186,15 +198,17 @@ GL_MODEL.fusion = function (B, st) {
   kBox(0, 0, 0, .42, .42, .27, st.wall, M_PLASTER); kWalls(-.42, .42, -.42, .42, (a, b, ff, k) => kWins(a, b, ff, 0, .27, 1, 5, { ty: 'glass', hk: .4, hw: .04 }, null, k * 7));
   kDome(0, 0, .27, .34, .9, shade(st.wall, 1.02), M_PLASTER); kCyl(0, 0, .52, .372, .03, st.accent, 0, 24, 0, 3); if (lod) for (let q = 0; q < 12; q++) { const a = q / 12 * TAU; kBox(Math.cos(a) * .345, Math.sin(a) * .345, .27, .008, .008, .25, '#c9ced4'); }
 };
-GL_BIG.fusion = function (B, st) {
-  const [lx, lz] = glLot(B); kSet(lx, lz, [1, 0, 0], [0, 0, 1], B.id); const lod = KF.lod, w = '#e8edf2';
-  kBox(0, 0, 0, .9, .9, .02, '#c4c9cf', M_STONE);
-  for (const s of [-.42, .42]) { kCyl(s, -.15, .02, .3, .36, w, M_PLASTER, 20, 0); kDome(s, -.15, .38, .3, .5, '#eef2f6', M_PLASTER); kCyl(s, -.15, .3, .305, .025, st.accent, 0, 20, 0, 3);
-    if (lod) for (let q = 0; q < 10; q++) { const a = q / 10 * TAU; kBox(s + Math.cos(a) * .302, -.15 + Math.sin(a) * .302, .02, .008, .008, .28, '#c9ced4'); } kDoor(s, .15, .05, .12, '#5a5f66', { ty: 'glass' }); }
-  kBox(0, -.15, .02, .14, .06, .2, w, M_PLASTER); kFlat(-.14, .14, -.21, -.09, .22, w, .015); // the hall joining them
-  kCyl(0, .5, .02, .26, .12, '#9aa3ad', M_PLASTER, 20, 0); kCyl(0, .5, .02, .24, .02, '#7fe8e0', 0, 20, '#7fe8e0', 3); kCyl(0, .5, .14, .27, .02, '#c9ced4', 0, 20, 0); // the ring, glowing
-  kCone(-.6, .55, .02, .2, .55, '#d6dade', 16, M_PLASTER, .14); if (lod) kCyl(-.6, .55, .57, .142, .02, '#bfc4c8', 0, 16, 0); // a cooling tower
-  if (lod) { for (let k = 0; k < 4; k++) { kBox(.45 + k * .12, .55, .02, .004, .004, .3, '#8c939b'); kBox(.45 + k * .12, .55, .32, .05, .003, .003, '#8c939b'); } kBeam([.4, .55, .3], [.85, .55, .3], .0012, '#2a2a2a'); }
+GL_BIG.fusion = function (B, st) { // sized to its lot (2×2, then 3×3: a third dome, a second cooling tower)
+  const [lx, lz] = glLot(B); kSet(lx, lz, [1, 0, 0], [0, 0, 1], B.id); const lod = KF.lod, w = '#e8edf2', n = fpW(B), k3 = n / 2, hk = 1 + (k3 - 1) * .5;
+  kBox(0, 0, 0, n / 2 - .1, n / 2 - .1, .02, '#c4c9cf', M_STONE);
+  const domes = n > 2 ? [[-.62, -.3], [0, -.48], [.62, -.3]] : [[-.42, -.15], [.42, -.15]];
+  for (const [s, f] of domes) { const r = .3 * (n > 2 ? 1.15 : 1); kCyl(s, f, .02, r, .36 * hk, w, M_PLASTER, 20, 0); kDome(s, f, .02 + .36 * hk, r, .5 * hk, '#eef2f6', M_PLASTER); kCyl(s, f, .3 * hk, r + .005, .025, st.accent, 0, 20, 0, 3);
+    if (lod) for (let q = 0; q < 10; q++) { const a = q / 10 * TAU; kBox(s + Math.cos(a) * (r + .002), f + Math.sin(a) * (r + .002), .02, .008, .008, .28 * hk, '#c9ced4'); } kDoor(s, f + r, .05, .12, '#5a5f66', { ty: 'glass' }); }
+  kBox(0, domes[0][1], .02, Math.abs(domes[domes.length - 1][0]) - .2, .06, .2, w, M_PLASTER); // the hall joining them
+  const ry = n > 2 ? .55 : .5, rr = .26 * (n > 2 ? 1.25 : 1);
+  kCyl(0, ry, .02, rr, .12, '#9aa3ad', M_PLASTER, 20, 0); kCyl(0, ry, .02, rr - .02, .02, '#7fe8e0', 0, 20, '#7fe8e0', 3); kCyl(0, ry, .14, rr + .01, .02, '#c9ced4', 0, 20, 0); // the ring, glowing
+  for (const cx of n > 2 ? [-.95, .95] : [-.6]) { kCone(cx, ry + .1, .02, .2 * hk, .55 * hk, '#d6dade', 16, M_PLASTER, .14 * hk); if (lod) kCyl(cx, ry + .1, .02 + .55 * hk, .142 * hk, .02, '#bfc4c8', 0, 16, 0); } // cooling towers
+  if (lod) { const sx = n > 2 ? -.3 : .45; for (let k = 0; k < 4; k++) { kBox(sx + k * .12, ry + .5 * (n > 2 ? 1.6 : 1) - .45, .02, .004, .004, .3, '#8c939b'); } }
 };
 
 /* ---------- the climate engine: a tall ribbed stack ringed with teal light, a misting crown (fx3d.js) ---------- */
