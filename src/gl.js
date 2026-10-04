@@ -642,6 +642,8 @@ const GL_SMFS = `#version 300 es
 precision mediump float; in float vA, vS; out vec4 o; uniform vec3 uCol;
 void main(){ vec2 d=gl_PointCoord-.5; float r=length(d)*2.; if(r>1.) discard; float a=vA*(1.-smoothstep(.15,1.,r))*(.8+.2*sin(d.x*9.+d.y*7.)); o=vec4(uCol*vS*(1.-.12*d.y),a); }`;
 const SMOKE_AT = { workshop: [[.16, -.14, 21]], works: [[.28, -.18, 43]], power: [[-.16, -.2, 37], [.16, -.2, 37]], glassworks: [[.2, -.16, 24]] };
+const SMOKE_GEN = { workshop: [null, [[.16, -.14, 26]], []], weaver: [[], [[.32, -.34, 30]], []], glassworks: [null, [[.2, -.16, 26]]] }; // refitted workplaces (needs.js REFIT) smoke from their new stacks, or not at all
+const smokeAt = B => { const g = SMOKE_GEN[B.type], a = g && g[genOf(B)]; return a || SMOKE_AT[B.type]; };
 function glSmoke(gl, dt, FR, VP, pxs, day, tgt) {
   GL3.smF = [FR, day, tgt]; const A = glSmokeStep(Math.min(dt, .25)), n = A.n; if (!n) return;
   const Q = GL3.smp; for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
@@ -659,7 +661,7 @@ function glSmokeStep(dt) { // new puffs from what's in view, then everyone rises
     const ks = []; for (let k = 0; k < GL3.chunks.length; k++) { const ch = GL3.chunks[k], sm = ch.lamps && ch.lamps.smk, d = Math.hypot((k % GNC) * GCH + 4 - tgt[0], ((k / GNC) | 0) * GCH + 4 - tgt[2]); if (sm && sm.length && d < 16 && glSees(FR, ch, k)) ks.push([d, sm]); }
     ks.sort((a, b) => a[0] - b[0]); // the nearest chimneys first (far off, a puff is less than a pixel)
     for (const [, sm] of ks) for (const q of sm) if (P.length < cap && Math.random() < rate * dt) P.push({ x: q[0], y: q[1], z: q[2], a: 0, L: 6 + Math.random() * 3, s0: .09, s1: .6, o: .72 });
-    for (const B of DYN.anim || []) { const at = SMOKE_AT[B.type]; if (!at || P.length >= cap || Math.hypot(B.x - tgt[0], B.y - tgt[2]) > 40) continue; // the works smoke hard
+    for (const B of DYN.anim || []) { const at = smokeAt(B); if (!at || P.length >= cap || Math.hypot(B.x - tgt[0], B.y - tgt[2]) > 40) continue; // the works smoke hard
       const soot = sootK() >= .5 && !hasTech('solar'), b = surfZ(idx(B.x, B.y)) * ZS;
       for (const [u, v, z] of at) if (Math.random() < 2.2 * dt) P.push({ x: B.x + u, y: b + z * ZS, z: B.y + v, a: 0, L: 7 + Math.random() * 4, s0: .16, s1: 1.1, o: soot ? .8 : .6, sh: soot ? .6 : .92 }); }
   }

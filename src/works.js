@@ -193,6 +193,7 @@ const GLW = {
     const tip = wkTool(hd, h, an - .35, .11, 'spade'); if (tip && ph > .08 && ph < .5) gBox(wkAdd(tip, [0, 1, 0], .004), [.013, 0, 0], [0, 0, .013], .012, '#ead3a2');
   },
   weaver(B, c) { // dyed cloth drying on the frame, stirring in the wind
+    if (genOf(B)) return; // (a mill now: no frame outside)
     const cols = ['#c77fb0', '#7fb2c4', '#e0b04f', '#8fbf88'], X = c.X + .3, y = c.y + 8 * ZS; GLB.mat = 0;
     for (let k = 0; k < 4; k++) { const v = -.3 + (k + .5) * .15, len = (5.5 + (k % 2)) * ZS, ph = Math.sin(c.t * 1.6 * Math.min(2, c.wind) + k * 1.3) * .18 * c.wind + .06 * c.wind, hang = [Math.sin(ph), -Math.cos(ph), 0];
       glOBox(wkAdd([X, y, c.Z + v], hang, len / 2), V3(hang, len / 2), [0, 0, .026], [Math.cos(ph) * .002, Math.sin(ph) * .002, 0], cols[(k + Math.floor((B.var || 0) * 4)) % 4]); }
@@ -200,7 +201,7 @@ const GLW = {
   glassworks(B, c) { // the furnace mouth glows; the glassblower turns a gather of hot glass on the pipe
     const fl = .5 + .5 * Math.sin(c.t * 6) * Math.sin(c.t * 2.3); GLB.mat = 0;
     glOBox([c.X + .2, c.y + 2.5 * ZS, c.Z - .01 + .004], [.028, 0, 0], [0, 0, .004], [0, .028, 0], fl > .5 ? '#ffc070' : '#ff9a4a', 2);
-    if (!c.near) return;
+    if (!c.near || genOf(B)) return; // (in the float-glass works nobody blows glass at the door)
     const h = -Math.PI / 2, ph = (c.t * .12) % 1, an = ph < .35 ? 1.45 : 1.1 + Math.sin(c.t * .9) * .08, [hd] = wkMan(B, 0, c.X + .2, c.Z + .2, c.y, h, [an, an * .97]);
     if (!hd) return; const f = wkF(h), tip = wkAdd(hd, wkV(f, an + .1), .2); gBeam(hd, tip, .0028, '#5a5f66');
     const g = ph < .35 ? '#ffb45e' : ph < .7 ? '#ff8a4a' : '#bfe6ee', s = .012 + Math.min(1, ph * 1.5) * .012; glOBox(tip, [s, 0, 0], [0, 0, s], [0, s, 0], g, ph < .7 ? 2 : 0);
@@ -208,9 +209,12 @@ const GLW = {
   workshop(B, c) { // the smith at the anvil: a hammer and sparks
     if (!c.near) return;
     const X = c.X + .3, Z = c.Z + .34, h = -Math.PI / 2, ph = (c.t * 1.6) % 1, an = wkLift(ph, 1.15, 2.3, .6), top = c.y + 3.2 * ZS;
+    const g = genOf(B); // (refitted, the smith is a fitter at a bench: welding, not hammering)
+    if (g) { gBox([X, c.y, Z], [.06, 0, 0], [0, 0, .035], 3 * ZS, '#5a5f66'); const on = (c.t * .7) % 1 < .6; if (on) gBox([X, c.y + 3 * ZS, Z], [.01, 0, 0], [0, 0, .01], .01, '#dff4ff', 0, 2);
+      wkMan(B, 0, X, Z + .11, c.y, h, [1.25, 1.1]); if (on && (c.t * 9) % 1 < .5) wkBits([X, c.y + 3 * ZS + .01, Z], .05, 4, '#cfe8ff', true, B.id * 23 + Math.floor(c.t * 9)); return; }
     gBox([X, c.y, Z], [.03, 0, 0], [0, 0, .03], 2.2 * ZS, '#6b5040', M_PLANK); gBox([X, c.y + 2.2 * ZS, Z], [.045, 0, 0], [0, 0, .022], 1 * ZS, '#3a3d42');
     gBox([X, top, Z], [.025, 0, 0], [0, 0, .006], .006, '#ff7a3a', 0, 2); // the hot iron
-    const [hd] = wkMan(B, 0, X, Z + .11, c.y, h, [an, .9]); const tip = wkTool(hd, h, an - .55, .07, 'hammer');
+    const [hd] = wkMan(B, 0, X, Z + .11, c.y, h, [an, .9]); wkTool(hd, h, an - .55, .07, 'hammer');
     if (ph < .2) wkBits([X, top + .01, Z], ph / 1.6, 5, '#ffd27a', true, B.id * 23 + Math.floor(c.t * 1.6));
   },
   works(B, c) { wkFlywheel(B, c, .1, .36, .11, .15, '#5a5f66'); },

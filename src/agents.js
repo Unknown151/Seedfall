@@ -289,7 +289,7 @@ function spawnCaravan(from, to, n) {
   const A = S.T[from], B = S.T[to]; if (!A || !B) return;
   const path = navPath(idx(A.x, A.y), idx(B.x, B.y), 2, 9000);
   for (let k = 0; k < n; k++) DYN.caravans.push({ path, ax: A.x, ay: A.y, bx: B.x, by: B.y, t: -k * .04, s: -k * .55, spd: path ? .75 : 0, sp2: 1 / (dist(A.x, A.y, B.x, B.y) * 2.2), col: pick(CLOTH), pants: pick(PANTS), hair: pick(HAIR), skin: pick(SKIN), hat: rnd(), ph: rnd() * 6, off: rf(-.3, .3), ln: 0 });
-  camHint((A.x + B.x) / 2, (A.y + B.y) / 2, '🐪 A caravan sets out', 5);
+  camHint((A.x + B.x) / 2, (A.y + B.y) / 2, hasTech('motor') ? '🚚 Settlers on the move' : '🐪 A caravan sets out', 5);
 }
 function stepCaravans(dt) {
   for (const c of DYN.caravans) {

@@ -198,9 +198,15 @@ WHAT THE TOWNS NEED
   Nothing ever stops: an unmet need only slows a town down a little. Now and
   then the chronicle notices (queues at the wells, brownouts, dull towns).
   Old buildings retire when a later age outgrows them: granaries come down
-  once the trains bring grain (Railways), wells are capped once water is
-  piped (Concrete), and windmills stop once the gene gardens feed everyone.
-  Each town keeps its oldest well and windmill for old times' sake.
+  once the trains bring grain (Railways), windmills stop once electric roller
+  mills grind at the works (Electricity), and wells are capped and spare
+  water towers pulled down once water is piped (Concrete). Each town keeps
+  its oldest well and windmill, and its newest water tower, for old times'
+  sake. Workplaces that are still useful are refitted instead, one at a time:
+  stone cisterns get iron tanks, the smithy becomes a machine shop and later a
+  fab workshop, the weaving house a four-storey brick mill and later a quiet
+  knitting hall, and the glass cone a float-glass works. From Motorcars,
+  settlers move house in a convoy of lorries rather than on foot.
 
 WAREHOUSES, SHIPYARDS, AND THINGS FOR THE SOUL
   Warehouses (from Coinage): a town whose stores are full builds one, and

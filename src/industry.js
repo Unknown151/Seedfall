@@ -19,6 +19,7 @@ function iCart(s, f, a, col = '#8a6446', load) { // a little two-wheeled cart (a
 
 /* ---------- the smithy: a stone forge with its chimney, a lean-to over the anvil (the smith works it: works.js) ---------- */
 GL_MODEL.workshop = function (B, st) {
+  const g = genOf(B); if (g) return iWorkshopNew(B, st, g); // (refitted: see needs.js REFIT)
   iSet(B); const [wc, wm] = kWall(B, st), lod = KF.lod, rc = st.roof, wty = kWinTy() === 'glass' ? 'modern' : kWinTy(), s0 = -.3, s1 = .3, fB = -.26, fD = .26, H = .36;
   kPlinth(s0, s1, fB, fD, .03, '#a59c8e'); kBox(0, 0, .03, .3, .26, H - .03, wc, wm);
   kBox(-.1, fD - .02, .03, .075, .025, .2, '#2a2420'); kBox(-.1, fD + .003, .03, .07, .004, .19, '#5c4a3e', M_PLANK); if (lod) for (const d of [-1, 1]) kOB(-.1 + d * .035, fD + .008, .13, [.03, 0, 0], [0, .003, 0], [0, 0, .095], shade('#5c4a3e', 1.1), M_PLANK); // the big doors
@@ -113,6 +114,7 @@ function drawSandpit(B, i) {
 
 /* ---------- the weaving house: a long workshop with tall windows for the light, the drying frame (works.js) ---------- */
 GL_MODEL.weaver = function (B, st) {
+  const g = genOf(B); if (g) return iWeaverNew(B, st, g);
   iSet(B); const [wc, wm] = kWall(B, st), lod = KF.lod, rc = st.roof, wty = kWinTy() === 'glass' ? 'modern' : kWinTy(), s0 = -.36, s1 = .2, fB = -.28, fD = .16, H = .3;
   kPlinth(s0, s1, fB, fD, .03); kBox(-.08, -.06, .03, .28, .22, H - .03, wc, wm);
   kWins(s0, s1, fD, .03, .14, 2, 4, { ty: wty, hw: .03, hk: .62 }, (k, fk) => fk === 0 && k === 1, 0); kWins(s0, s1, fB, .03, .14, 2, 4, { ty: wty, back: 1, hk: .62 }, null, 10);
@@ -125,6 +127,7 @@ GL_MODEL.weaver = function (B, st) {
 
 /* ---------- the glassworks: the glassblowers' house, the furnace cone with its glowing mouth (works.js), bottles ---------- */
 GL_MODEL.glassworks = function (B, st) {
+  if (genOf(B)) return iGlassNew(B, st);
   iSet(B); const [wc, wm] = kWall(B, st), lod = KF.lod, rc = st.roof, s0 = -.36, s1 = .12, fB = -.16, fD = .28, H = .28;
   kPlinth(s0, s1, fB, fD, .03); kBox(-.12, .06, .03, .24, .22, H - .03, wc, wm);
   kWins(s0, s1, fD, .03, .25, 1, 3, { ty: kWinTy() === 'glass' ? 'modern' : 'sash', arch: 'round', hk: .5 }, k => k === 1, 0); kDoor(-.12, fD, .04, .15, '#5c4a3e', { ty: 'panel', hood: 'flat' });
@@ -133,6 +136,56 @@ GL_MODEL.glassworks = function (B, st) {
   kBox(.2, -.01, .0, .03, .006, .13, '#3a2a24'); if (lod) for (let q = 0; q < 7; q++) { const a = q / 6 * Math.PI, m = [Math.cos(a), Math.sin(a)]; kOB(.2 + m[0] * .036, -.006, .1 + m[1] * .036, [-m[1] * .01, 0, m[0] * .01], [0, .006, 0], [m[0] * .009, 0, m[1] * .009], '#8a4a3a', M_BRICK); } // the mouth, arched (it glows: works.js)
   if (lod) { for (const [s, f] of [[.34, .26], [.26, .34], [.3, .3], [.38, .32]]) kCyl(s, f, 0, .012, .035, '#a0dceb', 0, 6, '#cfeff6'); kCrate(.36, .4, 0, .022, '#b58d62'); for (let q = 0; q < 4; q++) kBeam([-.38 + q * .03, .35, 0], [-.37 + q * .03, .38, .1], .003, '#6b5040', M_PLANK); } // fresh bottles, a crate, pipes
 };
+
+/* ---------- refitted workplaces (needs.js REFIT): the same spots for works.js's worker and gl.js's smoke ---------- */
+const iBrick = st => hasTech('brick') ? [mix(st.wall, '#a5573f', .6), M_BRICK] : [st.wall, glWallMat({ type: 'works', style: S.styleIdx }) || M_STONE];
+function iWorkshopNew(B, st, g) { // 1: a Victorian machine shop (brick, arched windows, big doors, a roof lantern, a tall stack); 2: a fab workshop
+  iSet(B); const lod = KF.lod, s0 = -.36, s1 = .3, fB = -.28, fD = .24, rc = st.roof;
+  if (g === 1) { const [wc, wm] = iBrick(st), H = .4;
+    kPlinth(s0, s1, fB, fD, .04, '#8f877c'); kBox((s0 + s1) / 2, (fB + fD) / 2, .04, (s1 - s0) / 2, (fD - fB) / 2, H - .04, wc, wm);
+    kWins(s0, s1, fD, .06, .28, 1, 5, { ty: 'sash', arch: 'seg', hk: .5, wall: wc }, k => k === 1, 0); kWins(s0, s1, fB, .06, .28, 1, 5, { ty: 'sash', arch: 'seg', back: 1 }, null, 10);
+    kBox(-.17, fD + .004, .04, .06, .004, .24, '#3f5a4a', M_PLANK); if (lod) { kBox(-.17, fD + .007, .04, .003, .003, .24, '#2f4436'); kBox(-.17, fD + .006, .28, .07, .004, .012, '#c9c2b6', M_STONE); } // the double doors and their lintel
+    kBand(s0, s1, fD, H - .02, '#c9c2b6'); kGable(s0, s1, fB, fD, H, .14, rc, { wall: wc, wm });
+    kBox((s0 + s1) / 2, (fB + fD) / 2, H + .1, (s1 - s0) / 2 - .06, .04, .05, '#bfe3f0', M_GLASS, .4); kCtr((s0 + s1) / 2, (fB + fD) / 2, H + .1); // a glazed lantern along the ridge
+    iStack(.16, -.14, H, 1.18, .045); // (smoke: gl.js SMOKE_GEN)
+    kCtr(.32, .36, .1); kQ([.2, .26, .26], [.44, .26, .26], [.44, .46, .2], [.2, .46, .2], '#5d6670', M_SLATE); for (const s of [.21, .43]) kBox(s, .45, 0, .006, .006, .2, '#3d4a44'); // the fitting bay's canopy, on iron posts
+    if (lod) { for (let q = 0; q < 4; q++) kBox(-.32 + q * .022, .36, 0, .006, .08, .012 + q * .008, '#5a5f66'); kBarrel(-.22, .4, 0, .02, .05, '#3d5a6a'); kBarrel(-.18, .42, 0, .02, .05, '#3d5a6a'); kCrate(.0, .4, 0, .024); kCrate(.04, .42, 0, .02, '#8a6a4c'); kSign(.3, fD, .3, st.accent); }
+    return; }
+  const wc = mix(st.wall, '#dfe3e8', .55), H = .32; // the fab workshop: light panels, a glass front, a roller door, panels on the roof
+  kBox((s0 + s1) / 2, (fB + fD) / 2, 0, (s1 - s0) / 2, (fD - fB) / 2, H, wc, M_PLASTER);
+  kBox(.06, fD + .003, .04, .2, .003, .2, '#2c3e50', M_GLASS, .55); if (lod) for (let q = 0; q <= 5; q++) kBox(-.14 + q * .08, fD + .006, .04, .004, .004, .2, '#8c9199');
+  kBox(-.25, fD + .004, 0, .07, .004, .22, '#9aa0a6'); if (lod) for (let q = 0; q < 10; q++) kBox(-.25, fD + .007, .01 + q * .021, .068, .002, .002, '#7d838a'); // the roller door, ribbed
+  kBox(-.07, fD + .003, .26, .3, .006, .035, st.accent); kFlat(s0, s1, fB, fD, H, '#8c9199', .03); kSolar(0, -.05, H + .02, .26, .18, .25);
+  kCtr(.32, .36, .1); kBox(.32, .36, .2, .13, .11, .012, '#c9cdd2'); for (const [s, f] of [[.2, .26], [.44, .26], [.2, .46], [.44, .46]]) kBox(s, f, 0, .006, .006, .2, '#8c9199'); // the canopy over the work bay
+  if (lod) { kBox(-.12, .4, 0, .09, .045, .085, '#f2f4f7'); kBox(-.12, .4, .085, .085, .04, .03, '#3a4250', 0, .4); kBox(-.035, .4, .0, .02, .04, .05, '#2a2c30'); kCrate(.05, .4, 0, .022, '#c9a77a'); kSign(.3, fD, .28, st.accent); } // a little electric van
+}
+function iWeaverNew(B, st, g) { // 1: a brick cotton mill, four floors of windows, a stair tower and a chimney; 2: a quiet knitting hall
+  iSet(B); const lod = KF.lod, rc = st.roof;
+  if (g === 1) { const [wc, wm] = iBrick(st), s0 = -.4, s1 = .24, fB = -.28, fD = .14, H = .66;
+    kPlinth(s0, s1, fB, fD, .04, '#8f877c'); kBox((s0 + s1) / 2, (fB + fD) / 2, .04, (s1 - s0) / 2, (fD - fB) / 2, H - .04, wc, wm);
+    for (const ff of [fD, fB]) kWins(s0, s1, ff, .06, .145, 4, 7, { ty: 'sash', arch: 'seg', hk: .62, back: ff < 0 ? 1 : 0, wall: wc }, null, ff < 0 ? 20 : 0);
+    for (let k = 1; k < 4; k++) kBand(s0, s1, fD, .06 + k * .145, '#c9c2b6'); kCornice(s0, s1, fB, fD, H, '#c9c2b6', { h: .025, ov: .012 }); kHip(s0 - .01, s1 + .01, fB - .01, fD + .01, H + .025, .1, rc, { ov: .01 });
+    kBox(.31, -.07, 0, .07, .07, H + .14, wc, wm); kWalls(.24, .38, -.14, 0, (a, b, ff, k) => { if (k !== 2) kWins(a, b, ff, .1, .18, 3, 1, { ty: 'sash', arch: 'round', hk: .5 }, null, 30 + k); }); kHip(.235, .385, -.145, .005, H + .14, .1, rc, { ov: .008, fin: 1 }); // the stair tower
+    kDoor(-.08, fD, .04, .14, '#3f5a4a', { ty: 'panel', fan: 1, hood: 'flat' }); kSign(s0 + .06, fD, .3, st.accent);
+    iStack(.32, -.34, 0, 1.36, .05); // (smoke: gl.js SMOKE_GEN)
+    if (lod) for (let q = 0; q < 6; q++) kBox(-.3 + (q % 3) * .07, .32 + ((q / 3) | 0) * .06, 0, .03, .025, .045, '#ede6d6', M_PLANK); // bales of cloth
+    return; }
+  const wc = mix(st.wall, '#e8ecef', .5), s0 = -.4, s1 = .3, fB = -.3, fD = .16, H = .24, n = 4, w = (s1 - s0) / n; // sawtooth north lights over a single floor
+  kBox((s0 + s1) / 2, (fB + fD) / 2, 0, (s1 - s0) / 2, (fD - fB) / 2, H, wc, M_PLASTER);
+  for (let k = 0; k < n; k++) { const a = s0 + k * w, b = a + w; kCtr((a + b) / 2, (fB + fD) / 2, H); kQ([a, fB, H], [a, fD, H], [b, fD, H + .1], [b, fB, H + .1], '#9aa3ab', 0); kQ([b, fB, H], [b, fD, H], [b, fD, H + .1], [b, fB, H + .1], '#bfe3f0', M_GLASS, .4);
+    kT([a, fD, H], [b, fD, H], [b, fD, H + .1], wc, M_PLASTER); kT([a, fB, H], [b, fB, H], [b, fB, H + .1], wc, M_PLASTER); }
+  kBox(-.05, fD + .003, .04, .25, .003, .12, '#2c3e50', M_GLASS, .5); kBox(-.05, fD + .003, .19, .25, .006, .03, st.accent); kDoor(.2, fD, .04, .15, '#5a6470', { ty: 'glass' });
+  if (lod) { kTree(.38, .3, .7); kBench(-.25, .32, 0, 1); for (let q = 0; q < 3; q++) kCyl(-.05 + q * .05, .32, 0, .018, .04, ['#c77fb0', '#7fb2c4', '#e0b04f'][q], 0, 8); }
+}
+function iGlassNew(B, st) { // the float-glass works: a long hall, the furnace door glowing at its front, a tall stack, sheets stacked on racks
+  iSet(B); const lod = KF.lod, [wc, wm] = iBrick(st), s0 = -.4, s1 = .38, fB = -.34, fD = -.02, H = .3, rc = '#6c7680';
+  kPlinth(s0, s1, fB, fD, .03, '#8f877c'); kBox((s0 + s1) / 2, (fB + fD) / 2, .03, (s1 - s0) / 2, (fD - fB) / 2, H - .03, wc, wm);
+  kWins(s0, s1, fD, .08, .14, 1, 6, { ty: 'steel', hk: .5 }, k => k === 4, 0); kFlat(s0, s1, fB, fD, H, rc, .03);
+  kBox(.2, fD + .003, .03, .06, .004, .13, '#3a3d42'); // the furnace bay (its door glows: works.js)
+  iStack(.2, -.16, H, 1.18, .04, '#9aa0a6'); // (smoke: gl.js SMOKE_GEN)
+  kBox(-.15, fB + .1, H, .12, .06, .06, '#8c9199'); // the lehr's housing on the roof
+  if (lod) { for (let k = 0; k < 3; k++) { const s = -.3 + k * .14; kBeam([s - .04, .2, 0], [s, .2, .14], .004, '#5a6470'); kBeam([s + .04, .2, 0], [s, .2, .14], .004, '#5a6470'); for (let q = 0; q < 4; q++) kOB(s + (q - 1.5) * .012, .2, .065, [.002, 0, 0], [0, .05, 0], [0, 0, .06], '#bfe6ee', M_GLASS); } kCrate(.32, .3, 0, .022, '#b58d62'); kSign(s0 + .05, fD, .2, st.accent); } // A-frame racks of sheet glass
+}
 
 /* ---------- the works: a sawtooth shop floor of north lights, a tall chimney, the yard (works.js turns the flywheel) ---------- */
 GL_MODEL.works = function (B, st) {
@@ -178,7 +231,7 @@ GL_MODEL.warehouse = function (B, st) {
 /* ---------- the water tower: a stone cistern tower (before steam), then a riveted iron tank on a braced frame ---------- */
 GL_MODEL.watertower = function (B, st) {
   iSet(B); const lod = KF.lod;
-  if (!S.tech.done.steam || B.built < S.tech.done.steam) {
+  if (genOf(B) < 1) { // (until it's refitted with an iron tank: needs.js REFIT)
     const [wc, wm] = kWall(B, st); kCyl(0, 0, 0, .17, .04, '#a59c8e', M_STONE, 12); kCone(0, 0, .04, .16, .74, wc, 12, wm === M_PLASTER ? M_STONE : wm, .14);
     kDoor(0, .155, .03, .11, '#5c4a3e', { ty: 'plank', y: .04 }); for (let sd = 1; sd < 4; sd++) kSide(sd, () => kWin(0, .145, .38, .015, .06, sd, { ty: 'case', back: 1 }));
     kCyl(0, 0, .74, .21, .36, mix(wc, '#a8b4bf', .35), M_STONE, 14, 0); kCornice(-.2, .2, -.2, .2, .74, '#cfc6b4', { br: 0, h: .02, ov: .015 }); if (lod) for (let q = 0; q < 12; q++) { const a = q / 12 * TAU; kBox(Math.cos(a) * .2, Math.sin(a) * .2, .72, .012, .012, .02, '#cfc6b4', M_STONE); } // corbels under the cistern
