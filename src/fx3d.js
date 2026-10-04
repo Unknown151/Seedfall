@@ -161,7 +161,7 @@ function glFxDecor() {
   const em = LIGHT.emK || 0;
   // lighthouse beams sweep round all night
   if (em > .02) for (const B of DYN.anim || []) { if (B.type !== 'lighthouse') continue;
-    const L = [B.x, gGround(B.x, B.y) + 39.7 * ZS, B.y], a = GL3.t * .8 + B.id * 1.7, d = [Math.cos(a), 0, Math.sin(a)], s = [-d[2], 0, d[0]], R = 7, wd = .8;
+    const L = [B.x, gGround(B.x, B.y) + LH_LAMP, B.y], a = GL3.t * .8 + B.id * 1.7, d = [Math.cos(a), 0, Math.sin(a)], s = [-d[2], 0, d[0]], R = 7, wd = .8;
     const E = (k, o) => [L[0] + d[0] * R * k + s[0] * o, L[1] - .25 * k, L[2] + d[2] * R * k + s[2] * o];
     glTr('add', L, E(1, -wd), E(1, wd), '#fff0c4', .45 * em, 0, 0); glTr('add', L, [E(1, 0)[0], E(1, 0)[1] - wd * .7, E(1, 0)[2]], [E(1, 0)[0], E(1, 0)[1] + wd * .7, E(1, 0)[2]], '#fff0c4', .3 * em, 0, 0);
     FXA.glow.push(L[0], L[1], L[2], .45, 1, .95, .8, .9 * em, 0, 0, 0, 0, 0); }

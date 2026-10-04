@@ -24,7 +24,7 @@ ok(r.ax, 'each terrace house remembers which way its street runs');
 ok(r.rd > 0, 'old fields and misplaced buildings get redeveloped', `${r.rd} projects`);
 
 await p.evaluate(() => SF.ff(700)); r = await stats();
-ok(r.works.reduce((x, y) => x + y) > 0 && pct(r.works, 3) > .6, 'workshops and works sit in the works quarter', r.works.join('/'));
+ok(r.works.reduce((x, y) => x + y) > 0 && pct([0, ...r.works.slice(1)], 3) > .6, 'workshops and works sit in the works quarter (of those inside a quarter: a power house out past the edge is in none)', r.works.join('/'));
 ok(r.shops > 0 && pct(r.core, 1) > .4, 'shops and civic buildings gather in the market quarter', `${r.shops} shops, core ${r.core.join('/')}`);
 ok(r.joined > 0 && r.asym === 0, 'rowhouses keep their terraces', `${r.joined} joined`);
 

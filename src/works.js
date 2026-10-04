@@ -57,9 +57,9 @@ function gLog(A, Bp, r, col, end = '#d8b98a', mat = M_BARK) { // a round log fro
 // A pit can't go down into the ground the chunk is built on, so banks rise round its back instead, stepped down in terraces to its floor.
 function glPit(u0, v0, hw, hd, depth, rim, wall, floor, steps, mat = M_EARTH) {
   const X = GLB.x + u0, Z = GLB.y + v0, y = GLB.base, bw = Math.min(hw, hd) * .55 / Math.max(1, steps);
-  gBox([X, y, Z], [hw, 0, 0], [0, 0, hd], .3 * ZS, floor, mat);
+  gBox([X, y, Z], [hw - .001, 0, 0], [0, 0, hd - .001], .3 * ZS, floor, mat);
   for (let k = 0; k < steps; k++) { const w = bw * (k + 1), h = Math.max(1.2, depth * (1 - k / steps)) * ZS, col = k ? wall : rim; // a tall narrow lip at the back, lower and wider terraces inside it
-    gBox([X, y, Z - hd + w / 2], [hw, 0, 0], [0, 0, w / 2], h, col, mat); gBox([X - hw + w / 2, y, Z], [w / 2, 0, 0], [0, 0, hd], h, col, mat); }
+    const e = k * .002; gBox([X, y, Z - hd + w / 2 + e / 2], [hw - e, 0, 0], [0, 0, w / 2 - e / 2], h, col, mat); gBox([X - hw + w / 2 + e / 2, y, Z], [w / 2 - e / 2, 0, 0], [0, 0, hd - e], h, col, mat); } // (each set in a hair, so their outer faces don't flicker against each other)
   gBox([X, y, Z + hd - .02], [hw, 0, 0], [0, 0, .025], 1.4 * ZS, rim, mat); gBox([X + hw - .02, y, Z], [.025, 0, 0], [0, 0, hd], 1.4 * ZS, rim, mat); // a low spoil bank on the open sides
 }
 function glLogPile(u, v, n, col) { // logs stacked in a pyramid, cut ends out

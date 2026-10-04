@@ -421,8 +421,8 @@ function glHarbour(B) {
   const steel = hasTech('steam'), boxes = hasTech('computing'), brick = hasTech('brick');
   const P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t], A3 = [a[0], 0, a[1]], D3 = [d[0], 0, d[1]];
   gBox(P(0, 0, y - .005), V3s(A3, L / 2), V3s(D3, .5), .03, B.style >= 3 || steel ? '#bdb5a7' : '#b9a488', M_STONE); // the quay
-  gBox(P(0, .5, ys - .05), V3s(A3, L / 2), V3s(D3, .035), y - ys + .075, '#a39a8c', M_STONE); // its wall down into the water
-  for (const sg of [-1, 1]) gBox(P(sg * L / 2, 0, ys - .05), V3s(A3, .035), V3s(D3, .5), y - ys + .075, '#a39a8c', M_STONE); // and its ends
+  gBox(P(0, .5, ys - .05), V3s(A3, L / 2), V3s(D3, .035), y - ys + .079, '#a39a8c', M_STONE); // its wall down into the water
+  for (const sg of [-1, 1]) gBox(P(sg * L / 2, 0, ys - .05), V3s(A3, .035), V3s(D3, .5), y - ys + .079, '#a39a8c', M_STONE); // and its ends
   for (let k = 0; k <= L * 3; k++) gBox(P(-L / 2 + k / 3 + .02, .45), [.014, 0, 0], [0, 0, .014], .045, '#3a3c42'); // bollards
   for (let k = 0; k <= L; k++) { // piers between the berths, on posts
     const s = -L / 2 + k + (k === 0 ? .05 : k === L ? -.05 : 0);
