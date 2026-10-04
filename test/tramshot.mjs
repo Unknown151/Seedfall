@@ -13,7 +13,7 @@ for (const yr of years) {
       stepTrams(.01); const tm = (DYN.trams || []).slice().sort((a, b) => b.P.length - a.P.length)[0]; if (!tm) return null;
       let q; if (shot === 'tram') { tm.s = Math.floor(tm.P.length / 3) + .5; tm.wait = 9999; q = tramPos(tm.P, tm.s); }
       else { const B = stationOf(S.T[tm.sid]); if (!B) return null; q = [B.x, surfZ(idx(B.x, B.y)) * ZS, B.y, 1, 0]; }
-      const c = GL3.cam; c.tx = q[0]; c.tz = q[2]; c.ty = q[1] + .2; c.zoom = shot === 'tram' ? 1.7 : 3.2; c.pitch = .6; c.yaw = Math.atan2(q[4], q[3]) + .9;
+      const c = GL3.cam; c.tx = q[0]; c.tz = q[2]; c.ty = q[1] + .2; c.zoom = shot === 'tram' ? 1.15 : 3.2; c.pitch = shot === 'tram' ? .8 : .6; c.yaw = Math.atan2(q[4], q[3]) + .9;
       for (let j = 0; j < GNC * GNC; j++) { const cx = (j % GNC) * GCH + 4, cz = ((j / GNC) | 0) * GCH + 4; if (Math.hypot(cx - q[0], cz - q[2]) < 8) { const r = glBuildChunk(j, true); glAO(r.v); glUpload(GL3.chunks[j], r.v, true); } }
       return [Math.round(q[0]), Math.round(q[2])];
     }, shot);
