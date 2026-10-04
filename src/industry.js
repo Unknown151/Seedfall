@@ -175,7 +175,7 @@ function iWeaverNew(B, st, g) { // 1: a brick cotton mill, four floors of window
   for (let k = 0; k < n; k++) { const a = s0 + k * w, b = a + w; kCtr((a + b) / 2, (fB + fD) / 2, H); kQ([a, fB, H], [a, fD, H], [b, fD, H + .1], [b, fB, H + .1], '#9aa3ab', 0); kQ([b, fB, H], [b, fD, H], [b, fD, H + .1], [b, fB, H + .1], '#bfe3f0', M_GLASS, .4);
     kT([a, fD, H], [b, fD, H], [b, fD, H + .1], wc, M_PLASTER); kT([a, fB, H], [b, fB, H], [b, fB, H + .1], wc, M_PLASTER); }
   kBox(-.05, fD + .003, .04, .25, .003, .12, '#2c3e50', M_GLASS, .5); kBox(-.05, fD + .003, .19, .25, .006, .03, st.accent); kDoor(.2, fD, .04, .15, '#5a6470', { ty: 'glass' });
-  if (lod) { kTree(.38, .3, .7); kBench(-.25, .32, 0, 1); for (let q = 0; q < 3; q++) kCyl(-.05 + q * .05, .32, 0, .018, .04, ['#c77fb0', '#7fb2c4', '#e0b04f'][q], 0, 8); }
+  if (lod) { kTree(.38, .3, 0, .4, .7, '#5f9a4d'); kBench(-.25, .32, 0, 1); for (let q = 0; q < 3; q++) kCyl(-.05 + q * .05, .32, 0, .018, .04, ['#c77fb0', '#7fb2c4', '#e0b04f'][q], 0, 8); }
 }
 function iGlassNew(B, st) { // the float-glass works: a long hall, the furnace door glowing at its front, a tall stack, sheets stacked on racks
   iSet(B); const lod = KF.lod, [wc, wm] = iBrick(st), s0 = -.4, s1 = .38, fB = -.34, fD = -.02, H = .3, rc = '#6c7680';
