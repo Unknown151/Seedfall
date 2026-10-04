@@ -20,7 +20,7 @@ ok(f.at && f.mid === 1 && f.after === 0, 'a fire starts at a house and is over t
 ok(/🪣|🏚️/.test(f.lines), 'it ends saved or burnt down, and the chronicle says which', f.lines);
 
 // 2b) a wedding marries its couple; a flood costs its town a little, never much
-const w = await p.evaluate(() => { S.inc = []; const I = SF.incident('wedding'); if (!I) return null; SF.ff(.25); const a = S.P[I.a], b = S.P[I.b]; return { married: a.sp === b.id && b.sp === a.id }; });
+const w = await p.evaluate(() => { S.inc = []; let I = null; for (let k = 0; k < 12 && !I; k++) I = SF.incident('wedding'); if (!I) return null; /* (it picks a town at random, and not every town has a couple) */ SF.ff(.25); const a = S.P[I.a], b = S.P[I.b]; return { married: a.sp === b.id && b.sp === a.id }; });
 ok(w && w.married, 'a wedding ends with the couple married', JSON.stringify(w));
 const fl = await p.evaluate(() => { S.inc = []; const I = SF.incident('flood'); if (!I) return 'no river town'; const T = S.T[I.sid], p0 = T.pop; SF.ff(.3); return T.pop / p0; });
 ok(fl === 'no river town' || (fl > .9 && fl < 1.1), 'a flood is a hard season, not a disaster', String(fl));

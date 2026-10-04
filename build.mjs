@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 const here = path.dirname(fileURLToPath(import.meta.url));
-const ORDER = ['util', 'data', 'world', 'render', 'buildings', 'light', 'sim', 'streets', 'econ', 'needs', 'zones', 'incidents', 'people', 'ai', 'levers', 'prayers', 'faith', 'dyn', 'agents', 'sea', 'air', 'gl', 'works', 'kit', 'house', 'homes', 'civic', 'industry', 'modern', 'fx3d', 'ui', 'persist'];
+const ORDER = ['util', 'data', 'world', 'render', 'buildings', 'light', 'sim', 'streets', 'econ', 'needs', 'zones', 'incidents', 'people', 'ai', 'levers', 'prayers', 'faith', 'dyn', 'agents', 'sea', 'rail', 'air', 'gl', 'works', 'kit', 'house', 'homes', 'civic', 'industry', 'modern', 'fx3d', 'ui', 'persist'];
 const left = fs.readdirSync(path.join(here, 'src')).filter(f => f.endsWith('.js') && f !== 'main.js' && !ORDER.includes(f.slice(0, -3)));
 if (left.length) { console.error('NOT IN ORDER (would never ship):', left.join(', ')); process.exit(1); }
 let out = fs.readFileSync(path.join(here, 'src/head.html'), 'utf8');

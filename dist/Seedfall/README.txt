@@ -198,9 +198,15 @@ WHAT THE TOWNS NEED
   Nothing ever stops: an unmet need only slows a town down a little. Now and
   then the chronicle notices (queues at the wells, brownouts, dull towns).
   Old buildings retire when a later age outgrows them: granaries come down
-  once the trains bring grain (Railways), wells are capped once water is
-  piped (Concrete), and windmills stop once the gene gardens feed everyone.
-  Each town keeps its oldest well and windmill for old times' sake.
+  once the trains bring grain (Railways), windmills stop once electric roller
+  mills grind at the works (Electricity), and wells are capped and spare
+  water towers pulled down once water is piped (Concrete). Each town keeps
+  its oldest well and windmill, and its newest water tower, for old times'
+  sake. Workplaces that are still useful are refitted instead, one at a time:
+  stone cisterns get iron tanks, the smithy becomes a machine shop and later a
+  fab workshop, the weaving house a four-storey brick mill and later a quiet
+  knitting hall, and the glass cone a float-glass works. From Motorcars,
+  settlers move house in a convoy of lorries rather than on foot.
 
 WAREHOUSES, SHIPYARDS, AND THINGS FOR THE SOUL
   Warehouses (from Coinage): a town whose stores are full builds one, and
@@ -276,6 +282,19 @@ QUARTERS, TERRACES AND REBUILDING
   step, fields grow their own crops behind hedgerows and gates, and the
   town hall, library, school, theatre and the rest each look the part, down
   to the clock on the tower.
+
+RAILWAYS
+  With Railways, towns that have a station are joined by a line. It crosses
+  the streets rather than running down them, and cuts across the fields;
+  now and then a cottage in the way has to come down. The track is ballast,
+  timber sleepers and two rails, curving round the corners, climbing on an
+  embankment and crossing rivers on an iron truss bridge. Where it crosses a
+  street there are crossbucks and barriers: they come down while a train
+  goes by, and the folk and carts wait. The first trains are steam engines
+  with a tender and three coaches, easing in and out of the stations. With
+  Electricity come concrete sleepers, overhead wires and electric trains with
+  a cab at each end, and with Maglev a concrete guideway on columns and long
+  white trains that float along it.
 
 BOATS, SHIPS AND PLANES
   Fishing boats leave their piers in the morning, fish all day (you can see

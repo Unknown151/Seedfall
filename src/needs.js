@@ -49,14 +49,14 @@ function natWater(T) {
   const w = f ? .35 : .15; NATW.v[T.id] = { w, q }; return w;
 }
 // each windmill grinds for about sixteen fields, wherever they are in town
-function millShare(T, n) { n = n || townCounts(T); return n.farm ? clamp((n.mill || 0) * MILL_FIELDS / n.farm, 0, 1) : 1; }
+function millShare(T, n) { if (hasTech('electric')) return 1; /* (from Electricity, roller mills at the works grind it all) */ n = n || townCounts(T); return n.farm ? clamp((n.mill || 0) * MILL_FIELDS / n.farm, 0, 1) : 1; }
 function needValues(T, n, radios) {
   const v = {}, p = Math.max(1, T.pop);
   if (hasTech('wells')) {
     if (hasTech('concrete') || p < 15) v.water = 1; // piped water, or a camp small enough to carry it from the stream
     else v.water = clamp((natWater(T) * p + (n.well || 0) * WELL_N + (n.watertower || 0) * TOWER_N * (hasTech('steam') ? 2 : 1)) / p, 0, 1);
   }
-  if (hasTech('mills') && !hasTech('genegarden')) v.mill = millShare(T, n);
+  if (hasTech('mills') && !hasTech('electric')) v.mill = millShare(T, n);
   if (hasTech('medicine')) v.health = clamp(((n.clinic || 0) * clinicN() + (n.bathhouse || 0) * 700 + 150) / p, 0, 1);
   if (hasTech('electric')) v.energy = NEEDC.grid;
   if (hasTech('stone')) { let c = 0; for (const k in CULT_PTS) c += (n[k] || 0) * CULT_PTS[k]; v.culture = clamp(c / (1 + Math.sqrt(p) / 6), 0, 1); }
@@ -100,27 +100,50 @@ function yearlyIndustry() {
     chron('🌳', `The old power house of ${T.name} is pulled down now the fusion plant does its work. The site becomes a park, and the chimney a climbing wall.`, { x, y });
     break;
   }
-  yearlyRetire();
+  yearlyRetire(); yearlyRefit();
 }
-// Buildings a later age has no use for come down a few at a time: wells once water is piped, granaries once grain
-// comes by rail, windmills once the gene gardens feed everyone. Each town keeps its oldest well and mill for old
-// times' sake (`B.old`, the tooltip says so). The ground goes back to the town, so houses or shops fill it in.
+// Buildings a later age has no use for come down a few at a time: granaries once grain comes by rail, windmills once
+// electric roller mills grind at the works, wells and most water towers once water is piped. Each town keeps its oldest
+// well and mill (and its newest water tower) for old times' sake (`B.old`, the tooltip says so). The ground goes back to
+// the town, so houses or shops fill it in.
 const RETIRE = [
-  { t: 'well', tech: 'concrete', keep: 1, txt: T => `Water runs from taps all over ${T.name} now, and its wells are capped one by one. The oldest stays in the square, with geraniums in the bucket.` },
   { t: 'granary', tech: 'rail', keep: 0, txt: T => `The trains bring grain to ${T.name} every week, and nobody needs to hoard for winter. The old granaries are pulled down.` },
-  { t: 'mill', tech: 'genegarden', keep: 1, txt: T => `The gene gardens feed ${T.name} without any grinding. Its windmills stop, and come down one by one, all but the oldest.` }
+  { t: 'mill', tech: 'electric', keep: 1, txt: T => `Electric roller mills at the works grind ${T.name}'s grain now. Its windmills stop and come down one by one, all but the oldest, kept turning for the look of it.` },
+  { t: 'well', tech: 'concrete', keep: 1, txt: T => `Water runs from taps all over ${T.name} now, and its wells are capped one by one. The oldest stays in the square, with geraniums in the bucket.` },
+  { t: 'watertower', tech: 'concrete', keep: 1, newest: 1, txt: T => `With mains water under every street, ${T.name} needs only one water tower. The others come down, and the town keeps the newest, painted with its name.` }
 ];
 function yearlyRetire() {
   for (const r of RETIRE) {
     if (!hasTech(r.tech)) continue;
     for (const T of towns()) {
-      const bs = T.bl.map(id => S.B[id]).filter(B => B && B.type === r.t && !B.up).sort((a, b) => a.id - b.id);
+      const bs = T.bl.map(id => S.B[id]).filter(B => B && B.type === r.t && !B.up && B.prog >= 1).sort((a, b) => r.newest ? b.id - a.id : a.id - b.id); // (the one kept comes first)
       if (r.keep && bs[0] && !bs[0].old) bs[0].old = 1;
       if (bs.length <= r.keep || !chance(.3)) continue;
-      const B = bs[bs.length - 1], x = B.x, y = B.y; // the newest goes first
+      const B = bs[bs.length - 1], x = B.x, y = B.y;
       removeBuilding(B); T._fail = {}; // (the freed plot is worth a fresh look)
       if (!S.flags['ret_' + r.t + T.id]) { S.flags['ret_' + r.t + T.id] = 1; if (!FAST || chance(.5)) chron('🧱', r.txt(T), { x, y }); }
     }
+  }
+}
+// Workplaces still worth having are refitted when a later age changes the work: a town does one at a time, so the
+// new look spreads over a few years. B.gen is how many of its REFIT techs it has caught up with (older saves work it
+// out from the year it was built); the models in industry.js and the moving parts in works.js read genOf(B).
+const REFIT = { watertower: ['steam'], workshop: ['steam', 'computing'], weaver: ['steam', 'computing'], glassworks: ['electric'] };
+const REFIT_TXT = {
+  watertower: [null, T => `${T.name} swaps its old stone cistern for a riveted iron tank up on legs. The pigeons are furious.`],
+  workshop: [null, T => `The smithy in ${T.name} becomes a machine shop: lathes, a drill press and a steam engine turning them all on one long belt.`, T => `${T.name}'s old machine shop is fitted out as a fab workshop. Printers hum where the lathes used to scream.`],
+  weaver: [null, T => `${T.name}'s weavers move into a brick mill four floors high, full of power looms that never tire.`, T => `The old mill in ${T.name} is gutted and fitted with quiet looms that knit to order.`],
+  glassworks: [null, T => `${T.name}'s glass cone goes cold. In the new works next door, glass flows out as flat as a pond.`]
+};
+function genNow(t) { const g = REFIT[t]; let n = 0; if (g) for (const k of g) if (hasTech(k)) n++; return n; }
+function genOf(B) { const g = REFIT[B.type]; if (!g) return 0; if (B.gen != null) return B.gen; let n = 0; for (const k of g) if (S.tech.done[k] != null && S.tech.done[k] <= B.built) n++; return n; }
+function yearlyRefit() {
+  for (const T of towns()) {
+    if (!chance(.35)) continue;
+    const B = T.bl.map(id => S.B[id]).find(B => B && REFIT[B.type] && B.prog >= 1 && genOf(B) < genNow(B.type)); if (!B) continue;
+    B.gen = genNow(B.type); markDirty(idx(B.x, B.y));
+    const k = 'ref_' + B.type + B.gen + T.id, tx = REFIT_TXT[B.type][B.gen];
+    if (tx && !S.flags[k]) { S.flags[k] = 1; if (!FAST || chance(.5)) chron('🔧', tx(T), { x: B.x, y: B.y }); }
   }
 }
 
@@ -225,7 +248,7 @@ function needTip(B) {
   if ((t === 'well' || t === 'mill') && B.old) return t === 'well' ? '🪣 the old well, kept for old times’ sake (water comes by pipe now)' : '🌾 the old windmill, kept turning for the look of it';
   if (t === 'well') return `💧 water for about ${WELL_N} people`;
   if (t === 'watertower') return `💧 water for about ${fmtInt(TOWER_N * (hasTech('steam') ? 2 : 1))} people`;
-  if (t === 'mill' && hasTech('mills') && !hasTech('genegarden')) return `🌾 grinds the harvest of about ${MILL_FIELDS} fields (a quarter more food from them)`;
+  if (t === 'mill' && hasTech('mills') && !hasTech('electric')) return `🌾 grinds the harvest of about ${MILL_FIELDS} fields (a quarter more food from them)`;
   if (t === 'clinic') return `⚕️ cares for about ${fmtInt(clinicN())} people`;
   if (t === 'mast' || t === 'antenna') return `📡 carries the news ${t === 'mast' ? 24 : 44} tiles${t === 'antenna' && hasTech('electric') ? ' · ⚡ uses 1 power' : ''}`;
   if (POWER_OUT[t]) return `⚡ makes ${POWER_OUT[t]} power for the valley grid`;

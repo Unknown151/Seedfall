@@ -201,7 +201,9 @@ function glFxDyn() {
         GLB.ctr = [c[0], c[1] - 1, c[2]]; for (const g of [1, -1]) gtri([c[0] + f[0] * .03, c[1], c[2] + f[2] * .03], [c[0] - f[0] * .03, c[1], c[2] - f[2] * .03], [c[0] + s[0] * .1 * g - f[0] * .02, c[1] + fl, c[2] + s[2] * .1 * g - f[2] * .02], C); } }
     for (const g of DYN.giants) glGiant(g, t);
     for (const fl of DYN.flyers) glFlyer(fl, t, lit);
-    for (const cv of DYN.caravans) { const p = caravanPos(cv); if (!p) continue; const h = glHeading(cv, p[4], p[5]), y = p[2] * ZS; // folk walking a trade route, packs on their backs
+    const mv = hasTech('hover') ? 'hover' : hasTech('motor') ? 'truck' : null; let cn = 0; // settlers moving to a new town: on foot with packs, later a convoy of lorries, then hover pods
+    for (const cv of DYN.caravans) { const p = caravanPos(cv); if (!p) continue; const h = glHeading(cv, p[4], p[5]), y = p[2] * ZS;
+      if (mv) { if (cn++ % 3 === 0) glTrader({ kind: mv, col: cv.col, r: 'goods', s: cv.s }, p[0], p[1], y, h, lit); continue; }
       cv.kid = false; cv.skin = cv.skin || SKIN[(cv.off * 997 | 0) % SKIN.length]; glPerson(cv, p[0], p[1], y, h, true, false); const f = [Math.cos(h), 0, Math.sin(h)]; glOBox([p[0] - f[0] * .04, y + .19, p[1] - f[2] * .04], V3(f, .022), [-f[2] * .03, 0, f[0] * .03], [0, .04, 0], '#8a6446'); }
     for (const o of DYN.traders) { const p = pathPos(o, .12, true, true); if (!p) continue; glTrader(o, p[0], p[1], p[2] * ZS, glHeading(o, p[4], p[5]), lit); }
     if (DYN.drone && S.T[1]) { const T = S.T[1], a = DYN.t * .25, X = T.x + Math.cos(a) * 1.6, Z = T.y + Math.sin(a) * 1.6, y = gGround(T.x, T.y) + .75 + Math.sin(DYN.t * 2) * .08; // the helper drone from the pod

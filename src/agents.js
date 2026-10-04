@@ -201,6 +201,8 @@ function stepWalker(w, dt) {
   }
   // walking a path
   const n = w.path.length, k0 = Math.floor(w.s);
+  if (k0 + 1 < n && w.s - k0 > .3 && M.rail[w.path[k0 + 1]] && railBusy(w.path[k0 + 1])) { w.xw = 1; return; } // a train's coming: wait at the crossing
+  w.xw = 0;
   const step = dt * w.spd * (M.road[w.path[Math.min(n - 1, k0 + 1)]] ? 1 : .85);
   w.s += step; w.ph += step * 19;
   const k = Math.floor(w.s);
@@ -274,6 +276,7 @@ function planVehicle(v) {
 function stepVehicle(v, dt) {
   if (v.st === 'in') { if (DYN.t >= v.until) planVehicle(v); return; }
   const n = v.path.length, k0 = Math.floor(v.s);
+  if (k0 + 1 < n && v.s - k0 > .25 && M.rail[v.path[k0 + 1]] && railBusy(v.path[k0 + 1])) return; // waiting at the barrier
   v.s += dt * v.spd;
   const k = Math.floor(v.s);
   if (k !== k0 && k < n - 1 && !M.road[v.path[k + 1]]) { v.st = 'in'; v.until = DYN.t + 3; v.path = null; return; }
@@ -286,7 +289,7 @@ function spawnCaravan(from, to, n) {
   const A = S.T[from], B = S.T[to]; if (!A || !B) return;
   const path = navPath(idx(A.x, A.y), idx(B.x, B.y), 2, 9000);
   for (let k = 0; k < n; k++) DYN.caravans.push({ path, ax: A.x, ay: A.y, bx: B.x, by: B.y, t: -k * .04, s: -k * .55, spd: path ? .75 : 0, sp2: 1 / (dist(A.x, A.y, B.x, B.y) * 2.2), col: pick(CLOTH), pants: pick(PANTS), hair: pick(HAIR), skin: pick(SKIN), hat: rnd(), ph: rnd() * 6, off: rf(-.3, .3), ln: 0 });
-  camHint((A.x + B.x) / 2, (A.y + B.y) / 2, '🐪 A caravan sets out', 5);
+  camHint((A.x + B.x) / 2, (A.y + B.y) / 2, hasTech('motor') ? '🚚 Settlers on the move' : '🐪 A caravan sets out', 5);
 }
 function stepCaravans(dt) {
   for (const c of DYN.caravans) {
