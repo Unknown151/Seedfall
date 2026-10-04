@@ -250,6 +250,16 @@ HOW TOWNS LAY THEMSELVES OUT
   lights later on. Open meadows get grass and wildflowers, and small houses
   get hedges, bushes and a tree by the gate.
 
+BIG LANDMARKS
+  Some buildings need a lot of room. A stadium takes a four-by-four block, and
+  a university or a fusion plant three-by-three. A town that wants one clears
+  a patch at its edge (fields first, a few houses if it must), levels the
+  ground and runs a road to it, and the chronicle grumbles about what had to
+  go. An older world's smaller stadium grows into its lot if it can, or the
+  town builds a far bigger one out at the edge and turns the old ground into
+  a park. The big stadium has its gates, ticket booths, a scoreboard and
+  flags round the rim.
+
 QUARTERS, TERRACES AND REBUILDING
   Some landmarks take more room once they're built: a town hall, museum,
   theatre, rail station or market spreads over two plots, a university, stadium or fusion plant over

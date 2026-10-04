@@ -316,9 +316,14 @@ slow catch-ups. Tests of the sim, the panels and saves (`hover`, `needs`, `away`
 - **Houses and terraces.** `GL_MODEL.house` (homes.js) builds every house from the kit; `houseTint` tints it and its extras roll from `hk(B, n)` (hashed from the id, so they're stable). Tier 3–5 houses on the same street join up (`houseJoin`: same axis `B.ax`, town, height of ground, not round styles) and run to the tile edge; data stays one building per tile. Anything that changes a house (`mkBuilding`, upgrade start, completion, `removeBuilding`) calls `houseNbrDirty` so the neighbours redraw.
 - **Bigger lots.** A building can cover `B.w × B.h` tiles from `(B.x, B.y)` (sim.js, next to `mkBuilding`): every tile's `M.bld` points at it,
   `fpTiles`/`fpFront`/`fpOff` give its tiles, the tile it's drawn from (nearest the viewer) and the shift to the lot's middle, and
-  `removeBuilding` frees them all. Only `mkBuilding`, `removeBuilding` and `fpGrow` write `M.bld`. Landmarks in `FP_BIG` (hall, museum, theatre, station, market 2×1; university, stadium, fusion 2×2) spread once
+  `removeBuilding` frees them all. Only `mkBuilding`, `removeBuilding` and `fpGrow` write `M.bld`. Landmarks in `FP_BIG` (hall, museum, theatre, station, market 2×1) spread once
   built (`fpSettle`, a few a year in `yearlyFootprints`, so older worlds catch up) onto ground that gives way (`fpYield`: free, or a
-  house of tier ≤3, a field, a pasture); a full town clears an old cottage with room for the lot (`landmarkSite`). Harbours grow
+  house of tier ≤3, a field, a pasture); a full town clears an old cottage with room for the lot (`landmarkSite`). The big ones (`BIG_LOT`: a 4×4 stadium,
+  a 3×3 university and fusion plant) need a patch no street runs through, so they're laid out whole from the start (`placeBig`, used by `tryService`,
+  `placeProject` and `tryNeeds`): `bigLotSite` picks one at the edge of town (level, or one step that `bigClear` levels; fields, pastures, vertical farms,
+  solar fields, parks and houses up to tier 4 give way, `fpYieldBig`; not against the map's edge or a harbour; the best few checked with `lotReach` so a road
+  can be brought to it, `connectBig`). An older, smaller one grows where it stands if it can, or moves out to a new lot and leaves a park (`bigMove`, at most
+  every 30 years). The models scale to the lot (`GL_BIG.stadium` with gates, scoreboard and flags at 4×4; the fusion plant's third dome; the university's longer ranges). Harbours grow
   along their shore (`yearlyHarbours`, `harbourLen` by population and era, over the shallows too) with a berth per tile
   (`berths`, `berthTile`, ships keep `DYN.slot[bkey(B, k)]`). In 3D, `GL_BIG[type]` and `glHarbour` draw them; `glTraffic` draws ships,
   fishing boats, ferries, trains and planes. `test/lots.mjs` checks all of it (`SHOTS=1` for pictures).
