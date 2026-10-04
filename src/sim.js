@@ -334,14 +334,14 @@ function roadCost(i, j) {
 }
 // a railway crosses streets but doesn't run down them: it cuts across the fields, and clears a few old cottages if it must
 let RAIL_TO = -1; // the station a line is being laid to (it may not run through anyone else's)
-const railYield = B => B.prog >= 1 && !fpBig(B) && (B.type === 'farm' || B.type === 'pasture' || (B.type === 'house' && B.tier <= 3));
+const railYield = B => B.prog >= 1 && !fpBig(B) && (B.type === 'farm' || B.type === 'pasture' || (B.type === 'house' && B.tier <= 4)); // (terraces too, at a price: the railways cut through them)
 function railCost(i, j) {
-  if (M.bld[j]) { const B = S.B[M.bld[j]]; if (!B) return 1e9; if (B.type === 'station') return j === RAIL_TO ? 1 : 1e9; return railYield(B) ? (B.type === 'house' ? 9 : 2.5) : 1e9; }
+  if (M.bld[j]) { const B = S.B[M.bld[j]]; if (!B) return 1e9; if (B.type === 'station') return j === RAIL_TO ? 1 : 1e9; return railYield(B) ? (B.type === 'house' ? (B.tier <= 3 ? 9 : 16) : 2.5) : 1e9; }
   if (M.ruin[j] || M.water[j] === 1) return 1e9;
   if (M.water[j] === 2) return 6;
   const de = Math.abs(M.elev[j] - M.elev[i]);
   if (de > 1) return 1e9;
-  return (M.rail[j] ? 0.3 : 1.3) + de * 2 + (M.road[j] ? 5 : 0) + (springAt(j) ? 8 : 0);
+  return (M.rail[j] ? 0.3 : 1.3) + de * 2 + (M.road[j] ? (M.road[i] ? 18 : 4) : 0) + (springAt(j) ? 8 : 0); // (crossing a street is fine; running along one is not)
 }
 function layRail(path) { // the line goes down; fields and cottages in its way give way (returns how many homes went)
   let homes = 0;
@@ -398,7 +398,7 @@ function planRails() {
     const homes = layRail(path);
     S.rails.push({ a: T.id, b: best.id, path });
     const first = S.rails.filter(r => r.path).length === 1;
-    chron('🚂', (first ? `The first train runs from ${T.name} to ${best.name}. Half the valley turns out to wave at it.` : `The railway reaches ${T.name} from ${best.name}.`) + (homes ? ` ${homes === 1 ? 'A cottage' : homes + ' cottages'} on the way had to come down; the families got new houses and a free ride.` : ''), { T, k: first ? 'major' : '' });
+    chron('🚂', (first ? `The first train runs from ${T.name} to ${best.name}. Half the valley turns out to wave at it.` : `The railway reaches ${T.name} from ${best.name}.`) + (homes ? ` ${homes === 1 ? 'A house' : homes + ' houses'} in the way had to come down; the families got new homes and a free ride.` : ''), { T, k: first ? 'major' : '' });
     return;
   }
 }

@@ -8,13 +8,13 @@ let fails = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); 
 await p.goto(ROOT + 'seedfall.html?seed=4242&fresh&nointro&headless'); await p.waitForTimeout(800);
 const r = await p.evaluate(() => {
   SF.ff(1150 - yr());
-  const lines = S.rails.filter(r => r.path); let tiles = 0, road = 0, bad = 0;
-  for (const R of lines) for (let k = 1; k < R.path.length - 1; k++) { const i = R.path[k]; tiles++; if (M.road[i]) road++; if (M.bld[i]) bad++; if (!M.rail[i]) bad++; }
+  const lines = S.rails.filter(r => r.path); let tiles = 0, road = 0, along = 0, bad = 0;
+  for (const R of lines) for (let k = 1; k < R.path.length - 1; k++) { const i = R.path[k]; tiles++; if (M.road[i]) { road++; if (k + 1 < R.path.length - 1 && M.road[R.path[k + 1]]) along++; } if (M.bld[i]) bad++; if (!M.rail[i]) bad++; }
   const ends = lines.every(R => [R.path[0], R.path[R.path.length - 1]].every(i => M.bld[i] && S.B[M.bld[i]].type === 'station'));
-  return { lines: lines.length, tiles, road, bad, ends, era: railEra() };
+  return { lines: lines.length, tiles, road, along, bad, ends, era: railEra() };
 });
 ok(r.lines >= 2, `${r.lines} lines by year 1150`);
-ok(r.road / r.tiles < .35, `lines cross streets rather than run down them (${r.road} of ${r.tiles} tiles are crossings)`);
+ok(r.along / r.tiles < .03, `lines cross streets rather than run down them (${r.road} crossings, ${r.along} of ${r.tiles} tiles along a street)`);
 ok(r.bad === 0, 'every tile of a line is rail and none has a building on it');
 ok(r.ends, 'every line runs station to station');
 const t = await p.evaluate(() => { // run the trains for a while (view time only)
