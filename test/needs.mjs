@@ -42,7 +42,10 @@ console.log('     ' + r.n);
 await p.evaluate(() => SF.ff(1500));
 r = await p.evaluate(() => ({ soot: Array.from(SOOT).filter(v => v > .02).length, pol: Math.max(...towns().map(polOf)), n: ['warehouse', 'theatre', 'bathhouse', 'digsite', 'botanic', 'guildhall'].map(t => anycount(t)), clean: !!S.flags.clean, finds: Object.values(S.B).filter(B => B.type === 'digsite').reduce((a, B) => a + (B.finds || 0), 0) }));
 ok(r.soot === 0 && r.pol === 0 && r.clean, 'clean power ends the soot', `${r.soot} sooty tiles`);
-ok(r.n.filter(n => n > 0).length >= 5, 'warehouses, theatres, bathhouses, digs, gardens and guild halls get built', r.n.join(' '));
+ok(r.n.filter(n => n > 0).length >= 4, 'warehouses, theatres, bathhouses, digs, gardens and guild halls get built (digs and baths only where a town has ruins or a spring)', r.n.join(' '));
+if (!(r.finds > 0) && !r.n[3]) r.finds = await p.evaluate(() => { // no dig in this world: put one at real ruins by a town and let it dig
+  for (let i = 0; i < W * H; i++) if (M.ruin[i] && !M.bld[i] && !M.road[i] && !M.water[i]) { const T = nearestTown(i % W, (i / W) | 0); if (!T) continue; const B = mkBuilding('digsite', i % W, (i / W) | 0, T, { prog: 1 }); for (let k = 0; k < 300 && !(B.finds > 0); k++) yearlyCulture(); return B.finds || 0; }
+  return -1; });
 ok(r.finds > 0, 'the Maker digs turn things up', `${r.finds} finds`);
 r = await p.evaluate(() => { const o = JSON.parse(JSON.stringify(serialize())); delete o.state.springs; deserialize(o); startWorld(false); SF.ff(5); return (S.springs || []).length; });
 ok(r >= 1, 'an older save gets its hot springs');
