@@ -43,7 +43,8 @@ const keys = await p.evaluate(() => { const o = {}, fire = k => dispatchEvent(ne
   fire('n'); o.n = GL3.hi !== hi; fire('p'); o.p = GL3.cam.persp !== persp; fire('p'); fire('t'); o.t = GL3.town !== town; fire('r'); o.r = GL3.cam.auto !== auto; fire('r'); SF.hour(null); GL3.hi = hi; Object.assign(GL3.cam, cam0); GL3.goto = null; GL3.shot = null; return o; }); // (and back to where we were)
 ok(keys.n && keys.p && keys.t && keys.r, 'the keys work: N time of day, P perspective, T next town, R film camera', JSON.stringify(keys));
 const nf = await p.evaluate(() => { GL3.noNear = false; GL3.nearMs = 5000; GL3.cam.auto = false; GL3.cam.zoom = 3; let n = 0, k; // (a big budget: the detailed version builds in one frame)
-  while ((k = Object.keys(GL3.chunks).map(Number).find(k => GL3.chunks[k].near)) == null && n++ < 8) glFrame(.016); if (k == null) return { none: true }; const ch = GL3.chunks[k];
+  const dC = k => Math.hypot((k % GNC) * GCH + GCH / 2 - GL3.cam.tx, ((k / GNC) | 0) * GCH + GCH / 2 - GL3.cam.tz), near = () => Object.keys(GL3.chunks).map(Number).filter(k => GL3.chunks[k].near && dC(k) < 9).sort((a, b) => dC(a) - dC(b))[0]; // (one by the camera: a leftover from where it stood before is dropped on the next frame)
+  while ((k = near()) == null && n++ < 30) glFrame(.016); if (k == null) return { none: true }; const ch = GL3.chunks[k];
   GL3.dirty.add(k); glFrame(.016); const kept = ch.near && !!ch.nb, stale = !!ch.stale; n = 0; while (ch.stale && n++ < 8) glFrame(.016); GL3.nearMs = 0; return { kept, stale, fresh: !ch.stale && ch.near, frames: n }; });
 ok(!nf.none && nf.kept && nf.stale && nf.fresh, 'a busy street keeps its close-up detail while it is rebuilt (no flicker)', JSON.stringify(nf));
 ok(!glErr.length, 'WebGL draws without errors (a silently skipped bloom pass leaves old glows on screen)', glErr.join(','));
