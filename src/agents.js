@@ -325,7 +325,7 @@ function stepTraders(dt) {
 
 /* ---------- keeping the right number of people and vehicles around ---------- */
 function syncPeople() {
-  let total = 0; const crowd = 2.5 * (LVV.bustle === 'bustling' ? 1.4 : LVV.bustle === 'quiet' ? .45 : 1); // (the 3D view draws people cheaply enough to fill the streets; the custom makes them busier or quieter)
+  let total = 0; const crowd = (GL3.lite ? 1.2 : 2.5) * (LVV.bustle === 'bustling' ? 1.4 : LVV.bustle === 'quiet' ? .45 : 1); // (the 3D view draws people cheaply enough to fill the streets; the custom makes them busier or quieter)
   const vt = hasTech('hover') ? 'hover' : hasTech('motor') ? 'car' : hasTech('wheel') ? 'cart' : null;
   for (const T of towns()) {
     const want = Math.round(Math.min(56 * crowd, (T.id === 1 && S.year < 20 ? 0 : 4) + Math.sqrt(T.pop) * 2.3 * crowd));

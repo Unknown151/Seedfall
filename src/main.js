@@ -13,7 +13,7 @@ function startWorld(isNew) {
   updateSoot(false); zonesOnLoad();
   renderAll();
   $('pace').value = S.settings.pace; $('optCap').checked = S.settings.captions;
-  $('optSky').value = S.settings.sky; $('optWx').checked = S.settings.weather; $('optSh').checked = S.settings.shadows;
+  $('optSky').value = S.settings.sky; $('optWx').checked = S.settings.weather; $('optSh').checked = S.settings.shadows; $('optGfx').value = gfxLite() ? 'lite' : 'full'; $('optSh').disabled = gfxLite();
   if (isNew && S.flags.intro) startIntro();
   syncWalkers();
   UIDIRTY.chron = UIDIRTY.stats = UIDIRTY.tools = true;
@@ -35,7 +35,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   if (!lastT) lastT = now;
   let dt = (now - lastT) / 1000;
-  if (dt < 1 / 26) return;
+  if (dt < 1 / (GL3.lite ? 20 : 26)) return; // (light graphics draws fewer frames)
   lastT = now; dt = Math.min(dt, .25);
   // a long gap between frames (tab hidden, PC locked or asleep, or a save opened after a while) is time away
   if (!document.hidden && !CATCH) { const last = S.lastLive || S.savedAt; if (last && Date.now() - last > AWAY_MIN * 1000) maybeCatchUp(); S.lastLive = Date.now(); }
