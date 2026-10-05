@@ -415,6 +415,10 @@ function glFacing(B) { // the long side that has a street along it (a 2×1 lot f
 }
 
 // the harbour: a stone quay along its shore, a berth in front of each tile, piers between, warehouses behind, cranes and cargo by the era
+// The harbour by the age: a timber wharf, then the docklands (Steam: a brick warehouse range with copper roofs, stone piers,
+// portal cranes, cargo on the quay), the container port (Computing), and the port of the far future (Fusion: a glass terminal,
+// white gantries, floating piers edged with light). works.js swings the cranes and runs the gantries.
+const harbourStage = () => hasTech('fusion') ? 3 : hasTech('computing') ? 2 : hasTech('steam') ? 1 : 0;
 function glHarbour(B) {
   const d = B.dir || [1, 0], a = d[0] ? [0, 1] : [1, 0], L = berths(B), [lx, lz] = glLot(B), ys = SEAZ * ZS - .02;
   let y = 0; for (const j of fpTiles(B)) if (!M.water[j]) y = Math.max(y, surfZ(j) * ZS); if (!y) y = GLB.base; // (the quay is level with the land, also where it's built out over the water)
@@ -423,6 +427,7 @@ function glHarbour(B) {
   gBox(P(0, 0, y - .005), V3s(A3, L / 2), V3s(D3, .5), .03, B.style >= 3 || steel ? '#bdb5a7' : '#b9a488', M_STONE); // the quay
   gBox(P(0, .5, ys - .05), V3s(A3, L / 2), V3s(D3, .035), y - ys + .079, '#a39a8c', M_STONE); // its wall down into the water
   for (const sg of [-1, 1]) gBox(P(sg * L / 2, 0, ys - .05), V3s(A3, .035), V3s(D3, .5), y - ys + .079, '#a39a8c', M_STONE); // and its ends
+  const hs = harbourStage(); if (hs === 1 || hs === 3) return (hs === 1 ? harbourDocks : harbourFuture)(B, { y, ys, L, P, A3, D3, lx, lz }); // (the docklands of the age of steam, and the port of the far future: their own art below)
   for (let k = 0; k <= L * 3; k++) gBox(P(-L / 2 + k / 3 + .02, .45), [.014, 0, 0], [0, 0, .014], .045, '#3a3c42'); // bollards
   for (let k = 0; k <= L; k++) { // piers between the berths, on posts
     const s = -L / 2 + k + (k === 0 ? .05 : k === L ? -.05 : 0);
@@ -1342,3 +1347,56 @@ function glTextures() {
 // what a building's walls are made of
 function glWallMat(B) { if (!B) return M_PLASTER; if (B.type === 'house' && B.tier >= 6) return M_GLASS; if (B.mat === 'brick') return M_BRICK; if (B.mat === 'stone') return M_STONE; if (B.mat === 'wood') return M_PLANK; return M_PLASTER; }
 const ROAD_MAT = [0, M_EARTH, M_EARTH, M_COBBLE, M_BRICK, M_ASPHALT, M_PLASTER, 0];
+function harbourDocks(B, { y, ys, L, P, A3, D3, lx, lz }) {
+  kSet(lx, lz, A3, D3, B.id); KF.y0 = y; const lod = KF.lod, br = '#a8553f', br2 = '#c27a5c', cu = '#5f9e86', cuD = '#4e8a73', st = '#cfc6b4', s0 = -L / 2 + .04, s1 = L / 2 - .04, fB = -.47, fD = -.1, H = .36, fh = (H - .04) / 3;
+  // the quay: granite coping, setts, mooring rings, the rails along it
+  kBox(0, .47, .025, L / 2, .03, .012, st, M_STONE); kBox(0, .19, .025, L / 2 - .01, .28, .004, '#a39a8c', M_COBBLE);
+  for (const f of [.2, .27]) kBox(0, f, .029, L / 2 - .02, .004, .003, '#5d6066');
+  if (lod) for (let k = 0; k < L * 3; k++) kCyl(-L / 2 + (k + .5) / 3, .5, .005, .012, .003, '#3a3c42', 0, 8, 0);
+  // the warehouse range: three floors of brick, arched windows, pilasters, a cornice, a copper roof with dormers
+  kPlinth(s0, s1, fB, fD, .04, '#8f877c'); kBox(0, (fB + fD) / 2, .04, (s1 - s0) / 2, (fD - fB) / 2, H - .04, br, M_BRICK);
+  kWins(s0 + .03, s1 - .03, fD, .04, fh, 3, Math.round(L * 7), { ty: 'sash', arch: 'seg', hk: .55, wall: br }, null, B.id % 50);
+  if (lod) for (let q = 0; q <= L * 4; q++) kBox(s0 + q * (s1 - s0) / (L * 4), fD + .004, .04, .012, .004, H - .06, br2, M_BRICK);
+  kBand(s0, s1, fD, .04 + fh, br2, .012); kCornice(s0, s1, fB, fD, H, '#e8dcc8');
+  kGable(s0, s1, fB, fD, H + .02, .16, cu, { wall: br, wm: M_BRICK, ov: .015 });
+  if (lod) for (let q = 0; q < L * 3; q++) kDormer(s0 + .17 + q * (s1 - s0 - .3) / Math.max(1, L * 3 - 1), fD - .05, H + .07, .03, .06, .08, cu, br, M_BRICK, q);
+  // corner towers with tall pointed caps, a clock tower in the middle of a long range
+  for (const sg of [-1, 1]) { const ts = sg < 0 ? s0 + .07 : s1 - .07; kBox(ts, (fB + fD) / 2, 0, .075, (fD - fB) / 2 + .01, H + .12, br, M_BRICK); kCornice(ts - .075, ts + .075, fB - .01, fD + .01, H + .12, '#e8dcc8', { br: 0 });
+    kHip(ts - .08, ts + .08, fB - .015, fD + .015, H + .135, .2, cuD, { ov: .01, noGut: 1 }); kBox(ts, (fB + fD) / 2, H + .33, .005, .005, .06, '#d8b84f'); if (lod) kWins(ts - .06, ts + .06, fD + .01, H - .02, .1, 1, 2, { ty: 'sash', arch: 'round' }, null, 9 + sg); }
+  if (L >= 3) { kBox(0, (fB + fD) / 2, 0, .09, (fD - fB) / 2 + .015, H + .26, br, M_BRICK); kClock(0, fD + .016, H + .17, .05); kHip(-.095, .095, fB - .02, fD + .02, H + .27, .24, cuD, { ov: .01, noGut: 1, fin: 1 }); }
+  // at each berth: tall loading doors under a hoist, a portal crane on the rails (its jib swings: works.js), cargo on the quay
+  for (let k = 0; k < L; k++) { const sc = -L / 2 + k + .5, h = hash2(B.x + k, B.y, 5);
+    kBox(sc + .24, fD + .004, .04, .045, .005, H - .1, '#4a3a30', M_PLANK); if (lod) { kBeam([sc + .24, fD, H - .02], [sc + .24, fD + .1, H - .02], .007, '#5a4a3c', M_PLANK); kBeam([sc + .24, fD + .09, H - .02], [sc + .24, fD + .09, .12], .0015, '#3a3028'); }
+    const hc = 16 * ZS, cc = h < .5 ? '#b8503a' : '#3f6f5f', cs = sc - .22; // the portal: four legs over the rails, a cab on top
+    for (const [ds, df] of [[-.05, .19], [.05, .19], [-.05, .29], [.05, .29]]) kBox(cs + ds, df, .03, .008, .008, hc * .62, cc);
+    kBox(cs, .24, hc * .62, .065, .07, .02, cc); kBox(cs, .26, hc * .64, .035, .035, .06, '#3a4048'); kBox(cs, .26, hc * .7, .04, .04, .008, cc);
+    for (let q = 0; q < 5; q++) { const hh = hash2(B.x + k, q, 13), cf = .05 + (q % 2) * .08, cs2 = sc - .05 + (q >> 1) * .12; // crates, sacks and barrels
+      if (q % 3 === 0) kBox(cs2, cf, .029, .03, .03, .04 + hh * .03, hh < .5 ? '#a57c55' : '#8a6a4c', M_PLANK);
+      else if (q % 3 === 1) { for (let m = 0; m < 3; m++) kBlob(cs2 + (m - 1) * .022, cf, .04, .014, .012, '#d9c9a0', 0); }
+      else for (let m = 0; m < 3; m++) kCyl(cs2 + (m - 1) * .024, cf, .029, .011, .028, '#7a5a3c', M_PLANK, 8, '#6a4a30'); }
+    if (lod && h > .6) kBox(sc + .05, .1, .029, .06, .05, .04, '#6b7a5a', M_PLANK); } // a tarpaulin over a pile
+  for (const s of [s0 + .02, s1 - .02]) cLampPost(s, .42, .4);
+  // the piers between the berths: stone moles out over the water with bollards and lamps; a pavilion on the outer two, a beacon on the last
+  for (let k = 0; k <= L; k++) { const s = -L / 2 + k + (k === 0 ? .06 : k === L ? -.06 : 0), w = .055, f1 = 1.4;
+    kBox(s, (.5 + f1) / 2, ys - y - .05, w, (f1 - .5) / 2, y - ys + .08, '#a39a8c', M_STONE); kBox(s, (.5 + f1) / 2, .03, w + .006, (f1 - .5) / 2 + .006, .01, st, M_STONE);
+    if (lod) for (let q = 1; q < 4; q++) kCyl(s + (q % 2 ? w - .012 : -w + .012), .5 + q * .22, .04, .009, .02, '#3a3c42', 0, 8);
+    cLampPost(s, .95, .25);
+    if (k === 0 || k === L) { kBox(s, f1 - .07, .04, .045, .045, .08, '#e8e2d6', M_PLASTER); kHip(s - .055, s + .055, f1 - .125, f1 - .015, .12, .07, cu, { ov: .01, noGut: 1 }); kBox(s, f1 - .07, .19, .004, .004, .03, '#d8b84f'); }
+    if (k === L) { kCyl(s, f1 + .03, .04, .03, .18, '#f2efe8', M_PLASTER, 12); kCyl(s, f1 + .03, .22, .022, .03, '#ffd27a', 0, 10, 0, 3); kCone(s, f1 + .03, .25, .028, .03, '#b84a3a', 10, M_PLASTER); } }
+}
+function harbourFuture(B, { y, ys, L, P, A3, D3, lx, lz }) {
+  kSet(lx, lz, A3, D3, B.id); KF.y0 = y; const lod = KF.lod;
+  kBox(0, 0, .025, L / 2, .5, .004, '#e6e9ea', M_STONE); kBox(0, .495, .029, L / 2, .004, .004, C_GLOW, 0, 3); // a pale deck with a line of light along its edge
+  // the terminal: a long low glass hall under white ribs, green roofs on its wings, a white drum at either end
+  kEDome(0, -.28, .029, L / 2 - .12, .16, .2, C_GLASSF, M_GLASS); if (lod) for (let q = 0; q <= L * 4; q++) kBox(-L / 2 + .12 + q * (L - .24) / (L * 4), -.28, .029, .005, .165, .19, C_WHITE, M_PLASTER);
+  for (const sg of [-1, 1]) { fPod(sg * (L / 2 - .07), -.28, .029, .065, .26, 40 + sg); kBox(sg * (L / 2 - .07), -.28, .29, .05, .05, .01, C_GREEN, M_GRASS); }
+  // white gantries at each berth (their trolleys run: works.js), sleek cargo pods in pale colours
+  for (let k = 0; k < L; k++) { const s = -L / 2 + k + .5, hc = .95;
+    for (const [sa, ta] of [[-.14, .12], [.14, .12], [-.14, .42], [.14, .42]]) gBeam(P(s + sa, ta), P(s + sa, ta, y + hc), .011, '#f2f4f5');
+    for (const sa of [-.14, .14]) gBeam(P(s + sa, -.05, y + hc), P(s + sa, 1.3, y + hc), .013, '#f2f4f5'); gBox(P(s, 1.28, y + hc - .01), V3s(A3, .15), V3s(D3, .01), .006, C_GLOW, 0, 3);
+    for (let q = 0; q < 4; q++) kEDome(s - .25 + q * .14, .12 + (q % 2) * .1, .029, .05, .03, .05, ['#cfe7ef', '#e8dff2', '#f2ead8', '#dbeedd'][q], M_PLASTER); }
+  // floating piers edged with light, and a pad for the hover ferries at the end of the outer ones
+  for (let k = 0; k <= L; k++) { const s = -L / 2 + k + (k === 0 ? .06 : k === L ? -.06 : 0), f1 = 1.4;
+    kBox(s, (.5 + f1) / 2, ys - y + .02, .05, (f1 - .5) / 2, .03, C_WHITE, M_PLASTER); for (const sg of [-1, 1]) kBox(s + sg * .051, (.5 + f1) / 2, ys - y + .045, .002, (f1 - .5) / 2, .004, C_GLOW, 0, 3);
+    if (k === 0 || k === L) { kCyl(s, f1 + .06, ys - y + .02, .1, .03, C_WHITE, M_PLASTER, 20, '#d9dde0'); kCyl(s, f1 + .06, ys - y + .051, .07, .002, C_GLOW, 0, 20, 0, 3); } }
+}

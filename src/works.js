@@ -142,9 +142,9 @@ const GLW = {
     const P = (s, t, yy = y) => [lx + a[0] * s + d[0] * t, yy, lz + a[1] * s + d[1] * t];
     for (let k = 0; k < L; k++) { const s = -L / 2 + k + .5, tt = c.t * .3 + k * 2.1;
       if (boxes) { const hc = .95, tr = .5 + .45 * Math.sin(tt), hang = .28 + .26 * (.5 + .5 * Math.sin(tt * 1.7 + 1));
-        gBox(P(s, tr, y + hc - .06), V3s(A3, .16), V3s(D3, .06), .06, '#e8e2d6');
+        gBox(P(s, tr, y + hc - .06), V3s(A3, .16), V3s(D3, .06), .06, hasTech('fusion') ? '#f7f9fa' : '#e8e2d6'); // (the trolley; white in the far future's port)
         gBeam(P(s, tr, y + hc - .06), P(s, tr, y + hc - .06 - hang), .004, '#2a2a2a');
-        gBox(P(s, tr, y + hc - .108 - hang), V3s(A3, .075), V3s(D3, .04), .048, ['#c0584f', '#3f7fb0', '#e0a43a', '#4e9a6a'][(k + B.id) % 4]);
+        gBox(P(s, tr, y + hc - .108 - hang), V3s(A3, .075), V3s(D3, .04), .048, (hasTech('fusion') ? ['#cfe7ef', '#e8dff2', '#f2ead8', '#dbeedd'] : ['#c0584f', '#3f7fb0', '#e0a43a', '#4e9a6a'])[(k + B.id) % 4]);
       } else { const hc = (steel ? 16 : 11) * ZS, col = steel ? '#c8603a' : '#8a6446', base = P(s - .22, .32, y + hc * .75), sw = Math.sin(tt) * 1.1 - .2;
         const dir = [d[0] * Math.cos(sw) + a[0] * Math.sin(sw), 0, d[1] * Math.cos(sw) + a[1] * Math.sin(sw)], tip = [base[0] + dir[0] * .63, y + hc * 1.08, base[2] + dir[2] * .63];
         gBeam(base, tip, .012, col, steel ? 0 : M_PLANK);

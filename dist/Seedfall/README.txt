@@ -344,8 +344,12 @@ BOATS, SHIPS AND PLANES
   Bigger coastal towns build a harbour (from Masonry): a stone quay, a
   warehouse and a crane that swings cargo on and off. As the town grows, the
   harbour grows along the shore (out over the shallows on piles where the coast
-  bends): a second quay, then a port with piers and a row of warehouses, then
-  container docks with gantry cranes. Each stretch of quay has its own berth,
+  bends). With Steam it becomes docklands: a long brick warehouse with copper
+  roofs and corner towers, iron cranes on rails along the quay, crates, sacks
+  and barrels, and stone piers out into the water with little pavilions and a
+  beacon at the end. Then container docks with gantry cranes, and with Fusion
+  a glass terminal, white gantries and floating piers edged with light. Each
+  stretch of quay has its own berth,
   so several ships can tie up at once. Ships sail between
   harbours, or off over the horizon and back: sailing ships, then steamers,
   freighters, container ships and finally hover-freighters. Towns with
