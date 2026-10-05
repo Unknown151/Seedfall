@@ -253,6 +253,15 @@ HOW TOWNS LAY THEMSELVES OUT
   lights later on. Open meadows get grass and wildflowers, and small houses
   get hedges, bushes and a tree by the gate.
 
+THE LATER AGES
+  With Computing, a town's public buildings are rebuilt one at a time in
+  concrete, steel and glass: a council block up on columns, a glass library
+  behind timber fins, a theatre of bare concrete, a glass pyramid before the
+  museum, a campus of glass halls. With Fusion they are rebuilt again: white
+  drums and domes, green roofs with trees on them, glowing trim, glass
+  bridges in the air, a garden under a glass dome for a market. The chronicle
+  says each time.
+
 BIG LANDMARKS
   Some buildings need a lot of room. A stadium takes a four-by-four block, and
   a university or a fusion plant three-by-three. A town that wants one clears
@@ -316,10 +325,10 @@ RAILWAYS AND TRAMS
   Electricity come concrete sleepers, overhead wires and electric trains with
   a cab at each end, and with Maglev a concrete guideway on columns and long
   white trains that float along it.
-  Where lines share the way (out of a busy station, or along the valley floor)
-  each gets its own track, side by side, so trains pass instead of running
-  through each other. Where lines cross or part there are signals: a train
-  eases to a stand and waits while another goes through.
+  Every line is double track and trains keep to the right, so they pass
+  instead of running through each other; lines that share the way share the
+  two tracks. Signals keep trains on the same track apart, and where lines
+  cross or part a train eases to a stand and waits while another goes through.
   In town, the trams take over: a line along the streets from the station
   through the middle to the far side, stopping every few streets. First a
   horse tram, then an electric tram under its wire, then a long low modern

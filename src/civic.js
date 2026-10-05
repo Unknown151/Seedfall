@@ -407,3 +407,94 @@ GL_MODEL.watchstone = function (B, st) { // a tall pale obelisk on its steps, ca
   if (lod) { for (const [s, f] of [[-.28, -.28], [.28, -.28], [.28, .28], [-.28, .28]]) { kBox(s, f, 0, .01, .01, .08, '#3a3d42'); kBlob(s, f, .085, .012, .01, '#c9a447', 0); }
     for (const [a, b] of [[[-.28, -.28], [.28, -.28]], [[.28, -.28], [.28, .28]], [[.28, .28], [-.28, .28]], [[-.28, .28], [-.28, -.28]]]) kBeam([a[0], a[1], .07], [b[0], b[1], .07], .0025, '#3a3d42'); }
 };
+
+/* ---------- the later ages: public buildings rebuilt in concrete, steel and glass (Computing), then in white, green and
+   light (Fusion). REFIT (needs.js) moves each one on a stage at a time, so a town modernises bit by bit; glModel (gl.js)
+   hands a rebuilt one to CIVX[type](B, st, gen). Each builder takes the room it has (civRoom), so the same code draws a
+   single plot and a landmark's whole lot. ---------- */
+const C_CONC = '#d8d6ce', C_WHITE = '#eef1f0', C_GLOW = '#8fe8ff', C_GLASS = '#4d7895', C_GLASSF = '#86b9cc', C_GREEN = '#7cc47f';
+function civRoom(B) { // the frame (s along the front, f out to it) and [half the room along the front, half the depth]
+  if (fpBig(B)) { cBig(B); const { a } = glFacing(B), al = a[0] ? fpW(B) : fpH(B), dp = a[0] ? fpH(B) : fpW(B); return [al / 2 - .08, dp / 2 - .08]; }
+  kSetB(B); return [.42, .4];
+}
+// concrete floors with glass between, set back a little (each floor's windows lit by the hour)
+function mBlock(s, f, y, hs, hf, floors, fh, k, slab = C_CONC) {
+  kBox(s, f, y, hs, hf, .014, slab, M_STONE);
+  for (let q = 0; q < floors; q++) { const y0 = y + .014 + q * fh; kBox(s, f, y0, hs - .008, hf - .008, fh - .014, C_GLASS, M_GLASS, kLit(k + q)); kBox(s, f, y0 + fh - .014, hs, hf, .014, slab, M_STONE); }
+  if (KF.lod) for (const sg of [-1, 1]) for (let q = 1; q < Math.round(hs * 14); q++) kBox(s - hs + q * hs * 2 / Math.round(hs * 14), f + sg * (hf - .006), y + .014, .002, .003, floors * fh - .014, '#9aa3ad');
+  return y + .014 + floors * fh;
+}
+// white floors with a glowing line along each, glass set back between, and a green roof with a tree or two
+function fBlock(s, f, y, hs, hf, floors, fh, k, trees = 1) {
+  for (let q = 0; q < floors; q++) { const y0 = y + q * fh; kBox(s, f, y0, hs - .012, hf - .012, fh - .02, C_GLASSF, M_GLASS, kLit(k + q)); kBox(s, f, y0 + fh - .02, hs, hf, .02, C_WHITE, M_PLASTER); kBox(s, f + hf + .001, y0 + fh - .012, hs * .96, .002, .004, C_GLOW, 0, 3); }
+  const top = y + floors * fh; kBox(s, f, top, hs - .02, hf - .02, .012, C_GREEN, M_GRASS);
+  if (trees) for (let q = 0; q < trees; q++) kTree(s + (q - (trees - 1) / 2) * hs * .7, f - hf * .2, top + .01, .3 + q * .2, .55, '#5f9a4d');
+  return top + .012;
+}
+function fPod(s, f, y, r, h, k) { // a white drum with a band of glass round it and a ring of light at the top
+  kCyl(s, f, y, r, h, C_WHITE, M_PLASTER, 24, C_WHITE); kCyl(s, f, y + h * .3, r + .003, h * .42, C_GLASSF, M_GLASS, 24, 0, kLit(k)); kCyl(s, f, y + h - .012, r + .005, .007, C_GLOW, 0, 24, 0, 3);
+}
+function cPlaza(hs, hf, col = '#c9c5bc') { kBox(0, 0, 0, hs, hf, .006, col, M_STONE); }
+function cPool(s, f, hs, hf) { kBox(s, f, 0, hs + .012, hf + .012, .018, C_CONC, M_STONE); kBox(s, f, .004, hs, hf, .016, '#5aa7c9', 0, -1); }
+function cTrees(pts, y = 0) { for (const [s, f, k] of pts) kTree(s, f, y, .3 + (k || 0) * .3, .8, '#5f9a4d'); }
+function fSpire(s, f, y, h) { kCone(s, f, y, .03, h, C_WHITE, 10, M_PLASTER); kBox(s, f, y + h - .02, .008, .008, .03, C_GLOW, 0, 3); }
+const CIVX = {
+  hall(B, st, g) { const [A, D] = civRoom(B), lod = KF.lod; cPlaza(A, D);
+    if (g < 2) { const hs = Math.min(A * .8, .7), hf = D * .55, f0 = -D * .2; // a council block up on columns, a round chamber beside it, flags out front
+      for (let q = 0; q <= 4; q++) kCyl(-hs + q * hs / 2, f0 + hf - .03, 0, .014, .1, C_CONC, M_STONE, 8);
+      kBox(0, f0 - hf * .3, 0, hs * .3, hf * .5, .1, C_GLASS, M_GLASS, kLit(3)); const t = mBlock(0, f0, .1, hs, hf, 3, .1, 10); kFlat(-hs, hs, f0 - hf, f0 + hf, t, C_CONC, .03);
+      kCyl(hs + .02, f0 + hf * .5, 0, Math.min(.15, A - hs + .1), .2, C_CONC, M_STONE, 20, '#9aa3ad'); kCyl(hs + .02, f0 + hf * .5, .06, Math.min(.15, A - hs + .1) + .003, .08, C_GLASS, M_GLASS, 20, 0, kLit(30));
+      for (const q of [-1, 0, 1]) cFlag(q * .1, D - .06, 0, .3, q ? st.accent : '#f2ece0'); if (lod) { cLampPost(-A + .05, D - .05); cLampPost(A - .05, D - .05); } return; }
+    // a white dome on a ring of glass, a pool before it, a slender spire with a light at the top
+    const r = Math.min(A, D) * .72; kCyl(0, -D * .1, 0, r, .12, C_GLASSF, M_GLASS, 28, 0, kLit(5)); kCyl(0, -D * .1, .12, r + .02, .02, C_WHITE, M_PLASTER, 28, C_WHITE); kCyl(0, -D * .1, .135, r + .025, .006, C_GLOW, 0, 28, 0, 3);
+    kEDome(0, -D * .1, .14, r, r, .24, C_WHITE, M_PLASTER); fSpire(r * .55, -D * .1 - r * .55, .2, .55 + (A > .6 ? .25 : 0)); cPool(0, D - .1, Math.min(A * .6, .3), .05);
+    cTrees([[-A + .08, D - .1, 0], [A - .08, D - .1, 1]]); },
+  school(B, st, g) { const [A, D] = civRoom(B);
+    if (g < 2) { const hs = A * .9, hf = D * .4; kBox(0, -D * .45, 0, hs * .8, D * .4, .006, '#4f8a5a', M_GRASS); if (KF.lod) kBox(0, -D * .45, .006, hs * .5, .003, .002, '#f2f2f2');
+      const t = mBlock(0, D * .35, 0, hs, hf, 2, .1, 20); kFlat(-hs, hs, D * .35 - hf, D * .35 + hf, t, C_CONC, .03);
+      for (let q = 0; q < 4; q++) kBox(-hs + .1 + q * hs * .55, D * .35 + hf + .004, .02, .05, .004, .16, [st.accent, '#e0b04f', '#5fa8c9', '#e07a5f'][q], 0); kSolar(0, D * .35, t + .02, hs * .6, hf * .6, .3); return; }
+    fPod(-A * .45, D * .1, 0, Math.min(.2, A * .35), .18, 4); fPod(A * .45, D * .1, 0, Math.min(.2, A * .35), .14, 9); kBox(0, D * .1, .1, A * .2, .03, .04, C_GLASSF, M_GLASS, kLit(2)); // two drums and a glass bridge
+    for (const s of [-1, 1]) kBox(s * A * .45, D * .1, s < 0 ? .18 : .14, Math.min(.2, A * .35) * .8, Math.min(.2, A * .35) * .8, .01, C_GREEN, M_GRASS);
+    kBox(0, -D * .55, 0, A * .7, D * .3, .006, '#4f8a5a', M_GRASS); for (const s of [-1, 0, 1]) kDome(s * A * .4, -D * .55, .006, .05, .05, '#f2c94f', 0); }, // a playground of little domes
+  library(B, st, g) { const [A, D] = civRoom(B), lod = KF.lod;
+    if (g < 2) { const hs = Math.min(A * .8, .38), hf = D * .7, t = mBlock(0, 0, 0, hs, hf, 3, .1, 40); kFlat(-hs, hs, -hf, hf, t, C_CONC, .03);
+      if (lod) for (let q = 0; q < 9; q++) kBox(-hs + .02 + q * (hs * 2 - .04) / 8, hf + .012, .02, .006, .012, t - .03, '#b9a27a', M_PLANK); // timber fins over the glass
+      kBox(0, hf + .05, 0, hs * .6, .05, .006, '#c9c5bc', M_STONE); cTrees([[-A + .06, D - .06], [A - .06, D - .06, 1]]); return; }
+    let y = 0; const r0 = Math.min(A, D) * .8; for (let q = 0; q < 4; q++) { const r = r0 * (1 - q * .17), o = (q % 2 ? .04 : -.04); kCyl(o, 0, y, r, .1, C_GLASSF, M_GLASS, 24, 0, kLit(50 + q)); kCyl(o, 0, y + .1, r + .02, .016, C_WHITE, M_PLASTER, 24, C_GREEN); kCyl(o, 0, y + .108, r + .022, .005, C_GLOW, 0, 24, 0, 3); if (lod) kTree(o + r * .7, 0, y + .116, .2 + q * .2, .4, '#5f9a4d'); y += .116; } }, // rings of reading rooms, each with a garden round its edge
+  clinic(B, st, g) { const [A, D] = civRoom(B);
+    if (g < 2) { const hs = A * .8, hf = D * .6, t = mBlock(0, -D * .1, 0, hs, hf, 3, .1, 60, '#f2f2ee'); kFlat(-hs, hs, -D * .1 - hf, -D * .1 + hf, t, '#f2f2ee', .03);
+      kBox(0, -D * .1 + hf + .006, t - .1, .045, .004, .012, '#e84a3a', 0, 3); kBox(0, -D * .1 + hf + .006, t - .12, .012, .004, .05, '#e84a3a', 0, 3); // the lit cross
+      kBox(0, D - .08, .1, hs * .5, .06, .01, C_CONC, M_STONE); for (const s of [-1, 1]) kBox(s * hs * .45, D - .04, 0, .006, .006, .1, '#9aa3ad'); return; } // an ambulance canopy
+    const r = Math.min(A, D) * .7; fPod(0, 0, 0, r, .3, 8); kCyl(0, 0, .3, r * .7, .008, '#3a4250', 0, 24, '#3a4250'); kCyl(0, 0, .309, r * .5, .003, C_GLOW, 0, 24, 0, 3); // a landing ring on the roof
+    for (const [a, b] of [[.05, .012], [.012, .05]]) kBox(0, r + .006, .18, a, .004, b * 2, '#ff5a4a', 0, 3); },
+  theatre(B, st, g) { const [A, D] = civRoom(B);
+    if (g < 2) { const hs = A * .85; kBox(0, -D * .35, 0, hs * .55, D * .45, .62, C_CONC, M_STONE); // the fly tower, bare concrete
+      const t = mBlock(0, D * .35, 0, hs, D * .45, 2, .12, 70); kFlat(-hs, hs, D * .35 - D * .45, D * .8, t, C_CONC, .02); kBox(0, D * .8 + .01, t - .05, hs * .8, .006, .03, '#ffd27a', 0, 3); return; } // the name in lights
+    for (const [s, sc, h] of [[-A * .35, .9, .42], [A * .1, 1, .52], [A * .5, .7, .34]]) kEDome(s, 0, .08, A * .32 * sc, D * .6 * sc, h, C_WHITE, M_PLASTER, true, 18); // white shells
+    kBox(0, 0, 0, A * .85, D * .7, .08, C_GLASSF, M_GLASS, kLit(7)); kBox(0, D * .7 + .002, .07, A * .8, .003, .006, C_GLOW, 0, 3); },
+  museum(B, st, g) { const [A, D] = civRoom(B);
+    if (g < 2) { cPlaza(A, D, '#d9d4c8'); kBox(0, -D * .45, 0, A * .85, D * .4, .24, C_CONC, M_STONE); kBox(0, -D * .45 + D * .4 + .002, .04, A * .7, .003, .16, C_GLASS, M_GLASS, kLit(4)); // a long gallery
+      kEDome(0, D * .2, 0, Math.min(.22, A * .4), Math.min(.22, D * .4), .26, C_GLASSF, M_GLASS, true, 4); return; } // and a glass pyramid in the forecourt
+    for (let q = 0; q < 5; q++) kRot(q * .22, () => { kBox(0, 0, q * .09, A * .7 - q * .04, D * .55 - q * .03, .07, C_WHITE, M_PLASTER); kBox(0, 0, q * .09 + .07, A * .7 - q * .04 - .015, D * .55 - q * .03 - .015, .02, C_GLASSF, M_GLASS, kLit(q)); kBox(0, D * .55 - q * .03 + .001, q * .09 + .066, (A * .7 - q * .04) * .95, .002, .004, C_GLOW, 0, 3); }); }, // a stack of white galleries, each turned on the last
+  station(B, st, g) { const [A, D] = civRoom(B), lod = KF.lod;
+    if (g < 2) { const hs = A * .9; kBox(0, D * .4, 0, hs * .5, D * .3, .16, C_GLASS, M_GLASS, kLit(2)); kFlat(-hs * .5, hs * .5, D * .1, D * .7, .16, C_CONC, .02);
+      kBox(0, -D * .3, .18, hs, D * .45, .012, C_CONC, M_STONE); for (let q = 0; q <= 4; q++) for (const sg of [-1, 1]) kBox(-hs + q * hs / 2, -D * .3 + sg * D * .35, 0, .008, .008, .18, '#9aa3ad'); return; } // and a long platform canopy on columns
+    kEDome(0, -D * .15, 0, A * .95, D * .55, .26, C_GLASSF, M_GLASS); if (lod) for (let q = 0; q <= 8; q++) kRot(0, () => kBox(-A * .9 + q * A * .225, -D * .15, 0, .006, D * .56, .02, C_WHITE, M_PLASTER)); // a glass tube with white ribs
+    kBox(0, D * .55, 0, A * .4, .05, .01, C_GLOW, 0, 3); },
+  university(B, st, g) { const [A, D] = civRoom(B), big = A > .7;
+    if (g < 2) { const q = Math.min(A, D) * .35; kBox(0, 0, 0, q, q, .008, '#6f9a52', M_GRASS); // glass halls round a lawn, a tower at one corner
+      for (const [s, f, hs, hf] of [[0, -D + .14, A - .05, .12], [-A + .14, .08, .12, D * .55], [A - .14, .08, .12, D * .55]]) { const t = mBlock(s, f, 0, hs, hf, big ? 4 : 3, .1, (s + f) * 50 | 0); kFlat(s - hs, s + hs, f - hf, f + hf, t, C_CONC, .025); }
+      const t2 = mBlock(A - .14, D - .14, 0, .1, .1, big ? 9 : 6, .1, 77); kFlat(A - .24, A - .04, D - .24, D - .04, t2, C_CONC, .02); cTrees([[-q * .5, q * .4], [q * .4, -q * .3, 1]]); return; }
+    const R = Math.min(A, D) * .78, n = big ? 7 : 5; kBox(0, 0, 0, R * .6, R * .6, .008, C_GREEN, M_GRASS); cTrees([[-R * .3, R * .25, 1], [-R * .25, -R * .3], [R * .3, -R * .25]]); // a ring of white halls round a garden, joined by glass bridges
+    for (let q = 0; q < n; q++) { const a = q / n * TAU, s = Math.cos(a) * R, f = Math.sin(a) * R; fPod(s, f, 0, big ? .2 : .1, (big ? .34 : .22) + (q % 2) * .12, q * 7); const a2 = (q + 1) / n * TAU, s2 = Math.cos(a2) * R, f2 = Math.sin(a2) * R; kBeam([s, f, .16], [s2, f2, .16], big ? .03 : .018, C_GLASSF, M_GLASS); }
+    fBlock(R * .2, R * .2, 0, .08, .08, big ? 9 : 6, .1, 33, 1); }, // and a tower of laboratories in the garden
+  market(B, st, g) { const [A, D] = civRoom(B);
+    if (g < 2) { kBox(0, 0, 0, A * .9, D * .75, .1, C_GLASS, M_GLASS, kLit(6)); kEDome(0, 0, .1, A * .9, D * .75, .16, C_GLASSF, M_GLASS); for (let q = 0; q <= 5; q++) kBox(-A * .9 + q * A * .36, 0, .1, .006, D * .76, .12, '#7d838a'); return; } // a steel-and-glass hall
+    kEDome(0, 0, 0, A * .9, D * .8, .34, C_GLASSF, M_GLASS); kCyl(0, 0, 0, Math.min(A, D) * .82, .014, C_WHITE, M_PLASTER, 28, C_WHITE); cTrees([[-A * .3, 0], [A * .25, D * .2, 1], [0, -D * .3]]); kCyl(0, 0, .335, .05, .01, C_GLOW, 0, 12, 0, 3); }, // a garden under a glass dome
+  guildhall(B, st, g) { const [A, D] = civRoom(B), hs = A * .6, hf = D * .55;
+    if (g < 2) { const t = mBlock(0, 0, 0, hs, hf, 5, .1, 90); kFlat(-hs, hs, -hf, hf, t, C_CONC, .03); kBox(hs + .004, hf * .3, t * .4, .004, .05, t * .5, st.accent); return; }
+    const t = fBlock(0, 0, 0, hs * .9, hf * .9, 6, .1, 91, 2); fSpire(0, -hf * .5, t, .25); },
+  bathhouse(B, st, g) { const [A, D] = civRoom(B);
+    if (g < 2) { cPlaza(A, D, '#e2ddd2'); cPool(0, D * .35, A * .6, D * .25); kBox(0, -D * .4, 0, A * .8, D * .35, .14, C_GLASS, M_GLASS, kLit(8)); kFlat(-A * .8, A * .8, -D * .75, -D * .05, .14, C_CONC, .02); return; }
+    cPool(-A * .35, D * .3, A * .3, D * .2); cPool(A * .4, D * .35, A * .25, D * .15); kEDome(0, -D * .25, 0, A * .6, D * .5, .26, C_GLASSF, M_GLASS); kCyl(0, -D * .25, 0, Math.min(A * .6, D * .5), .012, C_WHITE, M_PLASTER, 24, C_WHITE); }
+};

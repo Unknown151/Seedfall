@@ -502,7 +502,7 @@ function glBuildSite(B, st, f, hh) {
 // over by adding GL_MODEL[type] = (B, st) => {...}. Helpers: gBox/gBeam/gRoof/gSpire/gWins (world units: x, y = height,
 // z), glCylAt/glDomeAt (tile-local u, v and heights in height units), gCone below; GLB.x/GLB.y is the tile, GLB.base
 // its ground, GLB.lod true for the close-up version (put small detail behind it).
-function glModel(B) { return fpBig(B) && GL_BIG[B.type] || GL_MODEL[B.type] || null; }
+function glModel(B) { if (CIVX[B.type]) { const g = genOf(B); if (g) return (B, st) => CIVX[B.type](B, st, g); } return fpBig(B) && GL_BIG[B.type] || GL_MODEL[B.type] || null; } // (a public building rebuilt in a later age: civic.js CIVX)
 function gCone(u, v, r, z0, h, col, n = 12) { // a cone standing on tile-local (u, v), from height z0 up h
   const c = gcol(col), A = gw(u, v, z0 + h); GLB.ctr = gw(u, v, z0 - 1); GLB.mat = roofMat(c);
   for (let k = 0; k < n; k++) { const a = k / n * TAU, b = (k + 1) / n * TAU; gtri(gw(u + Math.cos(a) * r, v + Math.sin(a) * r, z0), gw(u + Math.cos(b) * r, v + Math.sin(b) * r, z0), A, c); }

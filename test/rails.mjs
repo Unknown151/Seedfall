@@ -35,13 +35,13 @@ const t = await p.evaluate(() => { // run the trains for a while (view time only
 ok(t.n >= 1 && t.maxOver < 1e-3, `trains stay between their buffers (${t.n} trains, overrun ${t.maxOver.toFixed(4)})`);
 ok(t.stops >= 2 && t.waited > 0, `they reach a station, wait and turn back (${t.stops} turns)`);
 ok(/^loco,tender,coach/.test(t.cars), `a steam train: ${t.cars}`);
-const sh = await p.evaluate(() => { // where lines share track each has its own; at junctions the signals hold one train back
-  railMap(); let shared = 0; for (const o of RAILX.ln.values()) for (const v of o) if (v) shared++;
+const sh = await p.evaluate(() => { // every line is double track and trains keep right; signals hold one train back on shared track and at junctions
+  railMap(); let shared = 0; for (const n of RAILX.multi.values()) if (n > 1) shared++;
   const cars = (tr, ln) => { const { len, fits } = trainCars(tr); if (!fits) return []; const out = []; for (let s = tr.lo; s <= tr.lo + len; s += .2) out.push(railPos(tr.r.path, s, ln)); return out; };
   let was = 0, now = 0; for (let f = 0; f < 3000; f++) { stepTrains(.05); if (f % 5) continue; const T = DYN.trains;
-    for (let a = 0; a < T.length; a++) for (let c = a + 1; c < T.length; c++) { const hit = l => { const A = cars(T[a], l ? railLane(T[a].r) : null), B = cars(T[c], l ? railLane(T[c].r) : null); return A.some(x => B.some(y => Math.hypot(x[0] - y[0], x[2] - y[2]) < .25)); }; was += hit(false); now += hit(true); } }
+    for (let a = 0; a < T.length; a++) for (let c = a + 1; c < T.length; c++) { const hit = l => { const A = cars(T[a], l ? trainOff(T[a]) : 0), B = cars(T[c], l ? trainOff(T[c]) : 0); return A.some(x => B.some(y => Math.hypot(x[0] - y[0], x[2] - y[2]) < .25)); }; was += hit(false); now += hit(true); } }
   return { shared, was, now, moving: DYN.trains.filter(t => (t.dist || 0) > 20 || !trainCars(t).fits).length, n: DYN.trains.length }; });
-ok(sh.shared > 0 && sh.now <= sh.was * .25 && sh.moving === sh.n, `lines that share track run on tracks side by side, and junction signals keep trains apart (${sh.shared} shared steps; ${sh.was} near misses on one track, ${sh.now} now; ${sh.moving}/${sh.n} trains keep going)`);
+ok(sh.shared > 0 && sh.now <= sh.was * .25 && sh.moving === sh.n, `double track, trains keeping right, and signals on shared track and at junctions keep trains apart (${sh.shared} shared tiles; ${sh.was} near misses on one track, ${sh.now} now; ${sh.moving}/${sh.n} trains keep going)`);
 const x = await p.evaluate(() => { // a walker and a cart at a crossing wait while a train is near, then go on
   railMap(); const nbOf = i => N4.map(([dx, dy]) => idx(i % W + dx, ((i / W) | 0) + dy)).find(j => M.road[j] && !M.rail[j]);
   const i = RAILX.xs.find(i => nbOf(i) != null) ?? [...RAILX.m.keys()].find(i => nbOf(i) != null); if (i == null) return null; const nb = nbOf(i); // (a crossing, or any track beside a street)
