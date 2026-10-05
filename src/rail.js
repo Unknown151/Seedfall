@@ -11,7 +11,7 @@
 // along a shared run and lanes slide apart and together smoothly within a tile (railPt). RAILX.ln[line] is a line's
 // offset at each of its edges, to the right of its own way.
 const RAILX = { S: null, n: -1, m: null, xs: null, ln: null };
-const LANE_SP = .42, laneSp = n => n < 2 ? LANE_SP : Math.max(.3, Math.min(LANE_SP, .84 / (n - 1))); // track centres apart (two ballast beds side by side; three or more closer, never too close for two trains to pass)
+const LANE_MAX = 4, LANE_SP = .42, laneSp = n => n < 2 ? LANE_SP : Math.max(.3, Math.min(LANE_SP, .84 / (n - 1))); // track centres apart (two ballast beds side by side; three or more closer, never too close for two trains to pass)
 function railMap() { // tile -> its pieces [[prev, next, offset in, offset out], ...]
   const rs = S.rails || [], gen = rs.length + (S.railGen || 0) * 1000;
   if (RAILX.S === S && RAILX.n === gen) return RAILX.m;
@@ -19,8 +19,8 @@ function railMap() { // tile -> its pieces [[prev, next, offset in, offset out],
   rs.forEach((r, q) => { if (r.path) for (let k = 0; k < r.path.length - 1; k++) { const key = ek(r.path[k], r.path[k + 1]); let e = E.get(key); if (!e) E.set(key, e = []); if (!e.some(o => o.q === q)) e.push({ q, a: r.path[k] }); } });
   const wid = new Map(); // (each line's edges: how many lines share them)
   rs.forEach((r, q) => { if (!r.path) return; const o = new Float32Array(r.path.length - 1), nw = new Uint8Array(r.path.length - 1); wid.set(r, nw);
-    for (let k = 0; k < o.length; k++) { const e = E.get(ek(r.path[k], r.path[k + 1])), n = e.length; nw[k] = n; if (n < 2) continue;
-      const rk = e.findIndex(z => z.q === q), sp = laneSp(n); o[k] = (rk - (n - 1) / 2) * sp * (e[0].a === r.path[k] ? 1 : -1); } // (the first line's right is the others' left when they run the other way)
+    for (let k = 0; k < o.length; k++) { const e = E.get(ek(r.path[k], r.path[k + 1])), n = Math.min(e.length, LANE_MAX); nw[k] = n; if (n < 2) continue;
+      const rk = e.findIndex(z => z.q === q) % n, sp = laneSp(n); /* (more lines than tracks: they take turns on them, and the signals keep them apart) */ o[k] = (rk - (n - 1) / 2) * sp * (e[0].a === r.path[k] ? 1 : -1); } // (the first line's right is the others' left when they run the other way)
     ln.set(r, o); });
   const m = new Map(), xs = [];
   for (const r of rs) if (r.path) { const o = ln.get(r); for (let k = 1; k < r.path.length - 1; k++) {

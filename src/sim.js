@@ -54,7 +54,7 @@ function newState(seed) { S = { rs: (seed * 2654435761) >>> 0 }; return simRun((
 function newState0(seed) {
   const g = genWorld(seed), rs = S.rs;
   S = {
-    v: 1, roadV: 2, railV: 3, size: W, rs, seed, created: Date.now(), savedAt: 0, playSec: 0,
+    v: 1, roadV: 2, railV: 4, size: W, rs, seed, created: Date.now(), savedAt: 0, playSec: 0,
     year: 0, month: 0, map: g.M, B: {}, nextB: 1, T: {}, nextT: 1, P: {}, nextP: 1,
     tech: { done: {}, cur: 0, pts: 0 }, era: 0, age: null, ageN: 0, ageUsed: {},
     styles: [Object.assign({}, STYLES0[0])], styleIdx: 0,
@@ -442,6 +442,15 @@ function moveStation(T) { // the town has grown round its station: a new one goe
   chron('🚉', `${T.name} has grown all round its old station, so a new one goes up out at the edge of town. The old one is pulled down, and the trams take folk the rest of the way.`, { x: s.x, y: s.y });
   return true;
 }
+function pruneRails() { // an older world with a line between nearly every pair of towns: the ones the network can do without are taken up
+  S.railV = 4; delete S.railPrune; let n = 0;
+  for (const r of S.rails.filter(r => r.path).sort((a, b) => b.path.length - a.path.length)) if (railRoute(r.a, r.b, r) <= r.path.length * RAIL_DETOUR) { r.path = null; r.gone = 1; n++; }
+  if (!n) return; S.rails = S.rails.filter(r => !r.gone);
+  const keep = new Set(); for (const r of S.rails) if (r.path) for (const i of r.path) keep.add(i);
+  for (let i = 0; i < W * H; i++) if (M.rail[i] && !keep.has(i)) { M.rail[i] = 0; markDirty(i); }
+  S.railGen = (S.railGen || 0) + 1;
+  if (!FAST) chron('🚂', `The railway company tidies up: ${n === 1 ? 'a line that ran beside another is' : n + ' lines that ran beside others are'} taken up, and the trains change at the junctions instead.`, {});
+}
 function replanRails() { // older worlds laid their lines through the towns: move the stations out to the edge and lay them again
   S.railV = 3; delete S.railReplan; refreshOwn();
   for (const T of towns()) { const B = stationOf(T); if (B && dist(B.x, B.y, T.x, T.y) < townRadius(T) * .7) moveStation(T); }
@@ -504,6 +513,16 @@ function stepRoadQ() {
     chron('🛤️', `The road from ${A.name} to ${B.name} is finished${bridge ? ', stone arches and all' : ''}.`, { T: A });
   }
 }
+// The railways are a network, not a line from every town to every other: a new line goes down only between towns the
+// network doesn't already join by a fair route (no more than RAIL_DETOUR times as far), and no town has more than
+// RAIL_DEG lines. (Before, every pair got its own line in the end, and dozens ran side by side down one corridor.)
+const RAIL_DEG = 3, RAIL_DETOUR = 1.7;
+function railRoute(a, b, skip) { // the shortest way from town a to town b over the lines there are (in tiles), skipping one line
+  const D = new Map([[a, 0]]), done = new Set();
+  for (;;) { let u = null, du = 1e9; for (const [k, v] of D) if (!done.has(k) && v < du) { u = k; du = v; } if (u == null) return 1e9; if (u === b) return du; done.add(u);
+    for (const r of S.rails) { if (!r.path || r === skip || (r.a !== u && r.b !== u)) continue; const o = r.a === u ? r.b : r.a, nd = du + r.path.length; if (nd < (D.has(o) ? D.get(o) : 1e9)) D.set(o, nd); } }
+}
+const railDeg = id => S.rails.filter(r => r.path && (r.a === id || r.b === id)).length;
 function planRails() {
   if (!hasTech('rail')) return;
   const st = towns().filter(T => T.bl.some(id => S.B[id] && S.B[id].type === 'station' && S.B[id].prog >= 1));
@@ -512,7 +531,8 @@ function planRails() {
   for (const T of st) {
     if (S.rails.some(r => r.a === T.id || r.b === T.id) && chance(0.7)) continue;
     let best = null, bd = 1e9;
-    for (const O of st) { if (O === T || has(T.id, O.id)) continue; const d = dist(T.x, T.y, O.x, O.y); if (d < bd) { bd = d; best = O; } }
+    for (const O of st) { if (O === T || has(T.id, O.id)) continue; const d = dist(T.x, T.y, O.x, O.y), rt = railRoute(T.id, O.id); if (d >= bd) continue;
+      if (rt >= 1e9 || (railDeg(T.id) < RAIL_DEG && railDeg(O.id) < RAIL_DEG && rt > d * 1.25 * RAIL_DETOUR)) { bd = d; best = O; } } // (a line runs about 1.25 times as far as the crow flies; a town not on the network yet always gets joined, however busy its neighbours)
     if (!best) continue;
     const sa = T.bl.map(id => S.B[id]).find(B => B && B.type === 'station'), sb = best.bl.map(id => S.B[id]).find(B => B && B.type === 'station');
     RAIL_TO = idx(sb.x, sb.y); const path = astar(idx(sa.x, sa.y), RAIL_TO, railCost);
@@ -1263,6 +1283,7 @@ function simMonth() { // a bug in one month must never freeze the world (catch-u
 }
 function simMonth0() {
   if (S.railReplan) replanRails();
+  if (S.railPrune) pruneRails();
   S.month++; S.year = S.month / 12;
   const newYear = S.month % 12 === 0;
   stepIncidents();
