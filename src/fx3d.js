@@ -239,7 +239,7 @@ function glTrader(o, X, Z, y, h, lit) { // a trade wagon (a cart and horse, a lo
 }
 // the people you know carry a diamond over their heads (the founder orange, a leader gold, the newly famous green); a candle when they pray
 function glMark(w, X, Z, y0) {
-  const p = S.P[w.pid]; if (!p) return; const T = S.T[p.sid], top = y0 + (w.kid ? .27 : .36) + Math.sin(GL3.t * 2 + w.pid) * .01;
+  const p = S.P[w.pid]; if (!p) return; const T = S.T[p.sid], top = y0 + (w.kid ? .17 : .22) + Math.sin(GL3.t * 2 + w.pid) * .01;
   const col = w.pid === S.founder ? '#e5874f' : T && T.leader === p.id ? '#f2b84b' : p.fl != null && p.fl <= 3 ? '#7fd08a' : '#5fd0c9', a = .035, C = gcol(col), sv = GLB.mat; GLB.mat = 0; GLB.ctr = [X, top, Z];
   for (const [u, v] of [[a, 0], [0, a], [-a, 0], [0, -a]].map((q, k, A) => [q, A[(k + 1) % 4]])) for (const yy of [top + a * 1.4, top - a * 1.4]) gtri([X + u[0], top, Z + u[1]], [X + v[0], top, Z + v[1]], [X, yy, Z], C, 2);
   GLB.mat = sv;

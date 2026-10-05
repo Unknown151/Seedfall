@@ -27,15 +27,15 @@ function wkSpin(B, rate, k = 0) { // an angle that keeps turning (sails, wheels)
 }
 const wkF = h => [Math.cos(h), 0, Math.sin(h)];
 function wkTool(hand, h, a, len, kind) { // a tool held in the hand at swing angle a: a handle, and its head
-  if (!hand) return null;
+  if (!hand) return null; len *= PS; // (in the hand of a person at the world's scale: gl.js glPerson)
   const f = wkF(h), d = wkV(f, a), p = wkV(f, a + Math.PI / 2), r = [-f[2], 0, f[0]], tip = wkAdd(hand, d, len);
-  gBeam(wkAdd(hand, d, -.015), tip, .0032, '#6b5040'); GLB.mat = 0;
+  gBeam(wkAdd(hand, d, -.015 * PS), tip, .0032 * PS, '#6b5040'); GLB.mat = 0; const nh = GLB.v.length;
   if (kind === 'axe') glOBox(wkAdd(tip, p, .007), V3(d, .011), V3(r, .003), V3(p, .015), '#9aa3ad');
   else if (kind === 'pick') glOBox(tip, V3(d, .004), V3(r, .004), V3(p, .032), '#8a929c');
   else if (kind === 'hammer') glOBox(tip, V3(d, .007), V3(r, .008), V3(p, .013), '#4a4f56');
   else if (kind === 'spade') glOBox(wkAdd(tip, d, .014), V3(d, .017), V3(r, .013), V3(p, .002), '#8a929c');
   else if (kind === 'hoe') glOBox(wkAdd(tip, p, .011), V3(d, .003), V3(r, .013), V3(p, .012), '#8a929c');
-  return tip;
+  glShrink(nh, tip, PS); return tip;
 }
 function wkBits(at, tau, n, col, glow, seed) { // a burst of chips or sparks, tau seconds after the blow
   if (!at || tau < 0 || tau > .45) return;

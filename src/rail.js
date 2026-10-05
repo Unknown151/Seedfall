@@ -5,18 +5,36 @@
 // render.js drawTileObjects); the trains, the barriers at level crossings and the steam are view only (DYN, Math.random).
 // Three ages: timber sleepers and steam; concrete sleepers, overhead wires and electric units; a maglev guideway.
 
-const RAILX = { S: null, n: -1, m: null, xs: null };
-function railMap() { // tile -> its pieces [[prev, next], ...] (two lines can share a tile)
+// Where lines share track (out of the same station, or along the same valley), each has its own pair of rails side by side,
+// so their trains pass instead of running through each other. Every step between two tiles (an edge) gets a lane for
+// each line on it: ranked by line, measured to the right of the first line's way along it, so lines keep their order
+// along a shared run and lanes slide apart and together smoothly within a tile (railPt). RAILX.ln[line] is a line's
+// offset at each of its edges, to the right of its own way.
+const RAILX = { S: null, n: -1, m: null, xs: null, ln: null };
+const LANE_SP = .42, laneSp = n => n < 2 ? LANE_SP : Math.max(.3, Math.min(LANE_SP, .84 / (n - 1))); // track centres apart (two ballast beds side by side; three or more closer, never too close for two trains to pass)
+function railMap() { // tile -> its pieces [[prev, next, offset in, offset out], ...]
   const rs = S.rails || [], gen = rs.length + (S.railGen || 0) * 1000;
   if (RAILX.S === S && RAILX.n === gen) return RAILX.m;
+  const E = new Map(), ek = (u, v) => Math.min(u, v) * W * H + Math.max(u, v), ln = new Map();
+  rs.forEach((r, q) => { if (r.path) for (let k = 0; k < r.path.length - 1; k++) { const key = ek(r.path[k], r.path[k + 1]); let e = E.get(key); if (!e) E.set(key, e = []); if (!e.some(o => o.q === q)) e.push({ q, a: r.path[k] }); } });
+  const wid = new Map(); // (each line's edges: how many lines share them)
+  rs.forEach((r, q) => { if (!r.path) return; const o = new Float32Array(r.path.length - 1), nw = new Uint8Array(r.path.length - 1); wid.set(r, nw);
+    for (let k = 0; k < o.length; k++) { const e = E.get(ek(r.path[k], r.path[k + 1])), n = e.length; nw[k] = n; if (n < 2) continue;
+      const rk = e.findIndex(z => z.q === q), sp = laneSp(n); o[k] = (rk - (n - 1) / 2) * sp * (e[0].a === r.path[k] ? 1 : -1); } // (the first line's right is the others' left when they run the other way)
+    ln.set(r, o); });
   const m = new Map(), xs = [];
-  for (const r of rs) if (r.path) for (let k = 1; k < r.path.length - 1; k++) {
-    const i = r.path[k], a = r.path[k - 1], b = r.path[k + 1]; let L = m.get(i); if (!L) m.set(i, L = []);
-    if (!L.some(([p, q]) => (p === a && q === b) || (p === b && q === a))) L.push([a, b]);
-  }
+  for (const r of rs) if (r.path) { const o = ln.get(r); for (let k = 1; k < r.path.length - 1; k++) {
+    const i = r.path[k], a = r.path[k - 1], b = r.path[k + 1], o0 = o[k - 1], o1 = o[k], nw = wid.get(r), bw = Math.min(RB, laneSp(Math.max(nw[k - 1], nw[k])) / 2 - .01); let L = m.get(i); if (!L) m.set(i, L = []);
+    if (!L.some(([p, q, u, v]) => (p === a && q === b && u === o0 && v === o1) || (p === b && q === a && u === -o1 && v === -o0))) L.push([a, b, o0, o1, bw]); } }
   for (const i of m.keys()) if (M.road[i] && !M.water[i]) xs.push(i);
-  RAILX.S = S; RAILX.n = gen; RAILX.m = m; RAILX.xs = xs; return m;
+  // junctions: tiles where two lines' tracks come close (they cross, or meet and part) without lanes of their own. Only
+  // one train at a time goes through: the signals (stepTrains).
+  const per = new Map(), cf = new Set(); rs.forEach((r, q) => { if (r.path) { const o = ln.get(r); for (let k = 1; k < r.path.length - 1; k++) { const i = r.path[k]; let L = per.get(i); if (!L) per.set(i, L = []); L.push([q, r.path[k - 1], r.path[k + 1], o[k - 1], o[k]]); } } });
+  for (const [i, L] of per) { if (L.length < 2) continue; const pts = L.map(([q, a, b, u, v]) => [0, .25, .5, .75, 1].map(t => railPt(i, a, b, t, u, v)));
+    for (let A = 0; A < L.length && !cf.has(i); A++) for (let B = A + 1; B < L.length; B++) if (L[A][0] !== L[B][0] && pts[A].some(p => pts[B].some(q => Math.hypot(p[0] - q[0], p[2] - q[2]) < .27))) { cf.add(i); break; } }
+  RAILX.S = S; RAILX.n = gen; RAILX.m = m; RAILX.xs = xs; RAILX.ln = ln; RAILX.cf = cf; return m;
 }
+function railLane(r) { railMap(); return RAILX.ln.get(r) || null; }
 const railEra = () => hasTech('maglev') ? 2 : hasTech('electric') ? 1 : 0;
 EV.on('tech', d => { if (d.t && (d.t.id === 'electric' || d.t.id === 'maglev')) for (const i of railMap().keys()) markDirty(i); }); // the track changes with the age
 function railH(i) { // the height the track runs at over a tile: the ground, or a deck level with the higher bank
@@ -26,14 +44,16 @@ function railH(i) { // the height the track runs at over a tile: the ground, or 
   return h;
 }
 // a point on tile i's piece (entered from a, left for b) at t in 0..1: [x, y, z, dx, dz] (y is the top of the rails' bed)
-function railPt(i, a, b, t) {
+function railPt(i, a, b, t, o0 = 0, o1 = 0) { // (o0, o1: its lane, to the right of the way it runs, where it comes in and goes out)
   const x = i % W, z = (i / W) | 0, ex = (x + a % W) / 2, ez = (z + ((a / W) | 0)) / 2, xx = (x + b % W) / 2, xz = (z + ((b / W) | 0)) / 2, u = 1 - t;
   const hi = railH(i), hE = Math.max(hi, railH(a)), hX = Math.max(hi, railH(b));
-  return [u * u * ex + 2 * u * t * x + t * t * xx, hE + (hX - hE) * t, u * u * ez + 2 * u * t * z + t * t * xz, 2 * (u * (x - ex) + t * (xx - x)), 2 * (u * (z - ez) + t * (xz - z))];
+  const p = [u * u * ex + 2 * u * t * x + t * t * xx, hE + (hX - hE) * t, u * u * ez + 2 * u * t * z + t * t * xz, 2 * (u * (x - ex) + t * (xx - x)), 2 * (u * (z - ez) + t * (xz - z))];
+  if (o0 || o1) { const o = o0 + (o1 - o0) * t * t * (3 - 2 * t), l = Math.hypot(p[3], p[4]) || 1; p[0] -= p[4] / l * o; p[2] += p[3] / l * o; }
+  return p;
 }
-function railPos(path, s) { // where along a line s is (s in tiles from its first station; the stations' own tiles are the platforms' ends)
+function railPos(path, s, ln) { // where along a line s is (s in tiles from its first station; the stations' own tiles are the platforms' ends); ln: its lanes
   const L = path.length - 1, j = clamp(Math.round(s), 1, Math.max(1, L - 1)), t = clamp(s - j + .5, 0, 1);
-  return railPt(path[j], path[j - 1], path[Math.min(L, j + 1)], t);
+  return railPt(path[j], path[j - 1], path[Math.min(L, j + 1)], t, ln ? ln[j - 1] : 0, ln ? ln[Math.min(L - 1, j)] : 0);
 }
 
 /* ---------- the track, built into the chunk ---------- */
@@ -41,9 +61,9 @@ const RG = .07, RB = .19; // half the gauge, half the ballast's width (people ar
 function glRailTile(i, x, y) {
   const L = railMap().get(i); if (!L) return;
   const era = railEra(), lod = GLB.lod, xing = M.road[i] && !M.water[i], g = GT(i), wet = !!M.water[i];
-  for (const [a, b] of L) {
-    const turn = (a % W !== b % W) && (((a / W) | 0) !== ((b / W) | 0)), n = turn ? (lod ? 8 : 4) : (lod ? 2 : 1), P = [];
-    for (let k = 0; k <= n; k++) { const p = railPt(i, a, b, k / n), l = Math.hypot(p[3], p[4]) || 1; P.push([p[0], xing ? g + .008 : p[1], p[2], p[3] / l, p[4] / l]); }
+  for (const [a, b, o0, o1, bw] of L) {
+    const turn = (a % W !== b % W) && (((a / W) | 0) !== ((b / W) | 0)) || o0 !== o1, n = turn ? (lod ? 8 : 4) : (lod ? 2 : 1), P = []; // (a lane sliding sideways bends too)
+    for (let k = 0; k <= n; k++) { const p = railPt(i, a, b, k / n, o0, o1), l = Math.hypot(p[3], p[4]) || 1; P.push([p[0], xing ? g + .008 : p[1], p[2], p[3] / l, p[4] / l]); }
     const side = (p, d, y) => [p[0] - p[4] * d, y, p[2] + p[3] * d]; // d across the track (the right of the way it runs)
     const strip = (d0, d1, dy, col, mat, e = 0) => { GLB.mat = mat; const c = gcol(col); for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; GLB.ctr = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2 - 1, (A[2] + B[2]) / 2]; gquad(side(A, d0, A[1] + dy), side(A, d1, A[1] + dy), side(B, d1, B[1] + dy), side(B, d0, B[1] + dy), c, e); } };
     const wall = (d, dy0, dy1, col, mat, cd) => { GLB.mat = mat; const c = gcol(col); for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; GLB.ctr = side([(A[0] + B[0]) / 2, 0, (A[2] + B[2]) / 2, A[3], A[4]], cd, (A[1] + B[1]) / 2 + (dy0 + dy1) / 2); gquad(side(A, d, A[1] + dy0), side(B, d, B[1] + dy0), side(B, d, B[1] + dy1), side(A, d, A[1] + dy1), c); } };
@@ -51,8 +71,8 @@ function glRailTile(i, x, y) {
     const bal = era ? '#9a958c' : '#8c8173', slp = era ? '#c4c0b8' : '#6e5440', slpM = era ? M_STONE : M_PLANK, steel = '#5d5f63';
     if (xing) { strip(-RG - .03, RG + .03, .001, era ? '#b5b1a9' : '#8a6a4c', era ? M_STONE : M_PLANK); } // the crossing's planks between the rails
     else {
-      strip(-RB, RB, .03, bal, M_STONE); // the ballast's top, and its shoulders down to the ground (an embankment where it ramps up a step)
-      for (const d of [-1, 1]) { GLB.mat = M_STONE; const c = gcol(shade(bal, .9)); for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; GLB.ctr = [(A[0] + B[0]) / 2, Math.min(A[1], B[1]) - .5, (A[2] + B[2]) / 2]; const lo = wet ? -.04 : 0, ya = wet ? A[1] + lo : g, yb = wet ? B[1] + lo : g; gquad(side(A, d * RB, A[1] + .03), side(B, d * RB, B[1] + .03), side(B, d * (RB + (wet ? 0 : .05 + (A[1] - g) * .6)), Math.min(yb, B[1])), side(A, d * (RB + (wet ? 0 : .05 + (A[1] - g) * .6)), Math.min(ya, A[1])), c); } }
+      strip(-bw, bw, .03, bal, M_STONE); // the ballast's top, and its shoulders down to the ground (an embankment where it ramps up a step)
+      for (const d of [-1, 1]) { GLB.mat = M_STONE; const c = gcol(shade(bal, .9)); for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; GLB.ctr = [(A[0] + B[0]) / 2, Math.min(A[1], B[1]) - .5, (A[2] + B[2]) / 2]; const lo = wet ? -.04 : 0, ya = wet ? A[1] + lo : g, yb = wet ? B[1] + lo : g; gquad(side(A, d * bw, A[1] + .03), side(B, d * bw, B[1] + .03), side(B, d * (bw + (wet ? 0 : .05 + (A[1] - g) * .6)), Math.min(yb, B[1])), side(A, d * (bw + (wet ? 0 : .05 + (A[1] - g) * .6)), Math.min(ya, A[1])), c); } }
       if (lod) { // sleepers, about ten to a tile
         for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1], m = Math.max(1, Math.round(10 * Math.hypot(B[0] - A[0], B[2] - A[2]))); for (let q = 0; q < m; q++) { const t = (q + .5) / m, p = [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t, A[3] + (B[3] - A[3]) * t, A[4] + (B[4] - A[4]) * t]; GLB.mat = slpM; glOBox([p[0], p[1] + .036, p[2]], [p[3] * .022, 0, p[4] * .022], [-p[4] * .13, 0, p[3] * .13], [0, .006, 0], slp); } }
       }
@@ -61,8 +81,8 @@ function glRailTile(i, x, y) {
     const ry = xing ? .004 : .042; // the rails: two steel bars (a top and an inner face far off)
     for (const d of [-RG, RG]) { strip(d - .007, d + .007, ry + .016, '#8d9196', 0); if (lod) { wall(d - .007, ry, ry + .016, steel, 0, d); wall(d + .007, ry, ry + .016, steel, 0, d); } else wall(d - Math.sign(d) * .007, ry, ry + .016, steel, 0, d); }
     if (wet) glRailBridge(i, P, n, side, era, lod);
-    if (era === 1) glCatenary(i, P, n, side, lod, x, y);
-    if (xing && lod) glXingSigns(P, n, side);
+    if (era === 1) glCatenary(i, P, n, side, lod, x, y, o0 + o1);
+    if (xing && lod) glXingSigns(P, n, side, o0 + o1);
     for (const e of [a, b]) { const B = M.bld[e] && S.B[M.bld[e]]; if (B && B.type === 'station') glBuffer(P[e === a ? 0 : n], e === a ? 1 : -1); } // the line ends at the station: a buffer stop
   }
 }
@@ -74,8 +94,8 @@ function glRailBridge(i, P, n, side, era, lod) { // a deck over the river on a p
     if (lod || !era) { const q = era ? 1 : 3; for (let s = 0; s <= q; s++) { const t0 = s / q, p0 = [a0[0] + (b0[0] - a0[0]) * t0, a0[1] + (b0[1] - a0[1]) * t0, a0[2] + (b0[2] - a0[2]) * t0]; gBeam(p0, [p0[0], p0[1] + .14, p0[2]], .01, iron); if (!era && s < q) { const t1 = (s + 1) / q, p1 = [a0[0] + (b0[0] - a0[0]) * t1, a0[1] + (b0[1] - a0[1]) * t1 + .14, a0[2] + (b0[2] - a0[2]) * t1]; gBeam(p0, p1, .007, iron); } } }
   }
 }
-function glCatenary(i, P, n, side, lod, x, y) { // a mast at the side of each tile, an arm over the track, the contact wire
-  const m = P[(n / 2) | 0], d = hash2(x, y, 41) < .5 ? -1 : 1, base = side(m, d * .3, m[1]), top = [base[0], m[1] + .52, base[2]], over = side(m, 0, m[1] + .5), grey = '#7f858c';
+function glCatenary(i, P, n, side, lod, x, y, lane = 0) { // a mast at the side of each tile, an arm over the track, the contact wire
+  const m = P[(n / 2) | 0], d = lane ? Math.sign(lane) : hash2(x, y, 41) < .5 ? -1 : 1, base = side(m, d * .3, m[1]), top = [base[0], m[1] + .52, base[2]], over = side(m, 0, m[1] + .5), grey = '#7f858c';
   GLB.mat = 0; gBeam(base, top, .012, grey); gBeam([top[0], top[1] - .03, top[2]], over, .007, grey);
   for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; gBeam(side(A, 0, A[1] + .48), side(B, 0, B[1] + .48), .003, '#3a3d41'); if (lod) gBeam(side(A, 0, A[1] + .53), side(B, 0, B[1] + .53), .002, '#3a3d41'); }
 }
@@ -85,9 +105,9 @@ function glGuideway(i, P, n, side, strip, wall, wet, g, lod) { // the maglev's g
   const m = P[(n / 2) | 0], w = wet ? (M.water[i] === 1 ? SEAZ : surfZ(i)) * ZS : g;
   GLB.mat = M_STONE; glOBox([m[0], (w + m[1] + top - .09) / 2, m[2]], [m[3] * .04, 0, m[4] * .04], [-m[4] * .05, 0, m[3] * .05], [0, (m[1] + top - .09 - w) / 2, 0], '#cfcbc3');
 }
-function glXingSigns(P, n, side) { // crossbucks at two corners of a level crossing
+function glXingSigns(P, n, side, lane = 0) { // crossbucks at two corners of a level crossing (beside a second track, only on the outside)
   const m = P[(n / 2) | 0];
-  for (const d of [-1, 1]) { const b = side([m[0] + m[3] * .36 * d, m[1], m[2] + m[4] * .36 * d, m[3], m[4]], .36 * d, m[1]); GLB.mat = 0; gBeam(b, [b[0], b[1] + .3, b[2]], .008, '#f2f2f2');
+  for (const d of [-1, 1]) { if (lane && d !== Math.sign(lane)) continue; const b = side([m[0] + m[3] * .36 * d, m[1], m[2] + m[4] * .36 * d, m[3], m[4]], .36 * d, m[1]); GLB.mat = 0; gBeam(b, [b[0], b[1] + .3, b[2]], .008, '#f2f2f2');
     for (const s of [-1, 1]) gBeam([b[0] - m[3] * .06, b[1] + .27 - s * .03, b[2] - m[4] * .06], [b[0] + m[3] * .06, b[1] + .27 + s * .03, b[2] + m[4] * .06], .007, s > 0 ? '#c83a32' : '#f4f1ea'); }
 }
 function glBuffer(p, dir) { // two posts and a beam where the line stops, a lamp on it
@@ -108,24 +128,43 @@ function trainCars(tr) {
   return { C, len: len(), era, fits: len() <= room };
 }
 const TRAIN_SP = [[.75, .16], [1.25, .3], [2.4, .5]]; // top speed (tiles a second) and how fast they get going, by age
+// Block signals at the junctions: a train claims the run of junction tiles ahead before it gets there (and holds the ones
+// under it); if another line's train has them, it eases to a stand at the signal and waits. A train that has waited a
+// long while goes anyway, so two trains can never hold each other up for good.
+function trainBlock(tr, len) { // the run of junction tiles ahead of its head, within a few tiles: [path index of its first tile, tiles]
+  const P = tr.r.path, L = P.length - 1, cf = RAILX.cf, head = tr.dir > 0 ? tr.lo + len : tr.lo;
+  for (let k = Math.round(head) + tr.dir, n = 0; k >= 1 && k <= L - 1 && n < 3; k += tr.dir, n++) if (cf.has(P[k])) {
+    const run = []; for (let j = k; j >= 1 && j <= L - 1 && cf.has(P[j]); j += tr.dir) run.push(P[j]); return [k, run]; }
+  return null;
+}
 function stepTrains(dt) {
   const busy = DYN.railBusy || (DYN.railBusy = new Set()); busy.clear();
+  railMap(); const claim = new Map(); // junction tile -> the train that has it
+  for (const tr of DYN.trains) { const { len, fits } = trainCars(tr); if (!fits || tr.lo == null) continue; const P = tr.r.path;
+    for (let k = Math.round(tr.lo); k <= Math.round(tr.lo + len); k++) if (RAILX.cf.has(P[k])) claim.set(P[k], tr); // (under it)
+    for (const i of tr.res || []) if (!claim.has(i)) claim.set(i, tr); } // (claimed last time, not yet passed)
   for (const tr of DYN.trains) {
     const P = tr.r.path, L = P.length - 1, { len, era, fits } = trainCars(tr), [vm, ac] = TRAIN_SP[era]; if (!fits) { tr.lo = .5; continue; } // (too short a line for any train)
     if (tr.lo == null || tr.lo + len > L - .5 + 1e-6) { tr.lo = .5; tr.v = 0; }
     if (tr.wait > 0) { tr.wait -= dt; tr.v = 0; }
     else {
-      const rem = tr.dir > 0 ? (L - .5) - (tr.lo + len) : tr.lo - .5, top = Math.min(vm, Math.sqrt(2 * ac * Math.max(0, rem)) + .04); // easing into the station
+      let rem = tr.dir > 0 ? (L - .5) - (tr.lo + len) : tr.lo - .5;
+      const bk = trainBlock(tr, len); tr.res = null; if (!bk) tr.go = null;
+      if (bk) { const [k, run] = bk, free = tr.go === run[0] || run.every(i => { const o = claim.get(i); return !o || o === tr || ((o.sig || 0) > 0 && (tr.sig || 0) > 4 && (tr.sig || 0) >= (o.sig || 0)); }); // (one that is itself held at a signal gives way to the train that has waited longer, so a knot of short lines can't lock up)
+        if (free || (tr.sig || 0) > 20) { tr.res = run; tr.go = run[0]; // (once given the road it keeps it until it's through)
+          for (const i of run) claim.set(i, tr); tr.sig = 0; }
+        else { const stop = tr.dir > 0 ? (k - .5) - (tr.lo + len) - .12 : tr.lo - (k + .5) - .12; if (stop < rem) rem = Math.max(0, stop); tr.sig = (tr.sig || 0) + dt; } } // (held at the signal)
+      const signal = rem < (tr.dir > 0 ? (L - .5) - (tr.lo + len) : tr.lo - .5) - 1e-6, top = Math.min(vm, Math.sqrt(2 * ac * Math.max(0, rem)) + (signal ? 0 : .04)); // easing into the station, or up to a red signal
       tr.v = Math.min(top, (tr.v || 0) + ac * dt); const d = Math.min(rem, tr.v * dt); tr.lo += tr.dir * d; tr.dist = (tr.dist || 0) + d;
-      if (rem - d <= 1e-4) { tr.dir = -tr.dir; tr.v = 0; tr.wait = rf(8, 15); }
+      if (rem - d <= 1e-4 && !signal) { tr.dir = -tr.dir; tr.v = 0; tr.wait = rf(8, 15); }
     }
     tr.s = tr.dir > 0 ? tr.lo + len : tr.lo; // (its head, for the film camera)
     const ah = tr.wait > 0 ? 0 : 1.6, s0 = tr.dir > 0 ? tr.lo - .3 : tr.lo - ah, s1 = tr.dir > 0 ? tr.lo + len + ah : tr.lo + len + .3; // under it, and the way it's going (a train standing at the platform holds nobody up)
     for (let s = Math.round(s0); s <= Math.round(s1); s++) if (s >= 0 && s <= L) busy.add(P[s]);
-    if (era === 0 && tr.v > .05 && GL3.eye) { const p = railPos(P, tr.s - tr.dir * .1); if (Math.hypot(p[0] - GL3.eye[0], p[2] - GL3.eye[2]) < 45 && chance(dt * (2 + tr.v * 9))) SMOKE3(p[0] + rf(-.02, .02), p[1] + .4, p[2] + rf(-.02, .02), '#ece8e2', .5, .14); } // steam from the chimney
+    if (era === 0 && tr.v > .05 && GL3.eye) { const p = railPos(P, tr.s - tr.dir * .1, railLane(tr.r)); if (Math.hypot(p[0] - GL3.eye[0], p[2] - GL3.eye[2]) < 45 && chance(dt * (2 + tr.v * 9))) SMOKE3(p[0] + rf(-.02, .02), p[1] + .4, p[2] + rf(-.02, .02), '#ece8e2', .5, .14); } // steam from the chimney
   }
 }
-function trainPos(tr) { return railPos(tr.r.path, tr.s); }
+function trainPos(tr) { return railPos(tr.r.path, tr.s, railLane(tr.r)); }
 // the crossing's barriers come down while a train is near; walkers and carts wait at the edge
 function railBusy(i) { return !!(DYN.railBusy && DYN.railBusy.has(i)); }
 
@@ -134,9 +173,9 @@ function glTrains() {
   railMap();
   for (const i of RAILX.xs || []) { // barriers
     const x = i % W, z = (i / W) | 0; if (Math.hypot(x - eye[0], z - eye[2]) > 30) continue;
-    const L = RAILX.m.get(i); if (!L) continue; const p = railPt(i, L[0][0], L[0][1], .5), l = Math.hypot(p[3], p[4]) || 1, f = [p[3] / l, 0, p[4] / l], r = [-f[2], 0, f[0]];
+    const L = RAILX.m.get(i); if (!L) continue; const mo = Math.max(...L.map(q => Math.abs(q[2] + q[3]) / 2)), p = railPt(i, L[0][0], L[0][1], .5), l = Math.hypot(p[3], p[4]) || 1, f = [p[3] / l, 0, p[4] / l], r = [-f[2], 0, f[0]];
     const want = railBusy(i) ? 1 : 0, a = XG.get(i) || 0, na = a + clamp(want - a, -dt * .8, dt * .8); XG.set(i, na); const ang = na * Math.PI / 2, y = GT(i) + .008;
-    for (const s of [-1, 1]) { const piv = [x + f[0] * .3 * s + r[0] * .36 * s, y + .12, z + f[2] * .3 * s + r[2] * .36 * s];
+    for (const s of [-1, 1]) { const piv = [x + f[0] * .3 * s + r[0] * (.36 + mo) * s, y + .12, z + f[2] * .3 * s + r[2] * (.36 + mo) * s]; // (outside every track)
       GLB.mat = 0; glOBox([piv[0], y + .06, piv[2]], [.012, 0, 0], [0, 0, .012], [0, .06, 0], '#e8e4dc');
       const dir = [-f[0] * s * Math.sin(ang), Math.cos(ang), -f[2] * s * Math.sin(ang)]; // straight up, swinging down across the road
       for (let q = 0; q < 4; q++) { const c = [piv[0] + dir[0] * (.07 + q * .13), piv[1] + dir[1] * (.07 + q * .13), piv[2] + dir[2] * (.07 + q * .13)]; glOBox(c, V3s(dir, .065), V3s(r, .006), V3s(V3x(dir, r), .008), q % 2 ? '#f4f1ea' : '#c83a32'); }
@@ -144,11 +183,11 @@ function glTrains() {
   }
   for (const tr of DYN.trains) {
     const P = tr.r.path, { C, len, era, fits } = trainCars(tr), head = tr.dir > 0 ? tr.lo + len : tr.lo; if (!fits) continue;
-    const h0 = railPos(P, head); if (Math.hypot(h0[0] - eye[0], h0[2] - eye[2]) > 70) continue;
+    const ln = railLane(tr.r), h0 = railPos(P, head, ln); if (Math.hypot(h0[0] - eye[0], h0[2] - eye[2]) > 70) continue;
     let off = 0;
     for (let k = 0; k < C.length; k++) {
       const [kind, cl] = C[k], sc = head - tr.dir * (off + cl / 2), bo = cl / 2 - .1; off += cl + .04;
-      const A = railPos(P, sc + tr.dir * bo), B = railPos(P, sc - tr.dir * bo), c = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2 + (era === 2 ? .215 : .058), (A[2] + B[2]) / 2];
+      const A = railPos(P, sc + tr.dir * bo, ln), B = railPos(P, sc - tr.dir * bo, ln), c = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2 + (era === 2 ? .215 : .058), (A[2] + B[2]) / 2];
       let fx = A[0] - B[0], fz = A[2] - B[2]; const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
       const f = [fx, (A[1] - B[1]) / (2 * bo), fz], r = [-fz, 0, fx], far = Math.hypot(c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]) > 18;
       const back = k === C.length - 1 && C[0][0] === kind; // the cab at the tail faces the other way
@@ -219,12 +258,15 @@ function tramMap() { // road tile -> its pieces [[prev, next], ...]
   TRAMX.S = S; TRAMX.g = g; TRAMX.m = m; return m;
 }
 const tramRoadY = i => M.water[i] ? bridgeZ(i) * ZS : GT(i) + .006;
-function tramPt(i, a, b, t) { // like railPt, on the road (an end of the line stops at the tile's middle)
+const TRAM_O = .095; // two tracks down the street, one each way, this far either side of its middle (trams keep to the right)
+function tramPt(i, a, b, t, o = 0) { // like railPt, on the road (an end of the line stops at the tile's middle); o: that far to the right
   const x = i % W, z = (i / W) | 0, E = a < 0 ? [x, z] : [(x + a % W) / 2, (z + ((a / W) | 0)) / 2], X = b < 0 ? [x, z] : [(x + b % W) / 2, (z + ((b / W) | 0)) / 2], u = 1 - t;
   const hi = tramRoadY(i), hE = a < 0 ? hi : (hi + tramRoadY(a)) / 2, hX = b < 0 ? hi : (hi + tramRoadY(b)) / 2;
-  return [u * u * E[0] + 2 * u * t * x + t * t * X[0], hE + (hX - hE) * t, u * u * E[1] + 2 * u * t * z + t * t * X[1], 2 * (u * (x - E[0]) + t * (X[0] - x)) || (X[0] - E[0]), 2 * (u * (z - E[1]) + t * (X[1] - z)) || (X[1] - E[1])];
+  const p = [u * u * E[0] + 2 * u * t * x + t * t * X[0], hE + (hX - hE) * t, u * u * E[1] + 2 * u * t * z + t * t * X[1], 2 * (u * (x - E[0]) + t * (X[0] - x)) || (X[0] - E[0]), 2 * (u * (z - E[1]) + t * (X[1] - z)) || (X[1] - E[1])];
+  if (o) { const l = Math.hypot(p[3], p[4]) || 1; p[0] -= p[4] / l * o; p[2] += p[3] / l * o; }
+  return p;
 }
-function tramPos(P, s) { const L = P.length - 1, j = clamp(Math.round(s), 0, L), t = clamp(s - j + .5, 0, 1); return tramPt(P[j], j > 0 ? P[j - 1] : -1, j < L ? P[j + 1] : -1, t); }
+function tramPos(P, s, o = 0) { const L = P.length - 1, j = clamp(Math.round(s), 0, L), t = clamp(s - j + .5, 0, 1); return tramPt(P[j], j > 0 ? P[j - 1] : -1, j < L ? P[j + 1] : -1, t, o); }
 function glTramTile(i, x, y) {
   const L = tramMap().get(i); if (!L) return;
   const lod = GLB.lod, el = hasTech('electric');
@@ -232,20 +274,23 @@ function glTramTile(i, x, y) {
     const n = lod ? 6 : 2, P = []; for (let k = 0; k <= n; k++) { const p = tramPt(i, a, b, k / n), l = Math.hypot(p[3], p[4]) || 1; P.push([p[0], p[1], p[2], p[3] / l, p[4] / l]); }
     const side = (p, d, yy) => [p[0] - p[4] * d, yy, p[2] + p[3] * d];
     GLB.mat = 0; const c = gcol('#4d5054');
-    for (const d of [-.05, .05]) for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; GLB.ctr = [(A[0] + B[0]) / 2, A[1] - 1, (A[2] + B[2]) / 2]; gquad(side(A, d - .006, A[1] + .003), side(A, d + .006, A[1] + .003), side(B, d + .006, B[1] + .003), side(B, d - .006, B[1] + .003), c); } // the grooved rails, set in the road
-    if (el) { for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; gBeam(side(A, 0, A[1] + .5), side(B, 0, B[1] + .5), .003, '#3a3d41'); } // the wire
-      if ((x + y) % 2 === 0) { const m = P[(n / 2) | 0], s = hash2(x, y, 43) < .5 ? -1 : 1, base = side(m, s * .3, m[1]); gBeam(base, [base[0], m[1] + .56, base[2]], .009, '#5d6268'); gBeam([base[0], m[1] + .54, base[2]], side(m, 0, m[1] + .51), .004, '#5d6268'); } } // a pole and its arm, every other tile
+    for (const d of [-TRAM_O - .045, -TRAM_O + .045, TRAM_O - .045, TRAM_O + .045]) for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; GLB.ctr = [(A[0] + B[0]) / 2, A[1] - 1, (A[2] + B[2]) / 2]; gquad(side(A, d - .006, A[1] + .003), side(A, d + .006, A[1] + .003), side(B, d + .006, B[1] + .003), side(B, d - .006, B[1] + .003), c); } // the grooved rails, set in the road
+    if (el) { for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; for (const d of [-TRAM_O, TRAM_O]) gBeam(side(A, d, A[1] + .5), side(B, d, B[1] + .5), .003, '#3a3d41'); } // a wire over each track
+      if ((x + y) % 2 === 0) { const m = P[(n / 2) | 0], s = hash2(x, y, 43) < .5 ? -1 : 1, base = side(m, s * .3, m[1]); gBeam(base, [base[0], m[1] + .56, base[2]], .009, '#5d6268'); gBeam([base[0], m[1] + .54, base[2]], side(m, -s * TRAM_O, m[1] + .51), .004, '#5d6268'); } } // a pole and its arm across both tracks, every other tile
   }
 }
 const TRAM_COL = [['#2f5a3e', '#e9dcc0'], ['#7a2e2a', '#e9dcc0'], ['#2a4a6e', '#efe6d2'], ['#c8553d', '#efe6d2']];
 function stepTrams(dt) {
   const D = DYN.trams || (DYN.trams = []); if (DYN.tramS !== S) { D.length = 0; DYN.tramS = S; }
-  for (const T of towns()) { const P = T._tram; let tm = D.find(o => o.sid === T.id); if (!P) { if (tm) D.splice(D.indexOf(tm), 1); continue; }
-    if (!tm) D.push(tm = { sid: T.id, P, s: 0, dir: 1, wait: rf(0, 4), v: 0, next: 5, dist: 0 }); if (tm.P !== P) Object.assign(tm, { P, s: clamp(tm.s, 0, P.length - 1) }); }
+  for (const T of towns()) for (const n of [0, 1]) { const P = T._tram; let tm = D.find(o => o.sid === T.id && o.n === n); if (!P) { if (tm) D.splice(D.indexOf(tm), 1); continue; } // (two to a town: one sets off from each end)
+    if (!tm) D.push(tm = { sid: T.id, n, P, s: n ? P.length - 1 : 0, dir: n ? -1 : 1, off: n ? -TRAM_O : TRAM_O, wait: rf(0, 4), v: 0, next: n ? P.length - 6 : 5, dist: 0 }); if (tm.P !== P) Object.assign(tm, { P, s: clamp(tm.s, 0, P.length - 1) }); }
   for (const tm of D) {
     const L = tm.P.length - 1, vm = hasTech('electric') ? .6 : .32;
     if (tm.wait > 0) { tm.wait -= dt; tm.v = 0; continue; }
+    const ahead = D.some(o => o !== tm && o.sid === tm.sid && Math.abs((o.off || 0) - (tm.off || 0)) < .12 && (o.s - tm.s) * tm.dir > 0 && (o.s - tm.s) * tm.dir < 1.1); // (the other one in the way on this track: wait behind it)
+    if (ahead) { tm.v = 0; continue; }
     tm.v = Math.min(vm, tm.v + .4 * dt); const d = tm.v * dt; tm.s += tm.dir * d; tm.dist += d;
+    const to = tm.dir * TRAM_O; tm.off = (tm.off == null ? to : tm.off) + clamp(to - tm.off, -d * .35, d * .35); // (over the crossover to its own track after turning back at the end)
     if (tm.s >= L || tm.s <= 0) { tm.s = clamp(tm.s, 0, L); tm.dir = -tm.dir; tm.wait = rf(5, 9); tm.next = tm.s + tm.dir * 5; continue; }
     if ((tm.dir > 0 && tm.s >= tm.next) || (tm.dir < 0 && tm.s <= tm.next)) { tm.wait = rf(2, 3.5); tm.next = tm.s + tm.dir * (4 + ((tm.s * 7) | 0) % 3); } // a stop: folk get on and off
   }
@@ -253,14 +298,14 @@ function stepTrams(dt) {
 function glTrams() {
   const eye = GL3.eye || [0, 0, 0], era = hasTech('computing') ? 2 : hasTech('electric') ? 1 : 0;
   for (const tm of DYN.trams || []) {
-    const hl = era === 2 ? .36 : era === 1 ? .26 : .19, A = tramPos(tm.P, tm.s + tm.dir * hl * .7), B = tramPos(tm.P, tm.s - tm.dir * hl * .7), c = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2 + .02, (A[2] + B[2]) / 2];
+    const hl = era === 2 ? .36 : era === 1 ? .26 : .19, A = tramPos(tm.P, tm.s + tm.dir * hl * .7, tm.off || 0), B = tramPos(tm.P, tm.s - tm.dir * hl * .7, tm.off || 0), c = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2 + .02, (A[2] + B[2]) / 2];
     if (Math.hypot(c[0] - eye[0], c[2] - eye[2]) > 45) continue;
     let fx = A[0] - B[0], fz = A[2] - B[2]; const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
     glTram(era, c, [fx, 0, fz], [-fz, 0, fx], hl, tm, Math.hypot(c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]) > 16);
   }
 }
 function glTram(era, c, f, r, hl, tm, far) {
-  const K = 1.35, P = (s, t, y) => [c[0] + f[0] * s + r[0] * t, c[1] + y * K, c[2] + f[2] * s + r[2] * t], lit = GL3.litNow, [c1, c2] = TRAM_COL[tm.sid % TRAM_COL.length]; // (K: taller than the folk on the pavement)
+  const K = 1, P = (s, t, y) => [c[0] + f[0] * s + r[0] * t, c[1] + y * K, c[2] + f[2] * s + r[2] * t], lit = GL3.litNow, [c1, c2] = TRAM_COL[tm.sid % TRAM_COL.length]; // (K: how tall it stands; folk come up to about its windows)
   const box = (s0, s1, t, y0, y1, col, e = 0) => { GLB.mat = 0; glOBox(P((s0 + s1) / 2, 0, (y0 + y1) / 2), V3s(f, (s1 - s0) / 2), V3s(r, t), [0, (y1 - y0) / 2 * K, 0], col, e); };
   const wins = (s0, s1, y0, y1, m) => { for (const t of [-1, 1]) for (let q = 0; q < m; q++) { const s = s0 + (q + .5) / m * (s1 - s0); glOBox(P(s, t * .081, (y0 + y1) / 2), V3s(f, (s1 - s0) / m * .36), V3s(r, .003), [0, (y1 - y0) / 2 * K, 0], '#3a4250', .25 + .6 * hash2(tm.sid, q, t + 5)); } };
   const wheels = ss => { if (far) return; for (const s of ss) for (const t of [-1, 1]) trCyl(P(s, t * .06, .025), r, f, [0, 1, 0], .025 * K, .008, 8, '#2a2a2c'); };
