@@ -6,7 +6,7 @@ const b = await launch(); const p = await b.newPage({ viewport: { width: 1100, h
 const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
 let fails = 0; const ok = (c, what, extra = '') => { console.log(`${c ? 'ok  ' : 'FAIL'} ${what}${extra ? ' · ' + extra : ''}`); if (!c) fails++; };
 await p.goto(ROOT + 'seedfall.html?seed=999&fresh&nointro'); await p.waitForTimeout(700);
-await p.evaluate(() => { SF.ff(1400); SF.weather('clear', 9999); SF.hour(15); GL3.noNear = true; });
+await p.evaluate(() => { SF.ff(1400); SF.weather('clear', 9999); SF.hour(15); GL3.noNear = true; S.inc = []; }); // (an incident under way would take half the shots: incidents.mjs covers those)
 await p.waitForFunction(() => GL3.dirty.size === 0, null, { timeout: 300000 });
 // several shots in a row (time is stepped by hand so each shot is quick to reach)
 const seen = [];

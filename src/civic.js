@@ -100,7 +100,7 @@ GL_MODEL.theatre = function (B, st) {
   kSetB(B); const [wc, wm] = kWall(B, st), lod = KF.lod, rc = st.roof, acc = st.accent;
   const s0 = -.36, s1 = .36, fB = -.34, fD = .14, H = .42, fc = (fB + fD) / 2;
   kPlinth(s0, s1, fB, fD, .03); kBox(0, fc, .03, .36, (fD - fB) / 2, H - .03, wc, wm);
-  kBox(0, fB + .14, H, .22, .14, .26, shade(wc, .95), wm); kGable(-.22, .22, fB, fB + .28, H + .26, .06, rc, { wall: wc, wm }); cFlag(.18, fB + .14, H + .32, .14, acc); // the fly tower
+  kBox(0, fB + .142, H, .22, .14, .26, shade(wc, .95), wm); kGable(-.22, .22, fB, fB + .28, H + .26, .06, rc, { wall: wc, wm }); cFlag(.18, fB + .14, H + .32, .14, acc); // the fly tower
   kCols(-.24, .24, 4, fD + .13, .03, .26, .016); kBox(0, fD + .07, .29, .26, .08, .04, '#ece6da', M_STONE); kPed(-.26, .26, fD + .13, .33, .08, '#ece6da');
   for (let q = 0; q < 2; q++) kBox(0, fD + .2 - q * .03, q * .015, .26, .03 + q * .015, .015, '#d8d0c2', M_STONE);
   for (const d of [-1, 0, 1]) kDoor(d * .09, fD, .032, .14, '#7a3b3b', { ty: 'panel', y: .03 });
@@ -218,6 +218,7 @@ GL_MODEL.dock = function (B, st) {
 };
 
 /* ---------- the lighthouse: its rock, a banded tower, the gallery and its railing, the lantern, a keeper's cottage ---------- */
+const LH_LAMP = .04 + 5 * .17 + .12; // how high the lamp sits above the ground (fx3d.js sweeps its beam from there)
 GL_MODEL.lighthouse = function (B, st) {
   kSetB(B); const lod = KF.lod, red = '#c0584f', white = '#f4f1ea';
   for (const [s, f, r] of [[0, 0, .3], [.14, .12, .16], [-.16, .1, .14], [.08, -.18, .15], [-.1, -.2, .12]]) kBlob(s, f, 0, r, .06, s ? '#bdb7c9' : '#aaa4b8', M_STONE);
@@ -289,7 +290,7 @@ GL_BIG.museum = function (B, st) {
 GL_BIG.theatre = function (B, st) {
   cBig(B); const [wc, wm] = kWall(B, st), lod = KF.lod, rc = st.roof, acc = st.accent, s0 = -.85, s1 = .85, fB = -.42, fD = .14, H = .46, fc = (fB + fD) / 2;
   kPlinth(s0, s1, fB, fD, .04); kBox(0, fc, .04, .85, (fD - fB) / 2, H - .04, wc, wm);
-  kBox(-.45, fB + .2, H, .32, .2, .34, shade(wc, .95), wm); kGable(-.77, -.13, fB, fB + .4, H + .34, .08, rc, { wall: wc, wm }); cFlag(-.2, fB + .2, H + .42, .16, acc); // the fly tower
+  kBox(-.45, fB + .202, H, .32, .2, .34, shade(wc, .95), wm); kGable(-.77, -.13, fB, fB + .4, H + .34, .08, rc, { wall: wc, wm }); cFlag(-.2, fB + .2, H + .42, .16, acc); // the fly tower
   kCols(-.36, .36, 6, fD + .16, .04, .3, .018); kBox(0, fD + .08, .34, .4, .095, .045, '#ece6da', M_STONE); kPed(-.4, .4, fD + .16, .385, .1, '#ece6da');
   for (let q = 0; q < 3; q++) kBox(0, fD + .28 - q * .03, q * .015, .4, .03 + q * .015, .015, '#d8d0c2', M_STONE);
   for (const s of [-.2, 0, .2]) kDoor(s, fD, .045, .16, '#7a3b3b', { ty: 'panel', y: .04 });

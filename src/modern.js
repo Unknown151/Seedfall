@@ -126,7 +126,7 @@ GL_MODEL.vfarm = function (B, st) {
   kSetB(B); const lod = KF.lod, H = 30 * ZS, hw = .34;
   kBox(0, 0, 0, hw, hw, .03, '#cfd3d6', M_STONE);
   for (let k = 0; k < 5; k++) { const y = .03 + k * (H - .03) / 5, fh = (H - .03) / 5;
-    kBox(0, 0, y, hw - .02, hw - .02, fh, '#2f3a44', 0, .02); // inside, dark; the growing light shows at night
+    kBox(0, 0, y, hw - .02, hw - .02, fh - .014, '#2f3a44', 0, .02); // inside, dark; the growing light shows at night
     kBox(0, 0, y + fh - .014, hw + .004, hw + .004, .014, '#e8ecef', M_STONE); kBox(0, 0, y + fh - .03, hw - .005, hw - .005, .016, '#6fbf73', M_LEAF); // a floor of greens behind the glass
     kBox(0, 0, y + .02, hw - .03, hw - .03, .012, '#ff7ad9', 0, 3);
     if (lod) for (const d of [-1, 1]) for (const e of [-1, 1]) kBox(d * (hw - .005), e * (hw - .005), y, .006, .006, fh, '#9aa3ad');
@@ -237,7 +237,7 @@ GL_MODEL.elevator = function (B, st) {
   kBox(0, 0, 0, .46, .46, .45, st.wall, M_PLASTER); kWalls(-.46, .46, -.46, .46, (a, b, ff, k) => kWins(a, b, ff, 0, .45, 1, 5, { ty: 'glass', hk: .6 }, null, k * 7)); kFlat(-.46, .46, -.46, .46, .45, st.wall, .02);
   kBox(0, 0, .45, .3, .3, 1, w1, M_PLASTER); kWalls(-.3, .3, -.3, .3, (a, b, ff, k) => kWins(a, b, ff, .45, .33, 3, 3, { ty: 'glass' }, null, 40 + k * 7));
   kBox(0, 0, 1.45, .14, .14, 1.82, w2, M_PLASTER); kBox(0, 0, 3.27, .16, .16, .14, st.accent); kBox(0, 0, 3.41, .03, .03, .02, '#bff3ff', 0, 3);
-  for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) kBox(a * .13, b * .13, 1.45, .01, .01, 1.82, '#bff3ff', 0, 2); // light running up its corners
+  for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) kBox(a * .131, b * .131, 1.45, .011, .011, 1.82, '#bff3ff', 0, 2); // light running up its corners
   kBox(0, 0, 3.43, .008, .008, 3, '#bff3ff', 0, 3); // the tether, going on up out of sight
   if (lod) { for (let q = 0; q < 3; q++) kBox(.47, -.3 + q * .3, 0, .006, .06, .3, '#9aa3ad'); for (const [s, f] of [[-.4, .5], [.4, .5]]) cLampPost(s, f, .2); }
 };

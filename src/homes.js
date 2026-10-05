@@ -202,7 +202,7 @@ function hRow4(B, st) {
     kBox(sc, fc, g0, L / 2, (fD - fB) / 2, fh, st.wall, M_PLASTER); kBox(sc, fc, g0 + fh, L / 2, (fD - fB) / 2, hT - g0 - fh, clad, M_PLANK);
     if (lod) for (let s = s0 + .02; s < s1; s += .03) kBox(s, fD + .002, g0 + fh, .003, .003, hT - g0 - fh, shade(clad, .8), M_PLANK);
     if (shop) kShop(s0 + .03, s1 - .03, fD, g0, fh * .82, st.accent, B.id);
-    else { kBox(bay(dk), fD - .03, g0, .055, .03, fh * .8, '#2c3036'); kDoor(bay(dk), fD - .058, .042, fh * .74, '#3a3f45', { ty: 'glass' }); kBox(bay(dk), fD + .03, g0 + fh * .82, .08, .06, .014, '#e8ecf0');
+    else { kBox(bay(dk), fD - .029, g0, .055, .03, fh * .8, '#2c3036'); kDoor(bay(dk), fD - .058, .042, fh * .74, '#3a3f45', { ty: 'glass' }); kBox(bay(dk), fD + .03, g0 + fh * .82, .08, .06, .014, '#e8ecf0');
       for (let k = 0; k < nb; k++) if (k !== dk) kWin(bay(k), fD, g0 + fh * .12, Math.min(.08, L / nb * .38), fh * .7, k, { ty: 'glass' }); }
     for (let fk = 1; fk < floors; fk++) { const y = g0 + fk * fh; if (y > hT - .05) break; kWin(sc, fD, y + fh * .1, L * .38, fh * .78, 10 + fk, { ty: 'glass' }); if (fk === 1 && hk(B, 14) < .6) kBalc(sc, fD, y, L * .4, .07, { glass: 1 }); }
     kWins(s0 + .05, s1 - .05, fB, g0, fh, floors - (top ? 1 : 0), 2, { ty: 'glass', back: 1, hw: .07, hk: .7, yk: .14 }, null, 30);
@@ -268,11 +268,11 @@ function hFlats(B, st) {
   }
   // concrete and glass
   const conc = mix(st.wall, '#d8d8d4', .4), sb = kind === 1, top = sb ? H - fh : H;
-  ground('#3a4048', 0); if (!shop) kBox(sc, fc, g0, L / 2 - .02, hd - .02, fh0, '#2f363d');
+  ground('#3a4048', 0); if (!shop) kBox(sc, fc, g0, L / 2 - .02, hd - .02, fh0 * .97, '#2f363d');
   kBox(sc, fc, g0 + fh0 * .98, L / 2, hd, .02, conc, M_STONE);
   const fl = sb ? floors - 1 : floors;
   for (let fk = 0; fk < fl; fk++) { const y = y1 + fk * fh;
-    kBox(sc, fc, y, L / 2 - .015, hd - .03, fh, kind === 2 ? '#2f3a40' : '#33475a', 0, kLit(fk * 9 + 1)); // the glazing, set back
+    kBox(sc, fc, y, L / 2 - .015, hd - .03, fh - .016, kind === 2 ? '#2f3a40' : '#33475a', 0, kLit(fk * 9 + 1)); // the glazing, set back (up to the slab)
     kBox(sc, fc, y + fh - .016, L / 2, hd, .016, conc, M_STONE); // the slab edge
     if (lod) for (let k = 1; k < nb; k++) kBox(s0 + k * L / nb, fD - .028, y, .004, .004, fh - .016, '#9aa3ad');
     if (kind === 0 || kind === 2) { kBalc(sc, fD - .03, y, L / 2 - .01, .06, { glass: kind === 0, rail: kind === 2 ? '#6b7a5a' : null }); kBalc(sc, fB + .03, y, L / 2 - .01, .06, { glass: kind === 0 });
@@ -305,7 +305,7 @@ function hTower(B, st) {
   const b0 = Math.max(zb, form === 1 ? zb : .16), b1 = h * .82;
   GLB.wall = M_GLASS; glBox(0, 0, hw, hw, b0 / ZS, (b1 - b0) / ZS, glass); glBox(0, 0, hw * .78, hw * .78, b1 / ZS, h * .18 / ZS, shade(glass, 1.06)); GLB.wall = sv; // (curtain walls get their mullions and floor bands: gl.js glBox)
   glWindows(0, 0, hw, hw, b0 / ZS, (b1 - b0) / ZS, Math.floor((b1 - b0) / ZS / 8), 4, glass);
-  for (const d of [-1, 1]) for (const e of [-1, 1]) kBox(d * (hw - .008), e * (hw - .008), b0, .012, .012, b1 - b0, conc, M_STONE); // stone corners
+  for (const d of [-1, 1]) for (const e of [-1, 1]) kBox(d * (hw - .008), e * (hw - .008), b0, .013, .013, b1 - b0, conc, M_STONE); // stone corners (a hair past the mullions, gl.js glBox, or they flicker)
   kBox(0, 0, b1 - .01, hw + .008, hw + .008, .025, conc, M_STONE); kBox(0, 0, b1 + .012, hw * .97, hw * .97, .006, '#fff0c8', 0, 2); // a lit band round the crown
   kFlat(-hw * .78, hw * .78, -hw * .78, hw * .78, h, conc, .03);
   if (form === 4) { kCyl(0, 0, h + .01, .2, .01, '#5d646c', 0, 16); for (const [a, b] of [[.045, 0], [-.045, 0]]) kBox(a, b, h + .02, .006, .045, .002, '#f0f0f0'); kBox(0, 0, h + .02, .045, .006, .002, '#f0f0f0'); // a helipad, its lights

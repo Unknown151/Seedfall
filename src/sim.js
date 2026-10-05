@@ -161,11 +161,27 @@ function bigClear(B, s, w, h) { // claim the lot: whatever stands there gives wa
   return homes;
 }
 const BIG_N = { stadium: 'stadium', university: 'university', fusion: 'fusion plant' };
+// One stadium for the whole valley. The town with the most people within easy reach (its own, and its neighbours'
+// counted for less the further off they are) is elected to host it, so it goes to a big town in the thick of things,
+// not the far-flung one. Once one stands its town stays the host (S.stadT); an older world's extras close (yearlyRetire).
+function stadiumReach(T) { let r = 0; for (const U of towns()) r += U.pop / (1 + dist(T.x, T.y, U.x, U.y) / 12); return r; }
+function stadiumHost() {
+  const ts = towns(); if (!ts.length) return null;
+  const has = new Set(); if (anycount('stadium')) for (const id in S.B) if (S.B[id].type === 'stadium') has.add(S.B[id].sid);
+  let H = S.stadT != null ? S.T[S.stadT] : null;
+  if (H && ts.includes(H) && (!has.size || has.has(H.id))) return H;
+  const c = has.size ? ts.filter(T => has.has(T.id)) : ts.filter(T => T.pop >= 1500); if (!c.length) return null;
+  H = c.reduce((a, b) => stadiumReach(b) > stadiumReach(a) ? b : a); if (has.size) S.stadT = H.id;
+  return H;
+}
+function stadiumHere(T) { return !anycount('stadium') && stadiumHost() === T; } // (may this town start the valley's stadium?)
 function placeBig(T, type, o = {}) { // a new big landmark on its whole lot, cleared at the edge of town (null when there's no room)
+  if (type === 'stadium' && !stadiumHere(T)) return null;
   const f = FP_BIG[type], s = bigLotSite(T, f[0], f[1]); if (!s) return null;
   const a = M.bld[idx(s.x, s.y)] && S.B[M.bld[idx(s.x, s.y)]], a0 = a && a.type === 'house' ? 1 : 0; if (a) removeBuilding(a); // (clear the corner first: nothing may be left under it)
   const B = mkBuilding(type, s.x, s.y, T, o); const homes = a0 + bigClear(B, s, f[0], f[1]); connectBig(B);
   chron('🚧', `Ground is cleared at the edge of ${T.name} for a ${BIG_N[type]}${homes ? `; ${homes === 1 ? 'a house comes' : homes + ' houses come'} down to make room` : ''}.`, { x: s.x, y: s.y });
+  if (type === 'stadium') { S.stadT = T.id; if (towns().length > 1) chron('🏟️', `The towns of the valley pick ${T.name} to host their stadium: it's the easiest place for everyone to get to.`, { T }); }
   return B;
 }
 function bigMove(B) { // an older landmark too small for its lot and hemmed in: a new one at the edge, a park where it stood
@@ -656,6 +672,7 @@ function tryService(T) {
     if ((CULT.bld[sv.t] || 0) > .4) want = Math.min(sv.max + 2, want + 1);
     if (sv.t === 'park' && lever('nature') === 'gardens') want = Math.min(sv.max + 6, want + 3);
     if (sv.t === 'airfield' && wcount('airfield') >= Math.ceil(towns().length / 2)) continue;
+    if (sv.t === 'stadium' && !stadiumHere(T)) continue;
     if (sv.t === 'lighthouse' && (!townHarbour(T) || anycount('lighthouse') >= 3)) continue;
     if (have >= want) continue;
     if (BIG_LOT(sv.t)) { if (placeBig(T, sv.t)) return true; continue; } // (a big landmark: its whole lot cleared at the edge of town)
@@ -669,6 +686,7 @@ function tryService(T) {
   return false;
 }
 function placeProject(T, type, kinds, o = {}) {
+  if (type === 'stadium' && !stadiumHere(T)) return null; // (the valley has one, in the town it chose)
   if (BIG_LOT(type)) { const B = placeBig(T, type, o); if (B) return B; } // (big ones want their whole lot from the start)
   let s = null;
   for (const k of kinds) { s = findSite(T, k, 0, type) || findSite(T, k, 3, type); if (s) break; }
@@ -706,7 +724,9 @@ const AGE_BUILD = { gardens: ['park', 'dome'], lanterns: ['monument'], stone: ['
   quiet: ['library', 'park'], stars: ['observatory', 'museum'], craft: ['market', 'workshop'], echo: ['museum', 'monument'] };
 function ageProject(T) {
   const th = S.age.k, cb = Object.entries(CULT.bld);
-  const type = cb.length && chance(.4) ? wpick(cb) : pick(AGE_BUILD[th] || ['park']);
+  let type = cb.length && chance(.4) ? wpick(cb) : pick(AGE_BUILD[th] || ['park']);
+  if (type === 'stadium' && !stadiumHere(T)) type = 'park';
+  if (BIG_LOT(type)) { placeBig(T, type); return; }
   let s = type === 'dock' ? findSite(T, 'shore') : findSite(T, 'mid');
   if (!s) { // rebuild over an old low-rise block
     const olds = T.bl.map(id => S.B[id]).filter(B => B && B.type === 'house' && B.prog >= 1 && B.tier <= 4 && S.year - B.built > 60);

@@ -323,7 +323,7 @@ slow catch-ups. Tests of the sim, the panels and saves (`hover`, `needs`, `away`
   `placeProject` and `tryNeeds`): `bigLotSite` picks one at the edge of town (level, or one step that `bigClear` levels; fields, pastures, vertical farms,
   solar fields, parks and houses up to tier 4 give way, `fpYieldBig`; not against the map's edge or a harbour; the best few checked with `lotReach` so a road
   can be brought to it, `connectBig`). An older, smaller one grows where it stands if it can, or moves out to a new lot and leaves a park (`bigMove`, at most
-  every 30 years). The models scale to the lot (`GL_BIG.stadium` with gates, scoreboard and flags at 4×4; the fusion plant's third dome; the university's longer ranges). Harbours grow
+  every 30 years). The models scale to the lot (`GL_BIG.stadium` with gates, scoreboard and flags at 4×4; the fusion plant's third dome; the university's longer ranges). The valley has one stadium (`stadiumHost`: the town with the most people within reach, `stadiumReach`; kept in `S.stadT`; `stadiumHere(T)` gates every way one can be built, and `yearlyRetire` closes an older world's extras into parks). Harbours grow
   along their shore (`yearlyHarbours`, `harbourLen` by population and era, over the shallows too) with a berth per tile
   (`berths`, `berthTile`, ships keep `DYN.slot[bkey(B, k)]`). In 3D, `GL_BIG[type]` and `glHarbour` draw them; `glTraffic` draws ships,
   fishing boats, ferries, trains and planes. `test/lots.mjs` checks all of it (`SHOTS=1` for pictures).

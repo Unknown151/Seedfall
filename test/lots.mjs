@@ -42,6 +42,14 @@ const g = await p.evaluate(() => { // the big ones: full size, no street through
 });
 ok(g.n > 0 && g.full >= Math.ceil(g.n * .75) && g.stadium, 'the big landmarks stand on their whole lots (a 4×4 stadium, 3×3 university and fusion plant)', `${g.full}/${g.n}: ${g.kinds}`);
 ok(g.clean && g.beside, 'no street runs through a big lot, and a road runs beside each');
+const one = await p.evaluate(() => { // one stadium for the valley, in the town it chose; an older world's extras close into parks
+  const st = Object.values(S.B).filter(B => B.type === 'stadium'), H = stadiumHost(), n0 = st.length, at0 = st.every(B => B.sid === (H && H.id));
+  for (const T of towns().filter(T => T !== H).slice(0, 2)) { const O = T.bl.map(id => S.B[id]).find(B => B && B.type === 'house' && B.prog >= 1 && !fpBig(B)); if (O) { const x = O.x, y = O.y; removeBuilding(O); mkBuilding('stadium', x, y, T, { prog: 1 }); } }
+  const n1 = anycount('stadium'); for (let k = 0; k < 60 && anycount('stadium') > 1; k++) yearlyRetire();
+  const left = Object.values(S.B).filter(B => B.type === 'stadium');
+  const H2 = stadiumHost(); return { n0, at0, host: H2 && H2.name, n1, n2: left.length, kept: left.every(B => B.sid === (H2 && H2.id)) && (!n0 || H2 === H) };
+});
+ok(one.n0 <= 1 && one.at0 && one.n1 > one.n0 && one.n2 === Math.max(1, one.n0) && one.kept, 'the valley has one stadium, in the town it chose, and an older world\'s extras close', JSON.stringify(one));
 ok(r.harbours === '' || r.harbours.split(',').some(n => +n >= 2), 'harbours grow along the shore', `berths: ${r.harbours || 'no harbour'}`);
 // ships at their berths
 await p.evaluate(() => { for (const B of harbours()) for (let k = 0; k < berths(B); k++) { if (DYN.slot[bkey(B, k)]) continue; const sh = spawnShip(B, null); if (sh) { sh.bk = k; DYN.slot[bkey(B, k)] = sh; } } });

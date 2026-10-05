@@ -288,7 +288,7 @@ function kFence(pts, h = .055, col = '#e9e2d4', ty = 'picket') { // along a line
     const n = KF.lod ? Math.max(1, Math.round(L / (ty === 'picket' ? .022 : .09))) : Math.max(1, Math.round(L / .12));
     for (let q = 0; q <= n; q++) { const t = q / n, s = a0 + (a1 - a0) * t, f = b0 + (b1 - b0) * t, post = !KF.lod || q % 4 === 0 || ty !== 'picket'; kBox(s, f, 0, post ? .005 : .003, post ? .005 : .002, post ? h * 1.08 : h, col, M_PLANK); } }
 }
-function kPath(s0, f0, s1, f1, col = '#b8ad9c', mat = M_STONE) { kBox((s0 + s1) / 2, (f0 + f1) / 2, 0, Math.abs(s1 - s0) / 2, Math.abs(f1 - f0) / 2, .006, col, mat); }
+function kPath(s0, f0, s1, f1, col = '#b8ad9c', mat = M_STONE) { kBox((s0 + s1) / 2, (f0 + f1) / 2, 0, Math.abs(s1 - s0) / 2, Math.abs(f1 - f0) / 2, .009, col, mat); } // (a touch above a lawn or a bed, so the two don't flicker)
 function kBeds(s0, f0, s1, f1, rows, crop = '#6aa556') { // a kitchen garden: dug earth and rows of greens
   kBox((s0 + s1) / 2, (f0 + f1) / 2, 0, Math.abs(s1 - s0) / 2, Math.abs(f1 - f0) / 2, .008, '#7a5a40', M_SOIL);
   for (let k = 0; k < rows; k++) { const f = f0 + (k + .5) / rows * (f1 - f0); if (KF.lod) for (let s = Math.min(s0, s1) + .02; s < Math.max(s0, s1) - .01; s += .03) kBlob(s, f, .012, .013, .012, leafC(k % 2 ? crop : shade(crop, .85)));
