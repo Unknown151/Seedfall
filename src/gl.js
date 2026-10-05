@@ -575,7 +575,7 @@ precision highp float; precision highp sampler2DShadow;
 in vec3 vP, vN, vC; in float vE, vO; in vec4 vS; flat in float vI, vM; out vec4 o;
 uniform highp sampler2DArray uTex; uniform vec3 uAvg[20]; uniform float uTS[20], uRaw[20], uBump[20];
 uniform float uHi, uFog0, uFogL; uniform vec3 uFogC; uniform vec3 uSun, uSunC, uSky, uGnd, uWin, uLamp, uEye; uniform float uLit, uShK, uT;
-uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64]; uniform vec4 uSea; uniform vec3 uWx; uniform float uLo, uPot, uNoSh; // uPot: light graphics (plain colours); autumn, winter, spring, snow on the ground; rain, cloud cover, lightning` + GL_SKY + `
+uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64]; uniform vec4 uSea; uniform vec3 uWx; uniform float uLo, uPot, uNoSh, uMist; // uPot: light graphics (plain colours); autumn, winter, spring, snow on the ground; rain, cloud cover, lightning` + GL_SKY + `
 float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
 float fb(vec2 p){ return vn(p)*.55+vn(p*2.1+7.3)*.3+vn(p*4.3+1.7)*.15; }
@@ -611,7 +611,7 @@ void main(){
     vec2 q=vP.xz; n=normalize(vec3(sin(q.x*9.+uT*1.3)*.06+sin(q.y*13.7-uT*1.7)*.04+sin((q.x+q.y)*21.-uT*2.3)*.025, 1., cos(q.y*8.3+uT*1.1)*.06+cos((q.x-q.y)*17.+uT*1.9)*.03));
     vec3 v=normalize(uEye-vP), h=normalize(uSun+v); float sp=pow(max(dot(n,h),0.),120.);
     vec3 rf=reflect(-v,n); rf.y=abs(rf.y); c=mix(c*vec3(.72,.86,.92), untone(skyCol(rf))*.8, .35*(1.-max(dot(n,v),0.))); c+=vec3(1.,.95,.85)*sp*2.2*uShK; glow=min(.45,sp*.7)*uShK; }
-  float cs=uWx.y>.05 && uLo<.5 ? smoothstep(.62-.4*uWx.y,.82-.4*uWx.y,fb(vP.xz*.05+vec2(uT*.012,uT*.005))) : 0.; // clouds drifting over, their shadows on the land
+  float cv=min(uWx.y,.65), /* (CLOUD_MAX: the cloud layer's patches and their shadows agree) */ cs=uWx.y>.05 && uLo<.5 ? smoothstep(.66-.2*cv,.72-.2*cv,fb(vP.xz*.08+vec2(uT*.012,uT*.005))) : 0.; // clouds drifting over, their shadows on the land
   float nd=(m==5||m==18) ? clamp(dot(n,uSun)*.55+.45,0.,1.) : max(dot(n,uSun),0.), sh=uNoSh>.5 ? 1. : mix(1., shadow(), uShK); // leaves let light through, so it wraps round to their shady side
   float ao=vE<-.5?1.:clamp(vO,0.,1.); ao=ao*ao*(3.-2.*ao); if(m==5||m==18) ao=.35+.65*ao; // how much open sky this spot sees (baked per vertex)
   vec3 amb=mix(uGnd,uSky,n.y*.5+.5)*ao;
@@ -629,6 +629,7 @@ void main(){
   if(vE>2.5){ lit=c*(uLit>0. ? 1.7 : 1.15); glow=uLit>0. ? .9 : .15; } // (its own colour: a beacon, a signal, a glowing stone)
   else if(vE>1.5){ lit=mix(c, uLamp*1.4, uLit>0.?1.:0.); glow=uLit>0.?1.:0.; }
   if(uHi>0. && abs(vI-uHi)<.5) lit=mix(lit*1.2, vec3(1.,.84,.5), .28+.08*sin(uT*5.)); // what the pointer is on glows softly
+  if(uMist>0.){ vec3 mv=normalize(vP-uEye); float m=uMist*(1.-smoothstep(.2,1.6,vP.y-`+(SEAZ * ZS).toFixed(3)+`))*smoothstep(1.5,12.,length(vP-uEye)); lit=mix(lit, untone(skyCol(normalize(vec3(mv.x,.04,mv.z))))*.95, m*.85); glow*=1.-m; } // fog lies low in the valley: mist over the river and the fields, the roofs and towers standing out of it
   if(uFogL>0.){ vec3 fv=normalize(vP-uEye); fv.y=max(fv.y,0.); float f=1.-exp(-max(0.,length(vP-uEye)-uFog0)/uFogL*1.3); float d=length(vP-uEye)-uFog0; lit=mix(lit, untone(skyCol(normalize(fv))), min(f, mix(.62,1.,smoothstep(uFogL*1.2,uFogL*4.,d)))); glow*=1.-f; } // the far side of the valley fades into the haze, the colour of the sky behind it
   lit=1.-exp(-lit*1.45); // a soft tone curve that keeps the colour
   float g=dot(lit,vec3(.299,.587,.114)); lit=clamp(mix(vec3(g),lit,1.18),0.,1.);
@@ -672,6 +673,29 @@ function glSmokeStep(dt) { // new puffs from what's in view, then everyone rises
   return { a: A, n };
 }
 /* ---------- rain and snow, a screen-space pass over the view: three layers, the nearest biggest ---------- */
+/* ---------- clouds: a layer of them over the valley, in patches you can see the town through between, drifting with the
+   same noise that throws their shadows on the ground (shifted along the sun, so each shadow lies under its cloud) ---------- */
+const CLOUD_Y = 8.5, CLOUD_MAX = .65; // how high the layer floats, and how much of the sky it ever covers (so there are always gaps)
+const GL_CVS = `#version 300 es
+uniform mat4 uVP; uniform vec4 uRect; uniform float uY; out vec3 vP;
+void main(){ vec2 c=vec2[6](vec2(0,0),vec2(1,0),vec2(1,1),vec2(0,0),vec2(1,1),vec2(0,1))[gl_VertexID]; vP=vec3(mix(uRect.x,uRect.z,c.x),uY,mix(uRect.y,uRect.w,c.y)); gl_Position=uVP*vec4(vP,1.); }`;
+const GL_CFS = `#version 300 es
+precision highp float; in vec3 vP; out vec4 o; uniform float uT, uCov, uRain, uDay, uFog0, uFogL; uniform vec3 uEye, uSun, uTgt;` + GL_SKY + `
+float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
+float fb(vec2 p){ return vn(p)*.55+vn(p*2.1+7.3)*.3+vn(p*4.3+1.7)*.15; }
+void main(){
+  vec2 q=vP.xz-uSun.xz/max(uSun.y,.3)*vP.y; // (the spot on the ground this bit of cloud shades)
+  float n=fb(q*.08+vec2(uT*.012,uT*.005)), d=smoothstep(.66-.2*uCov,.72-.2*uCov,n); // (the same patches as the shadows on the ground)
+  d*=.75+.25*vn(vP.xz*.7+vec2(uT*.03,0.)); if(d<.01) discard; // a ragged edge
+  bool below=uEye.y<vP.y; float dist=length(vP-uEye);
+  float a=min(1.,d*1.3)*(below?.88:.8)*smoothstep(2.5,7.,dist); // (thin out round the camera, so flying through one doesn't white out the view)
+  if(!below){ float dt=length(uTgt-uEye); a*=smoothstep(5.,16.,length(vP.xz-uTgt.xz))*smoothstep(dt*.95,dt*1.5,dist); } // from above, what you're looking at stays clear (and everything between it and you): their shadows drift over it, the clouds gather further out
+  if(uFogL>0.) a*=exp(-max(0.,dist-uFog0-20.)/(uFogL*3.)); // (far off they melt into the haze)
+  vec3 sky=skyCol(normalize(vec3(uSun.x,.6,uSun.z))), top=mix(sky,vec3(1.),.55)*(.35+.65*uDay), under=mix(sky*.7,vec3(.55,.57,.62),.5)*(.3+.6*uDay);
+  float th=smoothstep(.66-.2*uCov,.85-.2*uCov,n); vec3 c=below?under*(1.-.25*th):top*(.9+.12*th); c*=1.-.35*uRain; // (the thick of a cloud is brighter on top and darker underneath) // rain clouds are darker, and so is the thick of a cloud
+  o=vec4(c,a);
+}`;
 const GL_PFS2 = `#version 300 es
 precision highp float; in vec2 vU; out vec4 o; uniform float uT, uRain, uSnow, uAsp, uYaw; uniform vec3 uCol;
 float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
@@ -767,7 +791,7 @@ function glInit() {
   // Stop drawing (the world keeps growing), and once it's back, save and reload: the same as pressing F5.
   c.addEventListener('webglcontextlost', e => { e.preventDefault(); GL3.on = false; GL3.lost = true; });
   c.addEventListener('webglcontextrestored', async () => { if (SCRATCH) { toast('The graphics card reset. Reload to see the world again.'); return; } try { await saveAll(true); } catch (e) { } location.reload(); });
-  GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sky = glProg(gl, GL_KVS, GL_KFS); GL3.prc = glProg(gl, GL_KVS, GL_PFS2);
+  GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sky = glProg(gl, GL_KVS, GL_KFS); GL3.prc = glProg(gl, GL_KVS, GL_PFS2); GL3.cld = glProg(gl, GL_CVS, GL_CFS);
   GL3.smp = glProg(gl, GL_SMVS, GL_SMFS); GL3.smB = gl.createBuffer(); GL3.ptMax = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 64; glFxInit(gl);
   GL3.lite = gfxLite();
   try { GL3.post = { pr: glProg(gl, GL_KVS, GL_BFS), msF: gl.createFramebuffer(), msC: gl.createRenderbuffer(), msD: gl.createRenderbuffer(), ns: (GL3.lo = glSoft(gl) || QS.has('lo')) ? 0 : Math.min(4, gl.getParameter(gl.MAX_SAMPLES)), hdr: !!gl.getExtension('EXT_color_buffer_float'), lv: [], w: 0, h: 0 }; } catch (e) { GL3.post = null; }
@@ -1009,10 +1033,18 @@ function glFrame(dt) {
   GL3.flash = Math.max(0, (GL3.flash || 0) - dt * 2.2); if (DYN.flash > GL3.flash) GL3.flash = DYN.flash;
   gl.uniform1f(U.uLo, GL3.lo || GL3.lite ? 1 : 0); gl.uniform1f(U.uPot, GL3.lite ? 1 : 0); gl.uniform1f(U.uNoSh, noSh ? 1 : 0); gl.uniform4f(U.uSea, sea.autumn, sea.winter, sea.spring, wxs.sc || 0); gl.uniform3f(U.uWx, wxs.rain || 0, cover, GL3.flash * (wxOn ? 1 : 0));
   const fog = wxs.fog || 0;
-  gl.uniform1f(U.uFog0, (dist + zz * .6) * (1 - .85 * fog)); gl.uniform1f(U.uFogL, cam.persp ? 55 * (1 - .8 * fog) : 0);
+  gl.uniform1f(U.uFog0, (dist + zz * .6) * (1 - .3 * fog)); gl.uniform1f(U.uFogL, cam.persp ? 55 * (1 - .4 * fog) : 0); gl.uniform1f(U.uMist, fog); // (a foggy morning hazes the distance a little; the thick of it lies low, uMist)
   drawAll(true);
   glSmoke(gl, dt, FR, VP, h / 2 * (cam.persp ? 1 / Math.tan(fov / 2) : 1 / zz), day, tgt);
   glFx(gl, VP, h / 2 * (cam.persp ? 1 / Math.tan(fov / 2) : 1 / zz), day); // particles, beams, overlays (fx3d.js)
+  if (wxOn && cover > .05 && GL3.cld) { // the cloud layer
+    const Q = GL3.cld; for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
+    gl.useProgram(Q.p); skyU(Q.u); gl.uniformMatrix4fv(Q.u.uVP, false, VP); gl.uniform4f(Q.u.uRect, -24, -24, W + 24, H + 24); gl.uniform1f(Q.u.uY, CLOUD_Y);
+    gl.uniform1f(Q.u.uT, GL3.t); gl.uniform1f(Q.u.uCov, Math.min(cover, CLOUD_MAX)); gl.uniform1f(Q.u.uRain, Math.max(wxs.rain || 0, wxs.storm || 0)); gl.uniform1f(Q.u.uDay, day);
+    gl.uniform3fv(Q.u.uEye, eye); gl.uniform3fv(Q.u.uTgt, tgt); gl.uniform3fv(Q.u.uSun, sd); gl.uniform1f(Q.u.uFog0, (dist + zz * .6)); gl.uniform1f(Q.u.uFogL, cam.persp ? 55 : 0);
+    gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE); gl.depthMask(false); // (the glow mask in alpha stays as it was)
+    gl.drawArrays(gl.TRIANGLES, 0, 6); gl.depthMask(true); gl.disable(gl.BLEND);
+  }
   if ((wxs.rain || 0) > .05 || (wxs.snow || 0) > .05) { // rain or snow falling across the view
     const Q = GL3.prc; for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
     gl.useProgram(Q.p); gl.uniform1f(Q.u.uT, GL3.t); gl.uniform1f(Q.u.uRain, wxs.rain || 0); gl.uniform1f(Q.u.uSnow, wxs.snow || 0); gl.uniform1f(Q.u.uAsp, aspect); gl.uniform1f(Q.u.uYaw, cam.yaw);
@@ -1147,7 +1179,17 @@ function glCat(d, f, r, y0, dph, moving, col) { // a cat at someone's heel, tail
   for (const sg of [1, -1]) glOBox([hd[0] + r[0] * sg * .005, hd[1] + .01, hd[2] + r[2] * sg * .005], V3(f, .002), V3(r, .002), [0, .004, 0], col);
   glLimb([d[0] - f[0] * .02, y0 + .03, d[2] - f[2] * .02], V3(f, -1), r, -2.7 + Math.sin(GL3.t * 2 + dph) * .2, .03, .003, col);
 }
+// People are modelled at a size that reads from afar, then shrunk about their feet to the world's own scale (a door is
+// about .13 high, a bench seat .03), with whatever they carry and the pet at their heel.
+const PS = .6;
+function glShrink(n0, o, k) { const v = GLB.v; if (!v || !v.a) return; const A = v.a; for (let i = n0; i < v.length; i += 13) { A[i] = o[0] + (A[i] - o[0]) * k; A[i + 1] = o[1] + (A[i + 1] - o[1]) * k; A[i + 2] = o[2] + (A[i + 2] - o[2]) * k; } }
 function glPerson(o, X, Z, y0, h, moving, carryLamp) {
+  const n0 = GLB.v.length, c0 = GL3.carry.length, O = [X, y0, Z], sc = p => p && [X + (p[0] - X) * PS, y0 + (p[1] - y0) * PS, Z + (p[2] - Z) * PS];
+  const hands = glPerson0(o, X, Z, y0, h, moving, carryLamp); glShrink(n0, O, PS);
+  for (let k = c0; k < GL3.carry.length; k++) GL3.carry[k] = sc(GL3.carry[k]);
+  return hands && hands.map(sc);
+}
+function glPerson0(o, X, Z, y0, h, moving, carryLamp) {
   const e0 = GL3.eye, far = e0 ? Math.hypot(X - e0[0], y0 - e0[1], Z - e0[2]) : 0;
   if (far > 30) { // a speck in the distance: a body and a head
     GLB.ctr = [X, y0 + .1, Z]; glOBox([X, y0 + .11, Z], [.02, 0, 0], [0, 0, .02], [0, .11, 0], clothOf(o) || '#e5874f'); glOBox([X, y0 + .245, Z], [.018, 0, 0], [0, 0, .018], [0, .022, 0], o.skin || '#e0b090'); return;

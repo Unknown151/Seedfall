@@ -314,10 +314,15 @@ RAILWAYS AND TRAMS
   Electricity come concrete sleepers, overhead wires and electric trains with
   a cab at each end, and with Maglev a concrete guideway on columns and long
   white trains that float along it.
+  Where lines share the way (out of a busy station, or along the valley floor)
+  each gets its own track, side by side, so trains pass instead of running
+  through each other. Where lines cross or part there are signals: a train
+  eases to a stand and waits while another goes through.
   In town, the trams take over: a line along the streets from the station
   through the middle to the far side, stopping every few streets. First a
   horse tram, then an electric tram under its wire, then a long low modern
-  tram.
+  tram. Each line has two tracks, one each way, and two trams that pass in the
+  middle of the street.
 
 BOATS, SHIPS AND PLANES
   Fishing boats leave their piers in the morning, fish all day (you can see
@@ -353,8 +358,11 @@ THE 3D VIEW
   The seasons follow the real calendar: blossom in spring, green summers,
   autumn colours (the pines stay green), and snow that settles on roofs and
   fields when it snows. Rain darkens the streets and leaves puddles that catch
-  the sky, fog rolls in some mornings, and clouds drift over with their
-  shadows sliding across the valley.
+  the sky, fog lies low in the valley some mornings with the roofs and towers
+  standing out of it, and clouds drift over with their shadows sliding across
+  the valley. Seen from high up, the clouds gather out towards the horizon
+  while what you're looking at stays clear under their shadows; go down low
+  and they're overhead.
   Leave the camera alone for a minute and it turns film camera: it drifts to
   wherever something is happening (news from the chronicle, a ship coming in,
   a townsperson on their way, the harbour at sunset) with a caption. Touch it

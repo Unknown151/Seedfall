@@ -26,7 +26,7 @@ ok(r.ends, 'every line runs station to station');
 ok(r.st >= .6, `stations stand at the edge of town (the nearest is ${(r.st * 100) | 0}% of the way out)`);
 ok(r.inT / r.tiles < .25, `lines run between towns, not through them (${r.inT} of ${r.tiles} tiles inside a town)`);
 ok(r.trams >= Math.max(1, r.big - 1) && r.okTram, `trams run along the streets of the towns (${r.trams} of ${r.big} towns, every route street to street)`);
-ok(r.moved === r.trams, `and the trams go (${r.moved} moving)`);
+ok(r.moved === r.trams * 2, `and the trams go, two to a town on a track each way (${r.moved} moving)`);
 const t = await p.evaluate(() => { // run the trains for a while (view time only)
   let maxOver = 0, waited = 0, stops = 0; const last = new Map();
   for (let f = 0; f < 6000; f++) { stepTrains(.05); for (const tr of DYN.trains) { const tc = trainCars(tr); if (!tc.fits) continue; const L = tr.r.path.length - 1, len = tc.len; maxOver = Math.max(maxOver, .5 - tr.lo, tr.lo + len - (L - .5)); if (tr.wait > 0) waited++; const d = last.get(tr); if (d != null && d !== tr.dir) stops++; last.set(tr, tr.dir); } }
@@ -35,6 +35,13 @@ const t = await p.evaluate(() => { // run the trains for a while (view time only
 ok(t.n >= 1 && t.maxOver < 1e-3, `trains stay between their buffers (${t.n} trains, overrun ${t.maxOver.toFixed(4)})`);
 ok(t.stops >= 2 && t.waited > 0, `they reach a station, wait and turn back (${t.stops} turns)`);
 ok(/^loco,tender,coach/.test(t.cars), `a steam train: ${t.cars}`);
+const sh = await p.evaluate(() => { // where lines share track each has its own; at junctions the signals hold one train back
+  railMap(); let shared = 0; for (const o of RAILX.ln.values()) for (const v of o) if (v) shared++;
+  const cars = (tr, ln) => { const { len, fits } = trainCars(tr); if (!fits) return []; const out = []; for (let s = tr.lo; s <= tr.lo + len; s += .2) out.push(railPos(tr.r.path, s, ln)); return out; };
+  let was = 0, now = 0; for (let f = 0; f < 3000; f++) { stepTrains(.05); if (f % 5) continue; const T = DYN.trains;
+    for (let a = 0; a < T.length; a++) for (let c = a + 1; c < T.length; c++) { const hit = l => { const A = cars(T[a], l ? railLane(T[a].r) : null), B = cars(T[c], l ? railLane(T[c].r) : null); return A.some(x => B.some(y => Math.hypot(x[0] - y[0], x[2] - y[2]) < .25)); }; was += hit(false); now += hit(true); } }
+  return { shared, was, now, moving: DYN.trains.filter(t => (t.dist || 0) > 20 || !trainCars(t).fits).length, n: DYN.trains.length }; });
+ok(sh.shared > 0 && sh.now <= sh.was * .15 && sh.moving === sh.n, `lines that share track run on tracks side by side, and junction signals keep trains apart (${sh.shared} shared steps; ${sh.was} near misses on one track, ${sh.now} now; ${sh.moving}/${sh.n} trains keep going)`);
 const x = await p.evaluate(() => { // a walker and a cart at a crossing wait while a train is near, then go on
   railMap(); const nbOf = i => N4.map(([dx, dy]) => idx(i % W + dx, ((i / W) | 0) + dy)).find(j => M.road[j] && !M.rail[j]);
   const i = RAILX.xs.find(i => nbOf(i) != null) ?? [...RAILX.m.keys()].find(i => nbOf(i) != null); if (i == null) return null; const nb = nbOf(i); // (a crossing, or any track beside a street)
