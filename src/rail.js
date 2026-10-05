@@ -5,36 +5,26 @@
 // render.js drawTileObjects); the trains, the barriers at level crossings and the steam are view only (DYN, Math.random).
 // Three ages: timber sleepers and steam; concrete sleepers, overhead wires and electric units; a maglev guideway.
 
-// Where lines share track (out of the same station, or along the same valley), each has its own pair of rails side by side,
-// so their trains pass instead of running through each other. Every step between two tiles (an edge) gets a lane for
-// each line on it: ranked by line, measured to the right of the first line's way along it, so lines keep their order
-// along a shared run and lanes slide apart and together smoothly within a tile (railPt). RAILX.ln[line] is a line's
-// offset at each of its edges, to the right of its own way.
-const RAILX = { S: null, n: -1, m: null, xs: null, ln: null };
-const LANE_MAX = 4, LANE_SP = .42, laneSp = n => n < 2 ? LANE_SP : Math.max(.3, Math.min(LANE_SP, .84 / (n - 1))); // track centres apart (two ballast beds side by side; three or more closer, never too close for two trains to pass)
-function railMap() { // tile -> its pieces [[prev, next, offset in, offset out], ...]
+// Every line is double track, one track each way, and trains keep to the one on their right (TRACK_O either side of the
+// line's middle; a train crosses over after turning back at the end). Lines that share the way share the pair of tracks,
+// so a busy corridor is still just two tracks. Signals (stepTrains) let one train at a time along a stretch shared with
+// other lines in its direction, and one at a time through a junction (RAILX.jn: a tile where the lines don't all take the
+// same way through, because they cross, or meet and part).
+const RAILX = { S: null, n: -1, m: null, xs: null, jn: null, multi: null };
+const TRACK_O = .21; // (each track's middle from the line's: two ballast beds side by side)
+function railMap() { // tile -> its pieces [[prev, next, offset, offset, ballast half width], ...], a pair of tracks for each way through
   const rs = S.rails || [], gen = rs.length + (S.railGen || 0) * 1000;
   if (RAILX.S === S && RAILX.n === gen) return RAILX.m;
-  const E = new Map(), ek = (u, v) => Math.min(u, v) * W * H + Math.max(u, v), ln = new Map();
-  rs.forEach((r, q) => { if (r.path) for (let k = 0; k < r.path.length - 1; k++) { const key = ek(r.path[k], r.path[k + 1]); let e = E.get(key); if (!e) E.set(key, e = []); if (!e.some(o => o.q === q)) e.push({ q, a: r.path[k] }); } });
-  const wid = new Map(); // (each line's edges: how many lines share them)
-  rs.forEach((r, q) => { if (!r.path) return; const o = new Float32Array(r.path.length - 1), nw = new Uint8Array(r.path.length - 1); wid.set(r, nw);
-    for (let k = 0; k < o.length; k++) { const e = E.get(ek(r.path[k], r.path[k + 1])), n = Math.min(e.length, LANE_MAX); nw[k] = n; if (n < 2) continue;
-      const rk = e.findIndex(z => z.q === q) % n, sp = laneSp(n); /* (more lines than tracks: they take turns on them, and the signals keep them apart) */ o[k] = (rk - (n - 1) / 2) * sp * (e[0].a === r.path[k] ? 1 : -1); } // (the first line's right is the others' left when they run the other way)
-    ln.set(r, o); });
-  const m = new Map(), xs = [];
-  for (const r of rs) if (r.path) { const o = ln.get(r); for (let k = 1; k < r.path.length - 1; k++) {
-    const i = r.path[k], a = r.path[k - 1], b = r.path[k + 1], o0 = o[k - 1], o1 = o[k], nw = wid.get(r), bw = Math.min(RB, laneSp(Math.max(nw[k - 1], nw[k])) / 2 - .01); let L = m.get(i); if (!L) m.set(i, L = []);
-    if (!L.some(([p, q, u, v]) => (p === a && q === b && u === o0 && v === o1) || (p === b && q === a && u === -o1 && v === -o0))) L.push([a, b, o0, o1, bw]); } }
+  const m = new Map(), xs = [], ways = new Map(), multi = new Map(), jn = new Set();
+  for (const r of rs) if (r.path) for (let k = 1; k < r.path.length - 1; k++) {
+    const i = r.path[k], a = r.path[k - 1], b = r.path[k + 1]; let W2 = ways.get(i); if (!W2) ways.set(i, W2 = []); multi.set(i, (multi.get(i) || 0) + 1);
+    if (W2.some(([p, q]) => (p === a && q === b) || (p === b && q === a))) continue; W2.push([a, b]);
+    let L = m.get(i); if (!L) m.set(i, L = []); L.push([a, b, -TRACK_O, -TRACK_O, RB], [a, b, TRACK_O, TRACK_O, RB]); }
+  for (const [i, W2] of ways) if (W2.length > 1 && multi.get(i) > 1) jn.add(i);
   for (const i of m.keys()) if (M.road[i] && !M.water[i]) xs.push(i);
-  // junctions: tiles where two lines' tracks come close (they cross, or meet and part) without lanes of their own. Only
-  // one train at a time goes through: the signals (stepTrains).
-  const per = new Map(), cf = new Set(); rs.forEach((r, q) => { if (r.path) { const o = ln.get(r); for (let k = 1; k < r.path.length - 1; k++) { const i = r.path[k]; let L = per.get(i); if (!L) per.set(i, L = []); L.push([q, r.path[k - 1], r.path[k + 1], o[k - 1], o[k]]); } } });
-  for (const [i, L] of per) { if (L.length < 2) continue; const pts = L.map(([q, a, b, u, v]) => [0, .25, .5, .75, 1].map(t => railPt(i, a, b, t, u, v)));
-    for (let A = 0; A < L.length && !cf.has(i); A++) for (let B = A + 1; B < L.length; B++) if (L[A][0] !== L[B][0] && pts[A].some(p => pts[B].some(q => Math.hypot(p[0] - q[0], p[2] - q[2]) < .27))) { cf.add(i); break; } }
-  RAILX.S = S; RAILX.n = gen; RAILX.m = m; RAILX.xs = xs; RAILX.ln = ln; RAILX.cf = cf; return m;
+  RAILX.S = S; RAILX.n = gen; RAILX.m = m; RAILX.xs = xs; RAILX.jn = jn; RAILX.multi = multi; return m;
 }
-function railLane(r) { railMap(); return RAILX.ln.get(r) || null; }
+const trainOff = tr => tr.off != null && !isNaN(tr.off) ? tr.off : TRACK_O * tr.dir; // (the track on its right, along the line's own way)
 const railEra = () => hasTech('maglev') ? 2 : hasTech('electric') ? 1 : 0;
 EV.on('tech', d => { if (d.t && (d.t.id === 'electric' || d.t.id === 'maglev')) for (const i of railMap().keys()) markDirty(i); }); // the track changes with the age
 function railH(i) { // the height the track runs at over a tile: the ground, or a deck level with the higher bank
@@ -51,9 +41,9 @@ function railPt(i, a, b, t, o0 = 0, o1 = 0) { // (o0, o1: its lane, to the right
   if (o0 || o1) { const o = o0 + (o1 - o0) * t * t * (3 - 2 * t), l = Math.hypot(p[3], p[4]) || 1; p[0] -= p[4] / l * o; p[2] += p[3] / l * o; }
   return p;
 }
-function railPos(path, s, ln) { // where along a line s is (s in tiles from its first station; the stations' own tiles are the platforms' ends); ln: its lanes
+function railPos(path, s, o = 0) { // where along a line s is (s in tiles from its first station; the stations' own tiles are the platforms' ends); o: on which track
   const L = path.length - 1, j = clamp(Math.round(s), 1, Math.max(1, L - 1)), t = clamp(s - j + .5, 0, 1);
-  return railPt(path[j], path[j - 1], path[Math.min(L, j + 1)], t, ln ? ln[j - 1] : 0, ln ? ln[Math.min(L - 1, j)] : 0);
+  return railPt(path[j], path[j - 1], path[Math.min(L, j + 1)], t, o, o);
 }
 
 /* ---------- the track, built into the chunk ---------- */
@@ -128,21 +118,23 @@ function trainCars(tr) {
   return { C, len: len(), era, fits: len() <= room };
 }
 const TRAIN_SP = [[.75, .16], [1.25, .3], [2.4, .5]]; // top speed (tiles a second) and how fast they get going, by age
-// Block signals at the junctions: a train claims the run of junction tiles ahead before it gets there (and holds the ones
-// under it); if another line's train has them, it eases to a stand at the signal and waits. A train that has waited a
-// long while goes anyway, so two trains can never hold each other up for good.
-function trainBlock(tr, len) { // the run of junction tiles ahead of its head, within a few tiles: [path index of its first tile, tiles]
-  const P = tr.r.path, L = P.length - 1, cf = RAILX.cf, head = tr.dir > 0 ? tr.lo + len : tr.lo;
-  for (let k = Math.round(head) + tr.dir, n = 0; k >= 1 && k <= L - 1 && n < 3; k += tr.dir, n++) if (cf.has(P[k])) {
-    const run = []; for (let j = k; j >= 1 && j <= L - 1 && cf.has(P[j]); j += tr.dir) run.push(P[j]); return [k, run]; }
+// Signals: a train claims the stretch ahead that it shares with other lines (its own direction's track, or the whole of a
+// junction) before it gets there, and holds what it stands on; if another train has it, it eases to a stand and waits.
+// One held longer than another held train goes first, and after 20 s anything goes, so trains can't hold each other up for good.
+function trainKey(tr, k) { const P = tr.r.path, i = P[k]; return RAILX.jn.has(i) ? 'j' + i : i + '>' + P[k - tr.dir]; } // (shared track: one key a direction)
+function trainBlock(tr, len) { // the run of shared tiles ahead of its head, within a few tiles: [path index of its first tile, their keys]
+  const P = tr.r.path, L = P.length - 1, mu = RAILX.multi, head = tr.dir > 0 ? tr.lo + len : tr.lo, sh = j => (mu.get(P[j]) || 0) > 1;
+  for (let k = Math.round(head) + tr.dir, n = 0; k >= 1 && k <= L - 1 && n < 3; k += tr.dir, n++) if (sh(k)) {
+    const run = []; for (let j = k; j >= 1 && j <= L - 1 && sh(j) && run.length < 16; j += tr.dir) run.push(trainKey(tr, j)); return [k, run]; }
   return null;
 }
 function stepTrains(dt) {
   const busy = DYN.railBusy || (DYN.railBusy = new Set()); busy.clear();
-  railMap(); const claim = new Map(); // junction tile -> the train that has it
+  railMap(); const claim = new Map(); // what each train has: shared track one way, or a junction
   for (const tr of DYN.trains) { const { len, fits } = trainCars(tr); if (!fits || tr.lo == null) continue; const P = tr.r.path;
-    for (let k = Math.round(tr.lo); k <= Math.round(tr.lo + len); k++) if (RAILX.cf.has(P[k])) claim.set(P[k], tr); // (under it)
-    for (const i of tr.res || []) if (!claim.has(i)) claim.set(i, tr); } // (claimed last time, not yet passed)
+    const both = tr.wait > 0 || Math.abs((tr.off == null ? TRACK_O * tr.dir : tr.off) - TRACK_O * tr.dir) > .02; // (standing at the platform, or crossing over: in the way of both tracks)
+    for (let k = Math.max(1, Math.round(tr.lo)); k <= Math.min(P.length - 2, Math.round(tr.lo + len)); k++) if ((RAILX.multi.get(P[k]) || 0) > 1) { claim.set(trainKey(tr, k), tr); if (both) { tr.dir = -tr.dir; claim.set(trainKey(tr, k), tr); tr.dir = -tr.dir; } } // (under it)
+    for (const key of tr.res || []) if (!claim.has(key)) claim.set(key, tr); } // (claimed last time, not yet passed)
   for (const tr of DYN.trains) {
     const P = tr.r.path, L = P.length - 1, { len, era, fits } = trainCars(tr), [vm, ac] = TRAIN_SP[era]; if (!fits) { tr.lo = .5; continue; } // (too short a line for any train)
     if (tr.lo == null || tr.lo + len > L - .5 + 1e-6) { tr.lo = .5; tr.v = 0; }
@@ -153,18 +145,19 @@ function stepTrains(dt) {
       if (bk) { const [k, run] = bk, free = tr.go === run[0] || run.every(i => { const o = claim.get(i); return !o || o === tr || ((o.sig || 0) > 0 && (tr.sig || 0) > 4 && (tr.sig || 0) >= (o.sig || 0)); }); // (one that is itself held at a signal gives way to the train that has waited longer, so a knot of short lines can't lock up)
         if (free || (tr.sig || 0) > 20) { tr.res = run; tr.go = run[0]; // (once given the road it keeps it until it's through)
           for (const i of run) claim.set(i, tr); tr.sig = 0; }
-        else { const stop = tr.dir > 0 ? (k - .5) - (tr.lo + len) - .12 : tr.lo - (k + .5) - .12; if (stop < rem) rem = Math.max(0, stop); tr.sig = (tr.sig || 0) + dt; } } // (held at the signal)
+        else { const stop = tr.dir > 0 ? (k - .5) - (tr.lo + len) - .35 : tr.lo - (k + .5) - .35; /* (well short: a train swinging through a junction sweeps wide) */ if (stop < rem) rem = Math.max(0, stop); tr.sig = (tr.sig || 0) + dt; } } // (held at the signal)
       const signal = rem < (tr.dir > 0 ? (L - .5) - (tr.lo + len) : tr.lo - .5) - 1e-6, top = Math.min(vm, Math.sqrt(2 * ac * Math.max(0, rem)) + (signal ? 0 : .04)); // easing into the station, or up to a red signal
       tr.v = Math.min(top, (tr.v || 0) + ac * dt); const d = Math.min(rem, tr.v * dt); tr.lo += tr.dir * d; tr.dist = (tr.dist || 0) + d;
-      if (rem - d <= 1e-4 && !signal) { tr.dir = -tr.dir; tr.v = 0; tr.wait = rf(8, 15); }
+      const to = TRACK_O * tr.dir, o0 = tr.off == null || isNaN(tr.off) ? to : tr.off; tr.off = o0 + clamp(to - o0, -d * .5, d * .5); // (over the crossover to its own track after turning back)
+      if (rem - d <= 1e-4 && !signal) { tr.off = trainOff(tr); tr.dir = -tr.dir; tr.v = 0; tr.wait = rf(8, 15); } // (it stays on the track it came in on until it moves off)
     }
     tr.s = tr.dir > 0 ? tr.lo + len : tr.lo; // (its head, for the film camera)
     const ah = tr.wait > 0 ? 0 : 1.6, s0 = tr.dir > 0 ? tr.lo - .3 : tr.lo - ah, s1 = tr.dir > 0 ? tr.lo + len + ah : tr.lo + len + .3; // under it, and the way it's going (a train standing at the platform holds nobody up)
     for (let s = Math.round(s0); s <= Math.round(s1); s++) if (s >= 0 && s <= L) busy.add(P[s]);
-    if (era === 0 && tr.v > .05 && GL3.eye) { const p = railPos(P, tr.s - tr.dir * .1, railLane(tr.r)); if (Math.hypot(p[0] - GL3.eye[0], p[2] - GL3.eye[2]) < 45 && chance(dt * (2 + tr.v * 9))) SMOKE3(p[0] + rf(-.02, .02), p[1] + .4, p[2] + rf(-.02, .02), '#ece8e2', .5, .14); } // steam from the chimney
+    if (era === 0 && tr.v > .05 && GL3.eye) { const p = railPos(P, tr.s - tr.dir * .1, trainOff(tr)); if (Math.hypot(p[0] - GL3.eye[0], p[2] - GL3.eye[2]) < 45 && chance(dt * (2 + tr.v * 9))) SMOKE3(p[0] + rf(-.02, .02), p[1] + .4, p[2] + rf(-.02, .02), '#ece8e2', .5, .14); } // steam from the chimney
   }
 }
-function trainPos(tr) { return railPos(tr.r.path, tr.s, railLane(tr.r)); }
+function trainPos(tr) { return railPos(tr.r.path, tr.s, trainOff(tr)); }
 // the crossing's barriers come down while a train is near; walkers and carts wait at the edge
 function railBusy(i) { return !!(DYN.railBusy && DYN.railBusy.has(i)); }
 
@@ -183,7 +176,7 @@ function glTrains() {
   }
   for (const tr of DYN.trains) {
     const P = tr.r.path, { C, len, era, fits } = trainCars(tr), head = tr.dir > 0 ? tr.lo + len : tr.lo; if (!fits) continue;
-    const ln = railLane(tr.r), h0 = railPos(P, head, ln); if (Math.hypot(h0[0] - eye[0], h0[2] - eye[2]) > 70) continue;
+    const ln = trainOff(tr), h0 = railPos(P, head, ln); if (Math.hypot(h0[0] - eye[0], h0[2] - eye[2]) > 70) continue;
     let off = 0;
     for (let k = 0; k < C.length; k++) {
       const [kind, cl] = C[k], sc = head - tr.dir * (off + cl / 2), bo = cl / 2 - .1; off += cl + .04;

@@ -134,11 +134,23 @@ function yearlyRetire() {
 // new look spreads over a few years. B.gen is how many of its REFIT techs it has caught up with (older saves work it
 // out from the year it was built); the models in industry.js and the moving parts in works.js read genOf(B).
 const REFIT = { watertower: ['steam'], workshop: ['steam', 'computing'], weaver: ['steam', 'computing'], glassworks: ['electric'] };
+for (const t of ['hall', 'school', 'library', 'clinic', 'theatre', 'museum', 'station', 'university', 'market', 'guildhall', 'bathhouse']) REFIT[t] = ['computing', 'fusion']; // public buildings: concrete and glass, then white, green and light (civic.js CIVX)
 const REFIT_TXT = {
   watertower: [null, T => `${T.name} swaps its old stone cistern for a riveted iron tank up on legs. The pigeons are furious.`],
   workshop: [null, T => `The smithy in ${T.name} becomes a machine shop: lathes, a drill press and a steam engine turning them all on one long belt.`, T => `${T.name}'s old machine shop is fitted out as a fab workshop. Printers hum where the lathes used to scream.`],
   weaver: [null, T => `${T.name}'s weavers move into a brick mill four floors high, full of power looms that never tire.`, T => `The old mill in ${T.name} is gutted and fitted with quiet looms that knit to order.`],
-  glassworks: [null, T => `${T.name}'s glass cone goes cold. In the new works next door, glass flows out as flat as a pond.`]
+  glassworks: [null, T => `${T.name}'s glass cone goes cold. In the new works next door, glass flows out as flat as a pond.`],
+  hall: [null, T => `${T.name} pulls down its old town hall for one of glass up on concrete legs. The clock goes to the museum.`, T => `${T.name}'s council now meets under a white dome beside a pool. A spire of light marks it from across the valley.`],
+  school: [null, T => `${T.name}'s school moves into a long glass block with bright panels and a proper sports pitch.`, T => `The children of ${T.name} go to school in two white drums joined by a glass bridge. The playground is all little domes.`],
+  library: [null, T => `${T.name} builds a new library: a glass cube behind timber fins. The old one's books take three weeks to carry over.`, T => `${T.name}'s library becomes rings of reading rooms stacked one on another, a garden round the edge of each.`],
+  clinic: [null, T => `A new clinic opens in ${T.name}: white, glass, a lit red cross and a bay for the ambulances.`, T => `${T.name}'s clinic is rebuilt as a white drum with a landing ring on its roof. The cross glows all night.`],
+  theatre: [null, T => `${T.name}'s new theatre is all bare concrete fly tower and glass foyer. Half the town hates it and goes anyway.`, T => `${T.name} builds a theatre of white shells. Nobody agrees what they look like; everybody agrees they're beautiful.`],
+  museum: [null, T => `A glass pyramid goes up in front of ${T.name}'s new museum. There are letters to the paper.`, T => `${T.name}'s museum is rebuilt as white galleries stacked and turned, each catching the light differently.`],
+  station: [null, T => `${T.name}'s station gets a glass hall and a long platform canopy on slender columns.`, T => `${T.name}'s station is a glass tube with white ribs now. The trains slide in without a sound.`],
+  university: [null, T => `${T.name}'s university swaps its cloisters for glass halls round a lawn and a tower of laboratories.`, T => `The university of ${T.name} becomes a ring of white halls round a garden, joined by glass bridges in the air.`],
+  market: [null, T => `${T.name}'s market moves under a roof of steel and glass. Nobody misses the rain.`, T => `${T.name}'s market is a garden under a glass dome now, stalls among the trees.`],
+  guildhall: [null, T => `The guilds of ${T.name} move into an office block five floors high, their banner down the side.`, T => `${T.name}'s guildhall is a white tower with gardens on its roof and a spire of light.`],
+  bathhouse: [null, T => `${T.name}'s bathhouse is rebuilt in glass beside an open-air pool.`, T => `${T.name}'s baths are under a glass dome now, with pools out on the terrace.`]
 };
 function genNow(t) { const g = REFIT[t]; let n = 0; if (g) for (const k of g) if (hasTech(k)) n++; return n; }
 function genOf(B) { const g = REFIT[B.type]; if (!g) return 0; if (B.gen != null) return B.gen; let n = 0; for (const k of g) if (S.tech.done[k] != null && S.tech.done[k] <= B.built) n++; return n; }
@@ -146,7 +158,7 @@ function yearlyRefit() {
   for (const T of towns()) {
     if (!chance(.35)) continue;
     const B = T.bl.map(id => S.B[id]).find(B => B && REFIT[B.type] && B.prog >= 1 && genOf(B) < genNow(B.type)); if (!B) continue;
-    B.gen = genNow(B.type); markDirty(idx(B.x, B.y));
+    B.gen = genNow(B.type); for (const j of fpTiles(B)) markDirty(j); // (a landmark's whole lot)
     const k = 'ref_' + B.type + B.gen + T.id, tx = REFIT_TXT[B.type][B.gen];
     if (tx && !S.flags[k]) { S.flags[k] = 1; if (!FAST || chance(.5)) chron('🔧', tx(T), { x: B.x, y: B.y }); }
   }

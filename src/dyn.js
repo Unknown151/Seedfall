@@ -45,7 +45,7 @@ function syncWalkers() {
   // trains
   for (const r of S.rails) {
     if (!r.path || DYN.trains.some(tr => tr.r === r)) continue;
-    DYN.trains.push({ r, s: .5, lo: .5, v: 0, dir: 1, wait: rf(0, 6) });
+    const L = r.path.length - 1, lo = rf(.5, Math.max(.5, L * .6)); DYN.trains.push({ r, s: lo, lo, v: 0, dir: chance(.5) ? 1 : -1, wait: rf(0, 3) }); // (somewhere along its line, not all stacked at one station's platform)
   }
   DYN.trains = DYN.trains.filter(tr => S.rails.includes(tr.r));
   // herds in the wild

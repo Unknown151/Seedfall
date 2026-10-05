@@ -35,7 +35,7 @@ const m = await p.evaluate(() => { // every stage of every refitted model builds
     try { const f1 = glBuildChunk(k).v.length, n1 = glBuildChunk(k, true).v.length; r = f1 > 0 && n1 >= f1 ? 'ok' : `far ${f1} near ${n1}`; } catch (e) { r = e.message; }
     B.gen = sv; out[t + g] = r; }
   return out; });
-ok(Object.values(m).every(v => v === 'ok'), `every stage builds far and near ${JSON.stringify(m)}`);
+ok(Object.values(m).every(v => v === 'ok' || v === 'none') && Object.values(m).filter(v => v === 'ok').length >= 25, `every stage builds far and near (public buildings too; 'none': not built in this world yet) ${JSON.stringify(m)}`);
 const o = await p.evaluate(() => { // an older save: a smithy built before Steam has no stage saved, and catches up
   const B = Object.values(S.B).find(B => B.type === 'workshop'); const sv = [B.gen, B.built]; delete B.gen; B.built = 100; const g0 = genOf(B);
   let n = 0; while (genOf(B) < genNow('workshop') && n++ < 60) yearlyRefit(); const g1 = genOf(B); B.built = sv[1]; return { g0, g1, now: genNow('workshop'), n };
