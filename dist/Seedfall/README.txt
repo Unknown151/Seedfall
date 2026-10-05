@@ -303,7 +303,9 @@ QUARTERS, TERRACES AND REBUILDING
 RAILWAYS AND TRAMS
   With Railways, towns get a station out at the edge, facing the next town,
   and a line joins them across the fields; now and then a cottage in the way
-  has to come down. Trains run between towns and stay out of them. When a
+  has to come down. The lines make a network: a town has three at most, and
+  you change trains at the junctions rather than every town having a line to
+  every other. Trains run between towns and stay out of them. When a
   town has grown all the way round its station, it builds a new one at the
   edge and the line is laid again. The track is ballast, sleepers and two
   rails, curving round the corners, climbing on an embankment and crossing
