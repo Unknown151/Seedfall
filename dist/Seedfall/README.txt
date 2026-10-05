@@ -139,8 +139,11 @@ SKY, WEATHER AND SEASONS
   Weather drifts on its own: clear, fair, cloudy, overcast, rain, thunderstorms,
   fog and snow. Seasons follow the real calendar: autumn colours now, snow that
   settles in winter, fresh greens in spring.
-  Weather and Shadows can be switched off in the same panel; Always day + no
-  shadows is the lightest setting for a slow PC.
+  Weather and Shadows can be switched off in the same panel.
+  Graphics: Light is for a slow computer or a work laptop. It draws plain
+  colours instead of textures, with no shadows, glow or smoothing, fewer
+  pixels and fewer people about, and a slightly lower frame rate. It is kept
+  in this browser, not in the world, so your desktop can stay on Full.
 
 WHAT THE TOWNS ARE BUILT FROM
   Every town keeps a store of timber, stone, clay, metal, goods, cloth and

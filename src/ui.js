@@ -43,6 +43,7 @@ function bindUI() {
   $('optSky').addEventListener('change', e => { S.settings.sky = e.target.value; relightNow(); });
   $('optWx').addEventListener('change', e => { S.settings.weather = e.target.checked; relightNow(); });
   $('optSh').addEventListener('change', e => { S.settings.shadows = e.target.checked; relightNow(); });
+  $('optGfx').addEventListener('change', e => { setGfx(e.target.value === 'lite'); $('optSh').disabled = GL3.lite; }); // (kept in this browser, not the world)
   $('bHelp').addEventListener('click', () => $('help').classList.add('show'));
   $('hClose').addEventListener('click', () => $('help').classList.remove('show'));
   $('bNew').addEventListener('click', openWorlds);

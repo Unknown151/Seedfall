@@ -47,6 +47,10 @@ const nf = await p.evaluate(() => { GL3.noNear = false; GL3.nearMs = 5000; GL3.c
   while ((k = near()) == null && n++ < 30) glFrame(.016); if (k == null) return { none: true }; const ch = GL3.chunks[k];
   GL3.dirty.add(k); glFrame(.016); const kept = ch.near && !!ch.nb, stale = !!ch.stale; n = 0; while (ch.stale && n++ < 8) glFrame(.016); GL3.nearMs = 0; return { kept, stale, fresh: !ch.stale && ch.near, frames: n }; });
 ok(!nf.none && nf.kept && nf.stale && nf.fresh, 'a busy street keeps its close-up detail while it is rebuilt (no flicker)', JSON.stringify(nf));
+const lite = await p.evaluate(() => { // light graphics: fewer pixels, no detailed close-ups, drawn straight to the screen, and back again
+  const w0 = GL3.c.width; setGfx(true); for (let k = 0; k < 4; k++) glFrame(.05); const r = { w0, w1: GL3.c.width, near: GL3.chunks.filter(c => c.near).length, err: GL3.gl.getError(), saved: localStorage.getItem('sfGfx') };
+  setGfx(false); for (let k = 0; k < 4; k++) glFrame(.05); r.w2 = GL3.c.width; r.err2 = GL3.gl.getError(); r.back = localStorage.getItem('sfGfx'); return r; });
+ok(lite.w1 < lite.w0 && lite.near === 0 && lite.err === 0 && lite.saved === 'lite' && lite.w2 === lite.w0 && lite.err2 === 0 && lite.back === 'full', 'light graphics switch on and off cleanly, and the choice is kept in this browser', JSON.stringify(lite));
 ok(!glErr.length, 'WebGL draws without errors (a silently skipped bloom pass leaves old glows on screen)', glErr.join(','));
 ok(!errs.length, 'no page errors', errs.join(' | '));
 await b.close(); console.log(fails ? `${fails} FAILED` : 'all ok'); process.exit(fails ? 1 : 0);

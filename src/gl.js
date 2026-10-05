@@ -575,7 +575,7 @@ precision highp float; precision highp sampler2DShadow;
 in vec3 vP, vN, vC; in float vE, vO; in vec4 vS; flat in float vI, vM; out vec4 o;
 uniform highp sampler2DArray uTex; uniform vec3 uAvg[20]; uniform float uTS[20], uRaw[20], uBump[20];
 uniform float uHi, uFog0, uFogL; uniform vec3 uFogC; uniform vec3 uSun, uSunC, uSky, uGnd, uWin, uLamp, uEye; uniform float uLit, uShK, uT;
-uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64]; uniform vec4 uSea; uniform vec3 uWx; uniform float uLo; // autumn, winter, spring, snow on the ground; rain, cloud cover, lightning` + GL_SKY + `
+uniform sampler2DShadow uSh; uniform int uNL; uniform vec3 uLP[64]; uniform vec4 uSea; uniform vec3 uWx; uniform float uLo, uPot, uNoSh; // uPot: light graphics (plain colours); autumn, winter, spring, snow on the ground; rain, cloud cover, lightning` + GL_SKY + `
 float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
 float fb(vec2 p){ return vn(p)*.55+vn(p*2.1+7.3)*.3+vn(p*4.3+1.7)*.15; }
@@ -584,7 +584,7 @@ float shadow(){ vec3 p=vS.xyz/vS.w*.5+.5; if(p.x<0.||p.x>1.||p.y<0.||p.y>1.) ret
 void main(){
   vec3 n=normalize(vN), c=vC; float glow=0.;
   int m=int(vM+.5);
-  if(m>0){ // triplanar: the ground and roofs take the texture from above, walls from the side they face
+  if(m>0 && uPot<.5){ // triplanar: the ground and roofs take the texture from above, walls from the side they face
     vec3 a=abs(n); vec2 uv = a.y>.55 ? vP.xz : (a.x>a.z ? vec2(vP.z,-vP.y) : vec2(vP.x,-vP.y));
     vec3 t=texture(uTex, vec3(uv*uTS[m], float(m))).rgb;
     if(uBump[m]>0.){ // relief from the texture itself: brighter is higher, so mortar, tile edges and plank seams sink in and catch the light
@@ -612,7 +612,7 @@ void main(){
     vec3 v=normalize(uEye-vP), h=normalize(uSun+v); float sp=pow(max(dot(n,h),0.),120.);
     vec3 rf=reflect(-v,n); rf.y=abs(rf.y); c=mix(c*vec3(.72,.86,.92), untone(skyCol(rf))*.8, .35*(1.-max(dot(n,v),0.))); c+=vec3(1.,.95,.85)*sp*2.2*uShK; glow=min(.45,sp*.7)*uShK; }
   float cs=uWx.y>.05 && uLo<.5 ? smoothstep(.62-.4*uWx.y,.82-.4*uWx.y,fb(vP.xz*.05+vec2(uT*.012,uT*.005))) : 0.; // clouds drifting over, their shadows on the land
-  float nd=(m==5||m==18) ? clamp(dot(n,uSun)*.55+.45,0.,1.) : max(dot(n,uSun),0.), sh=mix(1., shadow(), uShK); // leaves let light through, so it wraps round to their shady side
+  float nd=(m==5||m==18) ? clamp(dot(n,uSun)*.55+.45,0.,1.) : max(dot(n,uSun),0.), sh=uNoSh>.5 ? 1. : mix(1., shadow(), uShK); // leaves let light through, so it wraps round to their shady side
   float ao=vE<-.5?1.:clamp(vO,0.,1.); ao=ao*ao*(3.-2.*ao); if(m==5||m==18) ao=.35+.65*ao; // how much open sky this spot sees (baked per vertex)
   vec3 amb=mix(uGnd,uSky,n.y*.5+.5)*ao;
   vec3 bounce=uSunC*.22*max(dot(n,normalize(vec3(-uSun.x,.35,-uSun.z))),0.)*(.4+.6*ao); // light thrown back off the sunny side of things
@@ -656,7 +656,7 @@ function glSmoke(gl, dt, FR, VP, pxs, day, tgt) {
   gl.depthMask(true); gl.disable(gl.BLEND); gl.disableVertexAttribArray(0); gl.disableVertexAttribArray(1);
 }
 function glSmokeStep(dt) { // new puffs from what's in view, then everyone rises, drifts and grows
-  const [FR, day, tgt] = GL3.smF, P = GL3.smoke || (GL3.smoke = []), cap = GL3.lo ? 320 : 900, sea = LIGHT.season || seasonNow(), rate = .22 + .55 * sea.winter + .2 * sea.autumn + .15 * (1 - day), wind = [.07, 0, .04];
+  const [FR, day, tgt] = GL3.smF, P = GL3.smoke || (GL3.smoke = []), cap = GL3.lo || GL3.lite ? 320 : 900, sea = LIGHT.season || seasonNow(), rate = .22 + .55 * sea.winter + .2 * sea.autumn + .15 * (1 - day), wind = [.07, 0, .04];
   if (!FAST && dt > 0) {
     const ks = []; for (let k = 0; k < GL3.chunks.length; k++) { const ch = GL3.chunks[k], sm = ch.lamps && ch.lamps.smk, d = Math.hypot((k % GNC) * GCH + 4 - tgt[0], ((k / GNC) | 0) * GCH + 4 - tgt[2]); if (sm && sm.length && d < 16 && glSees(FR, ch, k)) ks.push([d, sm]); }
     ks.sort((a, b) => a[0] - b[0]); // the nearest chimneys first (far off, a puff is less than a pixel)
@@ -689,6 +689,11 @@ void main(){ vec2 uv=vU*.5+.5;
   else if(uMode==2){ vec3 s=vec3(0.); for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++) s+=texture(uA,uv+uPx*vec2(x,y)).rgb*float((2-abs(x))*(2-abs(y)))/16.; o=vec4(s*uK,1.); }
   else { o=vec4(texture(uA,uv).rgb+texture(uB,uv).rgb*uK,1.); }
 }`;
+// Light graphics, for a laptop that struggles: plain colours instead of textures, no shadows, bloom or multisampling, fewer
+// pixels, few street lamps lighting the ground, no detailed close-ups, fewer people and a lower frame rate. Kept per
+// browser (it's about this computer, not the world), and ?lite forces it.
+function gfxLite() { if (QS.has('lite') || QS.has('potato')) return true; try { return localStorage.getItem('sfGfx') === 'lite'; } catch (e) { return false; } }
+function setGfx(lite) { GL3.lite = !!lite; try { localStorage.setItem('sfGfx', lite ? 'lite' : 'full'); } catch (e) {} if (GL3.gl) for (const ch of GL3.chunks) if (ch.near) glDropNear(ch); GL3.nj = null; }
 function glSoft(gl) { // drawn by the CPU (no graphics card, a VM, remote desktop): multisampling there costs every pixel four times
   try { const d = gl.getExtension('WEBGL_debug_renderer_info'), r = d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); return /swiftshader|llvmpipe|software|softpipe|basic render/i.test(r || ''); } catch (e) { return false; }
 }
@@ -764,6 +769,7 @@ function glInit() {
   c.addEventListener('webglcontextrestored', async () => { if (SCRATCH) { toast('The graphics card reset. Reload to see the world again.'); return; } try { await saveAll(true); } catch (e) { } location.reload(); });
   GL3.main = glProg(gl, GL_VS, GL_FS); GL3.sky = glProg(gl, GL_KVS, GL_KFS); GL3.prc = glProg(gl, GL_KVS, GL_PFS2);
   GL3.smp = glProg(gl, GL_SMVS, GL_SMFS); GL3.smB = gl.createBuffer(); GL3.ptMax = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 64; glFxInit(gl);
+  GL3.lite = gfxLite();
   try { GL3.post = { pr: glProg(gl, GL_KVS, GL_BFS), msF: gl.createFramebuffer(), msC: gl.createRenderbuffer(), msD: gl.createRenderbuffer(), ns: (GL3.lo = glSoft(gl) || QS.has('lo')) ? 0 : Math.min(4, gl.getParameter(gl.MAX_SAMPLES)), hdr: !!gl.getExtension('EXT_color_buffer_float'), lv: [], w: 0, h: 0 }; } catch (e) { GL3.post = null; }
   GL3.sh = glProg(gl, GL_SVS, GL_SFS); GL3.pk = glProg(gl, GL_PVS, GL_PFS);
   { const t0 = performance.now(), T = glTextures(); GL3.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D_ARRAY, GL3.tex);
@@ -900,7 +906,7 @@ function glDirector(dt) {
 }
 function glFrame(dt) {
   const gl = GL3.gl, c = GL3.c, cam = GL3.cam; GL3.t += dt; GL3.dt = dt; GL3.ft = performance.now(); // (when this frame began: a slow frame mustn't make the pointer look idle)
-  const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
+  const dpr = GL3.lite ? Math.min(1, devicePixelRatio || 1) * .8 : Math.min(2, devicePixelRatio || 1), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr); // (light graphics: fewer pixels, stretched)
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
   // rebuild what changed, a few chunks a frame
   // (the height map first, for every chunk in this batch, then the occlusion, which looks across into the neighbours)
@@ -909,7 +915,7 @@ function glFrame(dt) {
   const built = batch.map(k => { GL3.dirty.delete(k); const r = glBuildChunk(k), old = glEdge(k); hfRaster(k, r.v); if (GL3.first && glEdge(k) !== old) for (const j of glNbrs(k)) if (!batch.includes(j)) again.add(j); return [k, r]; });
   for (const [k, r] of built) { glAO(r.v); const ch = GL3.chunks[k]; glUpload(ch, r.v, false); ch.lamps = r.lamps; if (ch.near) ch.stale = true; } // (its detailed version stays up until a fresh one replaces it: dropping it here made busy streets flicker plain and back)
   // the chunks round the camera get a detailed version, one a frame, nearest first (and lose it again once well out of range)
-  { const nr = cam.zoom <= 9 ? 11 : cam.zoom <= 15 ? 7 : 0, cx = cam.tx, cz = cam.tz; let best = -1, bd = 1e9;
+  { const nr = GL3.lite ? -99 : cam.zoom <= 9 ? 11 : cam.zoom <= 15 ? 7 : 0, cx = cam.tx, cz = cam.tz; let best = -1, bd = 1e9;
     for (let k = 0; k < GNC * GNC; k++) { const ch = GL3.chunks[k], d = Math.hypot((k % GNC) * GCH + GCH / 2 - cx, ((k / GNC) | 0) * GCH + GCH / 2 - cz);
       if (ch.near && d > nr + 8) glDropNear(ch); else if ((!ch.near || ch.stale) && ch.n && d < nr && d < bd && !GL3.dirty.has(k)) { best = k; bd = d; } }
     // one detailed chunk at a time, a few milliseconds a frame: rows first, then its shading, then off to the GPU
@@ -957,7 +963,7 @@ function glFrame(dt) {
   const SVP = m4mul(m4ortho(-50, 50, -50, 50, 1, 180), m4look(se, sc, [0, 1, 0]));
   // lamps near the middle of the view light the streets
   const dyn = glPeople(); // (first: the lanterns people carry are lights too)
-  const lamps = []; if (lit > 0) { for (const ch of GL3.chunks) for (const L of ch.lamps) lamps.push(L); for (const L of GL3.carry) lamps.push(L); lamps.sort((a, b) => Math.hypot(a[0] - tgt[0], a[2] - tgt[2]) - Math.hypot(b[0] - tgt[0], b[2] - tgt[2])); lamps.length = Math.min(64, lamps.length); }
+  const lamps = []; if (lit > 0) { for (const ch of GL3.chunks) for (const L of ch.lamps) lamps.push(L); for (const L of GL3.carry) lamps.push(L); lamps.sort((a, b) => Math.hypot(a[0] - tgt[0], a[2] - tgt[2]) - Math.hypot(b[0] - tgt[0], b[2] - tgt[2])); lamps.length = Math.min(GL3.lite ? 8 : 64, lamps.length); }
   const attrs = (full, pk) => { // full: everything the lit view needs; 1: position and id (picking); 0: position only (shadows). pk: a packed chunk
     const st = pk ? 28 : 52; gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, st, 0);
     if (full === true) {
@@ -976,17 +982,18 @@ function glFrame(dt) {
       const nb = full !== false && ch.near && ch.nb; gl.bindBuffer(gl.ARRAY_BUFFER, nb ? ch.nb : ch.buf); attrs(full, true); gl.drawArrays(gl.TRIANGLES, 0, nb ? ch.nn : ch.n); if (full === true) GL3.drawn++; } if (dyn.length) { gl.bindBuffer(gl.ARRAY_BUFFER, GL3.dyn); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, dyn.length / 13); } if (full === true) { gl.bindBuffer(gl.ARRAY_BUFFER, GL3.sea); attrs(full); gl.drawArrays(gl.TRIANGLES, 0, 6); } };
   gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
   // shadow pass
-  gl.bindFramebuffer(gl.FRAMEBUFFER, GL3.shF); gl.viewport(0, 0, 2048, 2048); gl.clear(gl.DEPTH_BUFFER_BIT);
-  gl.useProgram(GL3.sh.p); gl.uniformMatrix4fv(GL3.sh.u.uSVP, false, SVP); for (const a of [1, 2, 3]) gl.disableVertexAttribArray(a); drawAll(false);
+  const noSh = GL3.lite || S.settings.shadows === false; // (the most expensive pass after the view itself)
+  if (!noSh) { gl.bindFramebuffer(gl.FRAMEBUFFER, GL3.shF); gl.viewport(0, 0, 2048, 2048); gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(GL3.sh.p); gl.uniformMatrix4fv(GL3.sh.u.uSVP, false, SVP); for (const a of [1, 2, 3]) gl.disableVertexAttribArray(a); drawAll(false); }
   // the view
-  const post = GL3.post; if (post) { glPostSize(gl, w, h); if (!post.ok) GL3.post = null; }
-  gl.bindFramebuffer(gl.FRAMEBUFFER, GL3.post ? post.msF : null); gl.viewport(0, 0, w, h);
+  const post = GL3.lite ? null : GL3.post; if (post) { glPostSize(gl, w, h); if (!post.ok) GL3.post = null; }
+  const usePost = !!(post && GL3.post); gl.bindFramebuffer(gl.FRAMEBUFFER, usePost ? post.msF : null); gl.viewport(0, 0, w, h);
   gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   // the sky, behind everything
   const sd0 = [Math.cos(el * DEG) * Math.cos(t), Math.sin(el * DEG), Math.cos(el * DEG) * Math.sin(t)], skyU = U => { gl.uniform3fv(U.uSunD, sd0); gl.uniform1f(U.uSunY, sd0[1]); gl.uniform1f(U.uCover, cover); gl.uniform4fv(U.uTint, SKY_TINT[LVV.sky] || SKY_TINT0); };
   { const K = GL3.sky, f = [-dir[0], -dir[1], -dir[2]], tn = Math.tan(fov / 2), r0 = [f[2], 0, -f[0]], rl = Math.hypot(r0[0], r0[2]) || 1, r = [-r0[0] / rl, 0, -r0[2] / rl], u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
     for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
-    gl.useProgram(K.p); skyU(K.u); gl.uniform1f(K.u.uCT, GL3.t); gl.uniform1f(K.u.uLo, GL3.lo ? 1 : 0); gl.uniform1f(K.u.uAur, LVV.sky === 'aurora' ? 1 : 0); gl.uniform3fv(K.u.uF, f); gl.uniform3fv(K.u.uR, r.map(q => q * tn * aspect)); gl.uniform3fv(K.u.uU, u.map(q => q * tn));
+    gl.useProgram(K.p); skyU(K.u); gl.uniform1f(K.u.uCT, GL3.t); gl.uniform1f(K.u.uLo, GL3.lo || GL3.lite ? 1 : 0); gl.uniform1f(K.u.uAur, LVV.sky === 'aurora' ? 1 : 0); gl.uniform3fv(K.u.uF, f); gl.uniform3fv(K.u.uR, r.map(q => q * tn * aspect)); gl.uniform3fv(K.u.uU, u.map(q => q * tn));
     gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.depthMask(true); gl.enable(gl.DEPTH_TEST); }
   const P = GL3.main, U = P.u; gl.useProgram(P.p); skyU(U);
   gl.uniformMatrix4fv(U.uVP, false, VP); gl.uniformMatrix4fv(U.uSVP, false, SVP);
@@ -1000,7 +1007,7 @@ function glFrame(dt) {
   // the season and the weather: snow lies where it has fallen, rain wets things, fog closes in, lightning flashes
   const sea = LIGHT.season || seasonNow(), wxOn = S.settings.weather !== false, wxs = wxOn ? wx : { rain: 0, snow: 0, fog: 0, sc: 0 };
   GL3.flash = Math.max(0, (GL3.flash || 0) - dt * 2.2); if (DYN.flash > GL3.flash) GL3.flash = DYN.flash;
-  gl.uniform1f(U.uLo, GL3.lo ? 1 : 0); gl.uniform4f(U.uSea, sea.autumn, sea.winter, sea.spring, wxs.sc || 0); gl.uniform3f(U.uWx, wxs.rain || 0, cover, GL3.flash * (wxOn ? 1 : 0));
+  gl.uniform1f(U.uLo, GL3.lo || GL3.lite ? 1 : 0); gl.uniform1f(U.uPot, GL3.lite ? 1 : 0); gl.uniform1f(U.uNoSh, noSh ? 1 : 0); gl.uniform4f(U.uSea, sea.autumn, sea.winter, sea.spring, wxs.sc || 0); gl.uniform3f(U.uWx, wxs.rain || 0, cover, GL3.flash * (wxOn ? 1 : 0));
   const fog = wxs.fog || 0;
   gl.uniform1f(U.uFog0, (dist + zz * .6) * (1 - .85 * fog)); gl.uniform1f(U.uFogL, cam.persp ? 55 * (1 - .8 * fog) : 0);
   drawAll(true);
@@ -1013,7 +1020,7 @@ function glFrame(dt) {
     gl.disable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE); // (the glow mask in alpha stays as it was)
     gl.drawArrays(gl.TRIANGLES, 0, 3); gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST);
   }
-  if (GL3.post) glBloom(gl, w, h, .55 + lit * .7);
+  if (usePost) glBloom(gl, w, h, .55 + lit * .7);
   // what's under the pointer: the same scene again, each thing painted in its own id colour, read back one pixel
   if (GL3.pickReq && performance.now() - (GL3.pickT || 0) > 70 && UI.mouse.x >= 0) {
     GL3.pickReq = false; GL3.pickT = performance.now();
