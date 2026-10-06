@@ -15,6 +15,9 @@ function bindUI() {
   });
   $('dockChron').addEventListener('click', togglePanel);
   $('dockSky').addEventListener('click', clearSkies);
+  $('tbPrev').addEventListener('click', () => barStep(-1)); $('tbNext').addEventListener('click', () => barStep(1));
+  $('tbPl').addEventListener('click', () => { setTab('towns'); if (!UI.panel) togglePanel(); else renderPanelBody(true); });
+  $('optBar').addEventListener('change', e => setBar(e.target.checked)); setBar(TB.on);
   $('pClose').addEventListener('click', togglePanel);
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { if (t.dataset.tab === 'people' && UI.tab === 'people') UI.personSel = null; setTab(t.dataset.tab); renderPanelBody(true); }));
   $('pBody').addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.vk) { if (d.open) VOICE_OPEN.add(d.dataset.vk); else VOICE_OPEN.delete(d.dataset.vk); } }, true);
@@ -77,6 +80,7 @@ function onKey(e) {
   const k = e.key;
   if (k === 'c' || k === 'C') togglePanel();
   else if (k === 'w' || k === 'W') clearSkies();
+  else if (k === 'b' || k === 'B') { setBar(!TB.on); toast(TB.on ? 'Town bar on: the town you’re looking at, up top. B hides it.' : 'Town bar hidden. B brings it back.'); }
   else if (k === 'h' || k === 'H' || k === '?') $('help').classList.toggle('show');
   else if (k === 'z' || k === 'Z') { UI.zones = !UI.zones; toast(UI.zones ? 'Zone view: blue market quarters, green homes, yellow works, teal greens. The towns draw these themselves. Z again to hide.' : 'Zone view off.'); }
   else if (k === 'f' || k === 'F') { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => { }); else document.exitFullscreen(); }
@@ -214,6 +218,7 @@ function openPerson(pid) {
 
 function eraName() { return S.age ? S.age.name : ERAS[S.era].title; }
 function renderHUD() {
+  renderBar();
   $('hudName').textContent = S.planet || 'Unnamed world';
   $('hudLine').textContent = `Year ${yr()} · ${eraName()} · ${fmtInt(totalPop())} ${Math.round(totalPop()) === 1 ? 'person' : 'people'}${skyIcon()}`;
   const idle = performance.now() - UI.lastMove;
@@ -311,4 +316,40 @@ function renderPanelBody(force) {
   const keep = b.scrollTop;
   b.innerHTML = h;
   if (!force) b.scrollTop = keep;
+}
+
+/* ---------- the town bar (top middle, Anno-style): the town you're looking at ---------- */
+// Its stores and what each gains (or loses) a year, its people, room and food, how its needs are met, its leader's
+// initials on a badge in the town's colour, and its name on a plaque with a title (what it's known for and how big it
+// is). It follows the camera: whichever town is nearest the middle of the view. Per browser (localStorage sfBar), B toggles.
+const TB = { on: true, sel: null, k: '' };
+try { TB.on = localStorage.getItem('sfBar') !== '0'; } catch (e) { }
+function setBar(on) { TB.on = on; try { localStorage.setItem('sfBar', on ? '1' : '0'); } catch (e) { } document.body.classList.toggle('tbar', on); const c = $('optBar'); if (c) c.checked = on; }
+const TB_COL = ['#5b7fa6', '#7a9a5a', '#a0645a', '#8a6aa0', '#5a9a96', '#b08a4a', '#9a5a7a', '#6a7a8a'];
+const TB_SIZE = [[60, 'Camp'], [300, 'Hamlet'], [1500, 'Village'], [6000, 'Town'], [20000, 'City'], [1e12, 'Metropolis']];
+const TB_ADJ = { wood: 'Timber', stone: 'Stone', clay: 'Brick', metal: 'Iron', goods: 'Market', cloth: 'Weaving', glass: 'Glassblowing' };
+function townTitle(T) {
+  const size = TB_SIZE.find(([n]) => T.pop < n)[1], kn = T.known ? Object.keys(T.known) : [], big = towns().every(U => U === T || U.pop <= T.pop);
+  const adj = kn.length ? TB_ADJ[kn[0]] : townHarbour(T) ? 'Harbour' : T.pop < 60 ? 'Pioneer' : M.elev[idx(T.x, T.y)] >= 6 ? 'Hill' : natWater(T) > .2 ? 'River' : 'Quiet';
+  return `${adj} ${size}${big && towns().length > 1 ? ' · Capital' : ''}`;
+}
+function barTown() {
+  const ts = towns(); if (!ts.length) return null;
+  if (GL3 && GL3.cam && GL3.gl) return nearestTown(GL3.cam.tx, GL3.cam.tz);
+  return (TB.sel && S.T[TB.sel] && ts.includes(S.T[TB.sel])) ? S.T[TB.sel] : ts.sort((a, b) => b.pop - a.pop)[0];
+}
+function barStep(d) { const ts = towns().sort((a, b) => b.pop - a.pop); if (!ts.length) return; const T = barTown(), k = Math.max(0, ts.indexOf(T)); const N = ts[(k + d + ts.length) % ts.length]; TB.sel = N.id; if (GL3 && GL3.gl) { GL3.town = ts.indexOf(N); GL3.follow = GL3.goto = null; glTouch(); glFocusTown(); } renderBar(true); }
+function renderBar(force) {
+  document.body.classList.toggle('tbar', TB.on && !!S && towns().length > 0); if (!TB.on || !S) return;
+  const T = barTown(); if (!T) return;
+  const L = person(T.leader), ini = L ? L.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() : '·';
+  const v = needsOf(T), cap = T.res ? econCap(T) : 0;
+  const r1 = T.res ? RES.filter(r => resOpen(r) || T.res[r] >= 1).map(r => { const net = (T.flow[r] || 0) - ((T.use || {})[r] || 0), sh = (T.short || {})[r] > 1.5;
+    return `<span class="${sh ? 'short' : ''}" title="${cap1(RES_N[r])}: ${Math.floor(T.res[r])} in store (room for ${cap}) · makes ${fmt1(T.flow[r] || 0)} a year, building uses about ${fmt1((T.use || {})[r] || 0)}${sh ? ' · running short' : ''}">${RES_IC[r]} <b>${fmtInt(Math.floor(T.res[r]))}</b><em class="${net < -.05 ? 'neg' : ''}">${Math.abs(net) < .05 ? '±0' : (net > 0 ? '+' : '−') + fmt1(Math.abs(net))}/yr</em></span>`; }).join('') : '';
+  const nd = NEEDS.filter(n => v[n.k] != null).map(n => { const x = v[n.k]; return `<span class="${x < .55 ? 'low' : x < .9 ? 'mid' : ''}" title="${esc(cap1(n.n))}: ${Math.round(x * 100)}% met">${n.ic}${Math.round(x * 100)}%</span>`; }).join(' ');
+  const r2 = `<span title="People">👥 ${fmtInt(T.pop)}</span> <span title="Homes for this many">🏠 ${fmtInt(T.cap.house)}</span> <span class="${T.cap.food < T.pop ? 'low' : ''}" title="Food for this many">🍞 ${fmtInt(T.cap.food)}</span>${nd ? ' · ' + nd : ''}`;
+  const pl = `<b>${esc(T.name)}</b><small>${esc(townTitle(T))}${L && L.died === null ? ' · ' + cap1(titleFor()) + ' ' + esc(L.name) : ''}</small>`;
+  const key = T.id + '|' + r1 + r2 + pl; if (!force && key === TB.k) return; TB.k = key;
+  const P = $('tbP'); P.textContent = ini; P.style.background = T.color || TB_COL[T.id % TB_COL.length]; P.title = L ? `${cap1(titleFor())} ${L.name}` : '';
+  $('tbR1').innerHTML = r1; $('tbR2').innerHTML = r2; $('tbPl').innerHTML = pl;
 }

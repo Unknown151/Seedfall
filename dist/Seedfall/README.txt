@@ -139,6 +139,11 @@ SKY, WEATHER AND SEASONS
   Weather drifts on its own: clear, fair, cloudy, overcast, rain, thunderstorms,
   fog and snow. Seasons follow the real calendar: autumn colours now, snow that
   settles in winter, fresh greens in spring.
+  The town bar at the top shows the town you're looking at: its leader's
+  badge, its stores and what each gains or loses a year, its people, homes
+  and food, how its needs are met, and its name on a plaque with a title
+  (a Glassblowing City, a Harbour Town, the Capital). The arrows go from town
+  to town, the plaque opens the Towns tab, and B (or the panel) hides it.
   Weather and Shadows can be switched off in the same panel. Had enough of
   the rain for now? The ☀️ in the dock (or W) clears the skies for half an
   hour or so.
@@ -465,6 +470,7 @@ THE 3D VIEW
 KEYS
   C        chronicle, towns, people, lore
   W        clear skies for a good while (the ☀️ in the dock)
+  B        the town bar on or off
   1 - 5    nudges: rain, supply pod, inspire, starfall, bloom (then click the world;
            each costs Reverence)
   6        speak to your people
