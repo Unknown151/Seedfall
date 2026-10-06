@@ -116,35 +116,42 @@ function fpGrow(B, w, h, ok = fpFree) {
   return true;
 }
 // landmarks that take a bigger lot once there's room: [w, h] (a 2×1 may turn either way)
-const FP_BIG = { stadium: [4, 4], university: [3, 3], fusion: [3, 3], hall: [2, 1], museum: [2, 1], theatre: [2, 1], station: [2, 1], market: [2, 1] };
-// the big ones (3×3 and up) need a patch no street runs through: they go on cleared ground at the edge of town, where
-// fields, pastures and houses up to a terrace give way (BIG_LOT); an older, smaller one grows there or moves out
-const BIG_LOT = t => FP_BIG[t] && FP_BIG[t][0] >= 3;
+const FP_BIG = { stadium: [4, 4], university: [3, 3], fusion: [3, 3], launchpad: [3, 3], elevator: [3, 3], airfield: [4, 2], power: [2, 2], works: [2, 2], terraformer: [2, 2], dome: [2, 2],
+  hall: [2, 1], museum: [2, 1], theatre: [2, 1], station: [2, 1], market: [2, 1], warehouse: [2, 1] }; // (the airfield's runway runs along x: air.js)
+// the big ones (2×2 and up) need a patch no street runs through: they go on cleared ground at the edge of town, where
+// fields, pastures and houses up to a terrace give way (BIG_LOT); an older, smaller one grows there or moves out. The
+// works, the power house, the airfield and the like (BIG_FALL) make do with a single plot when there's no lot to be had,
+// and spread or move out later; a stadium, a university or a fusion plant waits for its lot.
+const BIG_LOT = t => FP_BIG[t] && FP_BIG[t][0] * FP_BIG[t][1] >= 4;
+const BIG_FALL = t => BIG_LOT(t) && FP_BIG[t][0] * FP_BIG[t][1] <= 8;
 function fpYieldBig(j, z) {
   if (M.road[j] || M.water[j] || M.ruin[j] || M.rail[j] || springAt(j) || surfZ(j) !== z) return false;
   const B = M.bld[j] && S.B[M.bld[j]]; if (!B) return !M.bld[j];
   return !fpBig(B) && B.prog >= 1 && (B.type === 'house' && B.tier <= 4 && B.up == null || B.type === 'farm' || B.type === 'vfarm' || B.type === 'pasture' || B.type === 'park' || B.type === 'solar'); // (late on the edge is vertical farms and solar fields)
 }
+const noHome = (j, z) => fpYieldBig(j, z) && !(M.bld[j] && S.B[M.bld[j]] && S.B[M.bld[j]].type === 'house'); // (a works spreads over fields, not homes)
 function fpSettle(B) {
   const f = FP_BIG[B.type]; if (!f || B.prog < 1 || (fpW(B) >= f[0] && fpH(B) >= f[1]) || (fpW(B) >= f[1] && fpH(B) >= f[0])) return false;
-  if (BIG_LOT(B.type)) { if (fpGrow(B, f[0], f[1], fpYieldBig)) { connectBig(B); return true; } return bigMove(B); } // (grown where it stood: make sure a road reaches it)
+  if (BIG_LOT(B.type)) { if (fpGrow(B, f[0], f[1], BIG_FALL(B.type) ? noHome : fpYieldBig)) { connectBig(B); return true; } return bigMove(B); } // (grown where it stood: make sure a road reaches it)
   if (fpBig(B)) return false;
   return fpGrow(B, f[0], f[1], fpYield) || (f[0] !== f[1] && fpGrow(B, f[1], f[0], fpYield));
 }
 // the best w×h patch for a big landmark: level, no street through it, a road beside it, out towards the edge, and as
 // few homes in the way as possible ({x, y} is its corner)
-function bigLotSite(T, w, h) {
-  const R = townRadius(T); refreshOwn(); const cand = [];
+function bigLotSite(T, w, h, maxH = 1e9, out = 0) { // (maxH: how many homes' worth may come down for it, in tiers; out: how far past the town's edge it would rather be)
+  const R = townRadius(T) + out; refreshOwn(); const cand = [];
+  const nb = out ? towns().filter(U => U !== T && dist(U.x, U.y, T.x, T.y) < 45) : [];
+  const toward = (cx, cy) => { const ax = cx - T.x, ay = cy - T.y, l = Math.hypot(ax, ay) || 1; let m = 0; for (const U of nb) { const bx = U.x - T.x, by = U.y - T.y, c = (ax * bx + ay * by) / (l * (Math.hypot(bx, by) || 1)); m = Math.max(m, clamp((c - .5) / .5, 0, 1)); } return m; }; // (1 straight at a neighbour)
   const x0 = Math.max(0, Math.floor(T.x - R - 6)), x1 = Math.min(W - w, Math.ceil(T.x + R + 6)), y0 = Math.max(0, Math.floor(T.y - R - 6)), y1 = Math.min(H - h, Math.ceil(T.y + R + 6));
   for (let ay = Math.max(1, y0); ay <= Math.min(H - h - 1, y1); ay++) for (let ax = Math.max(1, x0); ax <= Math.min(W - w - 1, x1); ax++) { // (never against the edge of the world)
     const cx = ax + (w - 1) / 2, cy = ay + (h - 1) / 2, d = dist(cx, cy, T.x, T.y); if (d > R + 5 || d < R * .4) continue;
-    const e0 = M.elev[idx(ax, ay)]; let good = true, homes = 0, own = 0, steps = 0;
-    for (let y = ay; y < ay + h && good; y++) for (let x = ax; x < ax + w; x++) { const j = idx(x, y), de = Math.abs(M.elev[j] - e0); if (de > 1 || !fpYieldBig(j, surfZ(j))) { good = false; break; } steps += de; const B = M.bld[j] && S.B[M.bld[j]]; if (B && B.type === 'house') homes += B.tier; if (OWN[j] === T.id || !OWN[j]) own++; }
-    if (!good || own < w * h * .6) continue; // (its own town's ground, or nobody's; a step in it is levelled)
+    const e0 = M.elev[idx(ax, ay)]; let good = true, homes = 0, own = 0, steps = 0, fields = 0;
+    for (let y = ay; y < ay + h && good; y++) for (let x = ax; x < ax + w; x++) { const j = idx(x, y), de = Math.abs(M.elev[j] - e0); if (de > 1 || !fpYieldBig(j, surfZ(j))) { good = false; break; } steps += de; const B = M.bld[j] && S.B[M.bld[j]]; if (B && B.type === 'house') homes += B.tier; if (B && (B.type === 'farm' || B.type === 'pasture')) fields++; if (OWN[j] === T.id || !OWN[j]) own++; }
+    if (!good || own < w * h * .6 || homes > maxH) continue; // (its own town's ground, or nobody's; a step in it is levelled)
     if (around(cx | 0, cy | 0, Math.ceil(w / 2) + 2, j => M.bld[j] && S.B[M.bld[j]] && S.B[M.bld[j]].type === 'harbor' ? 1 : 0)) continue; // (the harbour needs its shore to grow along)
     let road = 0; for (let x = ax - 1; x <= ax + w; x++) for (const y of [ay - 1, ay + h]) if (inb(x, y) && M.road[idx(x, y)]) road++; for (let y = ay; y < ay + h; y++) for (const x of [ax - 1, ax + w]) if (inb(x, y) && M.road[idx(x, y)]) road++;
     if (!road && !around(cx | 0, cy | 0, Math.ceil(w / 2) + 3, j => M.road[j] && !M.water[j] ? 1 : 0)) continue; // (a road near enough to reach it)
-    const s = -Math.abs(d - R) * 1.5 - homes * 1.2 + Math.min(road, 4) * .6 - steps * .4 + rnd() * .5; // (a road beside it is nice: otherwise one is laid)
+    const s = -Math.abs(d - R) * 1.5 - homes * 1.2 - fields * (out ? 1.2 : 0) - (out ? toward(cx, cy) * 8 : 0) + Math.min(road, 4) * .6 - steps * .4 + rnd() * .5; // (a works would rather have rough ground than the town's fields, and keeps out of the way to the next town: the station and the line go there) // (a road beside it is nice: otherwise one is laid)
     cand.push([s, ax, ay]);
   }
   cand.sort((a, b) => b[0] - a[0]);
@@ -160,7 +167,7 @@ function bigClear(B, s, w, h) { // claim the lot: whatever stands there gives wa
   for (const j of old) markDirty(j);
   return homes;
 }
-const BIG_N = { stadium: 'stadium', university: 'university', fusion: 'fusion plant' };
+const BIG_N = { stadium: 'stadium', university: 'university', fusion: 'fusion plant', launchpad: 'launch complex', elevator: 'space elevator', airfield: 'airfield', power: 'power station', works: 'works', terraformer: 'climate engine', dome: 'garden dome' };
 // One stadium for the whole valley. The town with the most people within easy reach (its own, and its neighbours'
 // counted for less the further off they are) is elected to host it, so it goes to a big town in the thick of things,
 // not the far-flung one. Once one stands its town stays the host (S.stadT); an older world's extras close (yearlyRetire).
@@ -177,7 +184,7 @@ function stadiumHost() {
 function stadiumHere(T) { return !anycount('stadium') && stadiumHost() === T; } // (may this town start the valley's stadium?)
 function placeBig(T, type, o = {}) { // a new big landmark on its whole lot, cleared at the edge of town (null when there's no room)
   if (type === 'stadium' && !stadiumHere(T)) return null;
-  const f = FP_BIG[type], s = bigLotSite(T, f[0], f[1]); if (!s) return null;
+  const f = FP_BIG[type], s = bigLotSite(T, f[0], f[1], BIG_FALL(type) ? 5 : 1e9, BIG_FALL(type) ? 2.5 : 0); if (!s) return null; // (works and the like out on the edge, where they don't take the town's own ground) // (a works won't knock down a street of homes: it starts on a plot and spreads later)
   const a = M.bld[idx(s.x, s.y)] && S.B[M.bld[idx(s.x, s.y)]], a0 = a && a.type === 'house' ? 1 : 0; if (a) removeBuilding(a); // (clear the corner first: nothing may be left under it)
   const B = mkBuilding(type, s.x, s.y, T, o); const homes = a0 + bigClear(B, s, f[0], f[1]); connectBig(B);
   chron('🚧', `Ground is cleared at the edge of ${T.name} for a ${BIG_N[type]}${homes ? `; ${homes === 1 ? 'a house comes' : homes + ' houses come'} down to make room` : ''}.`, { x: s.x, y: s.y });
@@ -187,7 +194,7 @@ function placeBig(T, type, o = {}) { // a new big landmark on its whole lot, cle
 function bigMove(B) { // an older landmark too small for its lot and hemmed in: a new one at the edge, a park where it stood
   if (S.year - (B._mv || B.built) < 30) return false;
   const T = S.T[B.sid], f = FP_BIG[B.type]; B._mv = S.year; if (!T) return false;
-  const s = bigLotSite(T, f[0], f[1]); if (!s) return false;
+  const s = bigLotSite(T, f[0], f[1], BIG_FALL(B.type) ? 5 : 1e9, BIG_FALL(B.type) ? 2.5 : 0); if (!s) return false;
   const ox = B.x, oy = B.y, homes = bigClear(B, s, f[0], f[1]); // (the same building, so its name and story go with it)
   if (!M.bld[idx(ox, oy)]) mkBuilding('park', ox, oy, T, { prog: 1 });
   connectBig(B); T._fail = {};
@@ -525,15 +532,25 @@ function railRoute(a, b, skip) { // the shortest way from town a to town b over 
     for (const r of S.rails) { if (!r.path || r === skip || (r.a !== u && r.b !== u)) continue; const o = r.a === u ? r.b : r.a, nd = du + r.path.length; if (nd < (D.has(o) ? D.get(o) : 1e9)) D.set(o, nd); } }
 }
 const railDeg = id => S.rails.filter(r => r.path && (r.a === id || r.b === id)).length;
+// two towns that have grown into each other, their stations a short walk apart, need no line between them (a train would fill
+// the whole of it and stand across the junction everyone else uses): they join the network through other towns
+const RAIL_NEAR = 6, railNear = (T, O) => { const a = stationOf(T), b = stationOf(O); return !!(a && b && dist(a.x, a.y, b.x, b.y) < RAIL_NEAR); };
+function dropNearLines() { // (and an older world's are taken up)
+  const n0 = S.rails.length; S.rails = S.rails.filter(r => !(r.path && railNear(S.T[r.a], S.T[r.b]))); if (S.rails.length === n0) return;
+  const keep = new Set(); for (const r of S.rails) if (r.path) for (const i of r.path) keep.add(i);
+  for (let i = 0; i < W * H; i++) if (M.rail[i] && !keep.has(i)) { M.rail[i] = 0; markDirty(i); }
+  S.railGen = (S.railGen || 0) + 1;
+}
 function planRails() {
   if (!hasTech('rail')) return;
+  dropNearLines();
   const st = towns().filter(T => T.bl.some(id => S.B[id] && S.B[id].type === 'station' && S.B[id].prog >= 1));
   if (st.length < 2) return;
   const has = (a, b) => S.rails.some(r => (r.a === a && r.b === b) || (r.a === b && r.b === a));
   for (const T of st) {
     if (S.rails.some(r => r.a === T.id || r.b === T.id) && chance(0.7)) continue;
     let best = null, bd = 1e9;
-    for (const O of st) { if (O === T || has(T.id, O.id)) continue; const d = dist(T.x, T.y, O.x, O.y), rt = railRoute(T.id, O.id); if (d >= bd) continue;
+    for (const O of st) { if (O === T || has(T.id, O.id) || railNear(T, O)) continue; const d = dist(T.x, T.y, O.x, O.y), rt = railRoute(T.id, O.id); if (d >= bd) continue;
       if (rt >= 1e9 || (railDeg(T.id) < RAIL_DEG && railDeg(O.id) < RAIL_DEG && rt > d * 1.25 * RAIL_DETOUR)) { bd = d; best = O; } } // (a line runs about 1.25 times as far as the crow flies; a town not on the network yet always gets joined, however busy its neighbours)
     if (!best) continue;
     const sa = T.bl.map(id => S.B[id]).find(B => B && B.type === 'station'), sb = best.bl.map(id => S.B[id]).find(B => B && B.type === 'station');
@@ -697,7 +714,7 @@ function tryService(T) {
     if (sv.t === 'stadium' && !stadiumHere(T)) continue;
     if (sv.t === 'lighthouse' && (!townHarbour(T) || anycount('lighthouse') >= 3)) continue;
     if (have >= want) continue;
-    if (BIG_LOT(sv.t)) { if (placeBig(T, sv.t)) return true; continue; } // (a big landmark: its whole lot cleared at the edge of town)
+    if (BIG_LOT(sv.t)) { if (placeBig(T, sv.t)) return true; if (!BIG_FALL(sv.t)) continue; } // (a big landmark: its whole lot cleared at the edge of town; a works makes do with a plot)
     const s = findSite(T, sv.site === 'shore' ? 'shore' : sv.site === 'ore' ? 'ore' : sv.site, 0, sv.t) || landmarkSite(T, sv.t);
     if (!s) continue;
     if (s.replaceFarm && M.bld[idx(s.x, s.y)]) removeBuilding(S.B[M.bld[idx(s.x, s.y)]]); // (a station out on the fields)
@@ -747,8 +764,8 @@ const AGE_BUILD = { gardens: ['park', 'dome'], lanterns: ['monument'], stone: ['
 function ageProject(T) {
   const th = S.age.k, cb = Object.entries(CULT.bld);
   let type = cb.length && chance(.4) ? wpick(cb) : pick(AGE_BUILD[th] || ['park']);
-  if (type === 'stadium' && !stadiumHere(T)) type = 'park';
-  if (BIG_LOT(type)) { placeBig(T, type); return; }
+  if (type === 'stadium' && !stadiumHere(T) || outgrown(type)) type = 'park';
+  if (BIG_LOT(type)) { if (placeBig(T, type) || !BIG_FALL(type)) return; }
   let s = type === 'dock' ? findSite(T, 'shore') : findSite(T, 'mid');
   if (!s) { // rebuild over an old low-rise block
     const olds = T.bl.map(id => S.B[id]).filter(B => B && B.type === 'house' && B.prog >= 1 && B.tier <= 4 && S.year - B.built > 60);
@@ -763,9 +780,11 @@ function ageProject(T) {
   if (type !== 'park') connectRoad(B);
 }
 const CULT_TECH = { park: 'stone', shrine: 'stone', monument: 'stone', market: 'loom', library: 'print', school: 'script', observatory: 'optics', museum: 'net', stadium: 'electric', dock: 'boats', workshop: 'smelt', dome: 'domes' };
+const outgrown = t => SERV.some(sv => sv.t === t && sv.until && hasTech(sv.until)); // (windmills after Electricity, wells after Concrete...: see yearlyRetire)
 function cultureProject(T) {
   const cb = Object.entries(CULT.bld); if (!cb.length || T.pop < 80) return;
   const type = wpick(cb), w = CULT.bld[type];
+  if (outgrown(type)) return; // (a custom can't bring back a windmill the age has outgrown)
   if (!hasTech(CULT_TECH[type] || 'stone') || !chance(.035 * Math.min(2, w))) return;
   if (type !== 'monument' && type !== 'park' && bcount(T, type) >= 4) return;
   const d = (S.doctrines || []).filter(d => d.ai && d.str >= .15 && (d.bld || []).includes(type)).pop();

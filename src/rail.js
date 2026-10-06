@@ -21,8 +21,10 @@ function railMap() { // tile -> its pieces [[prev, next, offset, offset, ballast
     if (W2.some(([p, q]) => (p === a && q === b) || (p === b && q === a))) continue; W2.push([a, b]);
     let L = m.get(i); if (!L) m.set(i, L = []); L.push([a, b, -TRACK_O, -TRACK_O, RB], [a, b, TRACK_O, TRACK_O, RB]); }
   for (const [i, W2] of ways) if (W2.length > 1 && multi.get(i) > 1) jn.add(i);
+  const jz = new Map(); for (const i of jn) jz.set(i, i); // a junction reaches a tile along each line either side of it: the lines, smoothed, part only gradually
+  for (const r of rs) if (r.path) for (let k = 1; k < r.path.length - 1; k++) { const i = r.path[k]; if (!jn.has(i)) continue; for (const j of [r.path[k - 1], r.path[k + 1]]) if (!jz.has(j)) jz.set(j, i); }
   for (const i of m.keys()) if (M.road[i] && !M.water[i]) xs.push(i);
-  RAILX.S = S; RAILX.n = gen; RAILX.m = m; RAILX.xs = xs; RAILX.jn = jn; RAILX.multi = multi; RAILX.geo = railGeoAll(rs); RAILX.lv = null; return m;
+  RAILX.S = S; RAILX.n = gen; RAILX.m = m; RAILX.xs = xs; RAILX.jn = jn; RAILX.jz = jz; RAILX.multi = multi; RAILX.geo = railGeoAll(rs); RAILX.lv = null; return m;
 }
 // The line's shape: its tile centres smoothed along it (a staircase of tiles becomes one straight diagonal, a corner a wide
 // curve), never more than RAIL_SM off a tile's middle so it keeps clear of what stands beside it. Each tile's piece runs from
@@ -159,9 +161,10 @@ const TRAIN_SP = [[.75, .16], [1.25, .3], [2.4, .5]]; // top speed (tiles a seco
 // Signals: a train claims the stretch ahead that it shares with other lines (its own direction's track, or the whole of a
 // junction) before it gets there, and holds what it stands on; if another train has it, it eases to a stand and waits.
 // One held longer than another held train goes first, and after 20 s anything goes, so trains can't hold each other up for good.
-function trainKey(tr, k) { const P = tr.r.path, i = P[k]; return RAILX.jn.has(i) ? 'j' + i : i + '>' + P[k - tr.dir]; } // (shared track: one key a direction)
+function trainKey(tr, k) { const P = tr.r.path, i = P[k], j = RAILX.jz.get(i); return j != null ? 'j' + j : i + '>' + P[k - tr.dir]; }
+const railSh = i => (RAILX.multi.get(i) || 0) > 1 || RAILX.jz.has(i); // (shared track, or in a junction's reach: a signal guards it) // (shared track: one key a direction)
 function trainBlock(tr, len) { // the run of shared tiles ahead of its head, within a few tiles: [path index of its first tile, their keys]
-  const P = tr.r.path, L = P.length - 1, mu = RAILX.multi, head = tr.dir > 0 ? tr.lo + len : tr.lo, sh = j => (mu.get(P[j]) || 0) > 1;
+  const P = tr.r.path, L = P.length - 1, mu = RAILX.multi, head = tr.dir > 0 ? tr.lo + len : tr.lo, sh = j => railSh(P[j]);
   for (let k = Math.round(head) + tr.dir, n = 0; k >= 1 && k <= L - 1 && n < 3; k += tr.dir, n++) if (sh(k)) {
     const run = []; for (let j = k; j >= 1 && j <= L - 1 && sh(j) && run.length < 16; j += tr.dir) run.push(trainKey(tr, j)); return [k, run]; }
   return null;
@@ -171,7 +174,7 @@ function stepTrains(dt) {
   railMap(); const claim = new Map(); // what each train has: shared track one way, or a junction
   for (const tr of DYN.trains) { const { len, fits } = trainCars(tr); if (!fits || tr.lo == null) continue; const P = tr.r.path;
     const both = tr.wait > 0 || Math.abs((tr.off == null ? TRACK_O * tr.dir : tr.off) - TRACK_O * tr.dir) > .02; // (standing at the platform, or crossing over: in the way of both tracks)
-    for (let k = Math.max(1, Math.round(tr.lo)); k <= Math.min(P.length - 2, Math.round(tr.lo + len)); k++) if ((RAILX.multi.get(P[k]) || 0) > 1) { claim.set(trainKey(tr, k), tr); if (both) { tr.dir = -tr.dir; claim.set(trainKey(tr, k), tr); tr.dir = -tr.dir; } } // (under it)
+    for (let k = Math.max(1, Math.round(tr.lo)); k <= Math.min(P.length - 2, Math.round(tr.lo + len)); k++) if (railSh(P[k])) { claim.set(trainKey(tr, k), tr); if (both) { tr.dir = -tr.dir; claim.set(trainKey(tr, k), tr); tr.dir = -tr.dir; } } // (under it)
     for (const key of tr.res || []) if (!claim.has(key)) claim.set(key, tr); } // (claimed last time, not yet passed)
   for (const tr of DYN.trains) {
     const P = tr.r.path, L = P.length - 1, { len, era, fits } = trainCars(tr), [vm, ac] = TRAIN_SP[era]; if (!fits) { tr.lo = .5; continue; } // (too short a line for any train)

@@ -139,7 +139,9 @@ SKY, WEATHER AND SEASONS
   Weather drifts on its own: clear, fair, cloudy, overcast, rain, thunderstorms,
   fog and snow. Seasons follow the real calendar: autumn colours now, snow that
   settles in winter, fresh greens in spring.
-  Weather and Shadows can be switched off in the same panel.
+  Weather and Shadows can be switched off in the same panel. Had enough of
+  the rain for now? The ☀️ in the dock (or W) clears the skies for half an
+  hour or so.
   Graphics: Light is for a slow computer or a work laptop. It draws plain
   colours instead of textures, with no shadows, glow or smoothing, fewer
   pixels and fewer people about, and a slightly lower frame rate. It is kept
@@ -275,11 +277,25 @@ BIG LANDMARKS
   host: a big town that is easy for everyone to reach, not the far-flung one.
   In an older world with a stadium in every town, all but the host's close
   over the years and become parks.
+  Other things are built to their real size too. The launch complex and the
+  space elevator take three-by-three: the pad and its rocket, a red service
+  tower, lightning masts, fuel spheres and a tall assembly building. An
+  airfield takes four-by-two, with a runway the length of it that the planes
+  really use, a taxiway, an apron, a terminal (jet bridges later), the tower
+  and hangars. The works and the power station take two-by-two out on the
+  edge of town: sawtooth sheds, a boiler house and tall stacks, an office at
+  the gate and a yard with a gantry crane; a turbine hall, twin stacks, a
+  cooling tower and a switchyard. Garden domes and climate engines are two
+  plots across, and a warehouse two long. Works and the like would rather
+  take rough ground than fields or homes; with no room they start on one plot
+  and spread, or move out, later.
+  Buildings the age has outgrown (windmills after Electricity, wells after
+  Concrete) aren't built again, not even for a custom of the Watcher's.
 
 QUARTERS, TERRACES AND REBUILDING
   Some landmarks take more room once they're built: a town hall, museum,
-  theatre, rail station or market spreads over two plots, a university, stadium or fusion plant over
-  four (a small house or a field may make way). A full town with no plot left
+  theatre, rail station, market or warehouse spreads over two plots (a small
+  house or a field may make way). A full town with no plot left
   for one clears an old cottage that has room round it.
   Nobody zones a Seedfall town but the town itself. Each one keeps a market
   quarter round its square, homes around that, a works quarter out on one edge
@@ -331,6 +347,8 @@ RAILWAYS AND TRAMS
   instead of running through each other; lines that share the way share the
   two tracks. Signals keep trains on the same track apart, and where lines
   cross or part a train eases to a stand and waits while another goes through.
+  Two towns that have grown into each other, their stations a short walk
+  apart, don't get a line of their own: people walk.
   In town, the trams take over: a line along the streets from the station
   through the middle to the far side, stopping every few streets. First a
   horse tram, then an electric tram under its wire, then a long low modern
@@ -446,6 +464,7 @@ THE 3D VIEW
 
 KEYS
   C        chronicle, towns, people, lore
+  W        clear skies for a good while (the ☀️ in the dock)
   1 - 5    nudges: rain, supply pod, inspire, starfall, bloom (then click the world;
            each costs Reverence)
   6        speak to your people

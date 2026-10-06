@@ -14,6 +14,7 @@ function bindUI() {
     b.addEventListener('mouseleave', () => $('tip2').style.opacity = 0);
   });
   $('dockChron').addEventListener('click', togglePanel);
+  $('dockSky').addEventListener('click', clearSkies);
   $('pClose').addEventListener('click', togglePanel);
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { if (t.dataset.tab === 'people' && UI.tab === 'people') UI.personSel = null; setTab(t.dataset.tab); renderPanelBody(true); }));
   $('pBody').addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.vk) { if (d.open) VOICE_OPEN.add(d.dataset.vk); else VOICE_OPEN.delete(d.dataset.vk); } }, true);
@@ -75,6 +76,7 @@ function onKey(e) {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
   const k = e.key;
   if (k === 'c' || k === 'C') togglePanel();
+  else if (k === 'w' || k === 'W') clearSkies();
   else if (k === 'h' || k === 'H' || k === '?') $('help').classList.toggle('show');
   else if (k === 'z' || k === 'Z') { UI.zones = !UI.zones; toast(UI.zones ? 'Zone view: blue market quarters, green homes, yellow works, teal greens. The towns draw these themselves. Z again to hide.' : 'Zone view off.'); }
   else if (k === 'f' || k === 'F') { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => { }); else document.exitFullscreen(); }

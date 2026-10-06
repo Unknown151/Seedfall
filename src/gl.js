@@ -649,7 +649,7 @@ precision mediump float; in float vA, vS; out vec4 o; uniform vec3 uCol;
 void main(){ vec2 d=gl_PointCoord-.5; float r=length(d)*2.; if(r>1.) discard; float a=vA*(1.-smoothstep(.15,1.,r))*(.8+.2*sin(d.x*9.+d.y*7.)); o=vec4(uCol*vS*(1.-.12*d.y),a); }`;
 const SMOKE_AT = { workshop: [[.16, -.14, 21]], works: [[.28, -.18, 43]], power: [[-.16, -.2, 37], [.16, -.2, 37]], glassworks: [[.2, -.16, 24]] };
 const SMOKE_GEN = { workshop: [null, [[.16, -.14, 26]], []], weaver: [[], [[.32, -.34, 30]], []], glassworks: [null, [[.2, -.16, 26]]] }; // refitted workplaces (needs.js REFIT) smoke from their new stacks, or not at all
-const smokeAt = B => { const g = SMOKE_GEN[B.type], a = g && g[genOf(B)]; return a || SMOKE_AT[B.type]; };
+const smokeAt = B => { if (fpBig(B) && SMOKE_BIG[B.type]) return SMOKE_BIG[B.type](B); const g = SMOKE_GEN[B.type], a = g && g[genOf(B)]; return a || SMOKE_AT[B.type]; }; // (a works or power station on its lot: bigmodels.js)
 function glSmoke(gl, dt, FR, VP, pxs, day, tgt) {
   GL3.smF = [FR, day, tgt]; const A = glSmokeStep(Math.min(dt, .25)), n = A.n; if (!n) return;
   const Q = GL3.smp; for (let a = 0; a < 7; a++) gl.disableVertexAttribArray(a);
