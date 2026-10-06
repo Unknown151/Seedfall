@@ -613,9 +613,9 @@ void main(){
     if(uSea.w>0.){ sn=smoothstep(.3,.75,n.y)*uSea.w*(m==5||m==18?.7:1.)*(uLo>.5 ? 1. : smoothstep(.2,.55,fb(vP.xz*3.)+uSea.w*.6)); c=mix(c, vec3(.93,.95,.99), sn); }
   }
   if(vE<-.5 && n.y>.5){ // water: ripples that move, a deeper colour, and the sun's glint
-    vec2 q=vP.xz; n=normalize(vec3(sin(q.x*9.+uT*1.3)*.06+sin(q.y*13.7-uT*1.7)*.04+sin((q.x+q.y)*21.-uT*2.3)*.025, 1., cos(q.y*8.3+uT*1.1)*.06+cos((q.x-q.y)*17.+uT*1.9)*.03));
+    vec2 q=vP.xz; float wk=1.+uWx.x*2.2; /* (rougher in rain and storms, the swell running faster) */ n=normalize(vec3((sin(q.x*9.+uT*1.3*wk)*.06+sin(q.y*13.7-uT*1.7)*.04+sin((q.x+q.y)*21.-uT*2.3)*.025)*wk, 1., (cos(q.y*8.3+uT*1.1*wk)*.06+cos((q.x-q.y)*17.+uT*1.9)*.03)*wk));
     vec3 v=normalize(uEye-vP), h=normalize(uSun+v); float sp=pow(max(dot(n,h),0.),120.);
-    vec3 rf=reflect(-v,n); rf.y=abs(rf.y); c=mix(c*vec3(.72,.86,.92), untone(skyCol(rf))*.8, .35*(1.-max(dot(n,v),0.))); c+=vec3(1.,.95,.85)*sp*2.2*uShK; glow=min(.45,sp*.7)*uShK; }
+    vec3 rf=reflect(-v,n); rf.y=abs(rf.y); c=mix(c*vec3(.72,.86,.92), untone(skyCol(rf))*.8, .35*(1.-max(dot(n,v),0.))); c+=vec3(1.,.95,.85)*sp*2.2*uShK; if(uWx.x>.3) c=mix(c, vec3(.86,.9,.93), smoothstep(.55,.95,fb(q*7.+vec2(uT*.4,-uT*.3)))*(uWx.x-.3)*.5); /* whitecaps */ glow=min(.45,sp*.7)*uShK; }
   float cv=min(uWx.y,.65), /* (CLOUD_MAX: the cloud layer's patches and their shadows agree) */ cs=uWx.y>.05 && uLo<.5 ? smoothstep(.66-.2*cv,.72-.2*cv,fb(vP.xz*.08+vec2(uT*.012,uT*.005))) : 0.; // clouds drifting over, their shadows on the land
   float nd=(m==5||m==18) ? clamp(dot(n,uSun)*.55+.45,0.,1.) : max(dot(n,uSun),0.), sh=uNoSh>.5 ? 1. : mix(1., shadow(), uShK); // leaves let light through, so it wraps round to their shady side
   float ao=vE<-.5?1.:clamp(vO,0.,1.); ao=ao*ao*(3.-2.*ao); if(m==5||m==18) ao=.35+.65*ao; // how much open sky this spot sees (baked per vertex)
@@ -907,6 +907,8 @@ function glShot() { // choose what to look at next
   if (big.length) opts.push([2, () => { const B = pick1(big), T = S.T[B.sid], [x, y] = glLot(B); return { at: () => [x, z(x, y), y], zoom: rf(2, 3), pitch: rf(.35, .55), cap: (B.name || (BT[B.type] ? BT[B.type].n : B.type)) + (T ? ' · ' + T.name : '') }; }]);
   opts.push([2, () => { const T = pick1(T0.slice().sort((a, b) => b.pop - a.pop).slice(0, 4)); return { at: () => [T.x, z(T.x, T.y), T.y], zoom: clamp(townRadius(T) * .8 + 3, 5, 14), pitch: rf(.4, .75), cap: T.name, sub: Math.round(T.pop).toLocaleString('en-GB') + ' people' }; }]);
   { const w = glWorkShot(); if (w) opts.push([1.5, () => w]); } // a workplace close up (works.js)
+  const sb = Object.values(S.B).filter(B => B.prog >= 1 && SEA_CAP[B.type]);
+  if (sb.length) opts.push([2, () => { const B = pick1(sb), T = S.T[B.sid], [x, y] = glLot(B), tall = B.type === 'windpark' || B.type === 'oilrig' || B.type === 'sealaunch'; return { at: () => [x, SEA_Y + (tall ? .6 : .1), y], zoom: tall ? rf(3, 4.2) : rf(1.8, 2.6), pitch: rf(.22, .38), cap: SEA_CAP[B.type] + (T ? ' off ' + T.name : '') }; }]); // out on the water (seamodels.js)
   const hs = harbours(); const sun = LIGHT.sun;
   if (hs.length && sun && sun.el > -2 && sun.el < 14) opts.push([4, () => { const B = pick1(hs), [x, y] = glLot(B), T = S.T[B.sid]; return { at: () => [x + B.dir[0] * .6, z(x, y), y + B.dir[1] * .6], zoom: rf(2.5, 3.5), pitch: rf(.18, .3), cap: '🌇 Evening at the harbour' + (T ? ' of ' + T.name : ''), yaw: Math.atan2(-B.dir[0], -B.dir[1]) }; }]); // golden hour by the water
   let tot = 0; for (const o of opts) tot += o[0]; let r = Math.random() * tot; for (const o of opts) if ((r -= o[0]) <= 0) return o[1]();

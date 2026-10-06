@@ -10,8 +10,8 @@ const NEEDS = [
   { k: 'culture', ic: '🎭', n: 'culture', tech: 'stone', tip: 'Shrines, markets, shops, the library, parks, monuments, theatres, museums, stadiums, gardens. People move to lively towns, and faith grows.' },
   { k: 'word', ic: '📡', n: 'news', tech: 'radio', tip: 'A radio mast or Weave relay in range. Research goes faster, and the Watcher’s words are remembered longer.' }
 ];
-const CULT_PTS = { shops: 1, theatre: 4, bathhouse: 2, botanic: 3, digsite: 1, guildhall: 1, shrine: 2, plaza: 1, market: 1, library: 2, park: 1, monument: 3, watchstone: 3, museum: 5, stadium: 4, dome: 2 };
-const POWER_OUT = { power: 12, turbine: 3, solar: 4, fusion: 40 };
+const CULT_PTS = { seapier: 3, seastead: 2, reef: 1, shops: 1, theatre: 4, bathhouse: 2, botanic: 3, digsite: 1, guildhall: 1, shrine: 2, plaza: 1, market: 1, library: 2, park: 1, monument: 3, watchstone: 3, museum: 5, stadium: 4, dome: 2 };
+const POWER_OUT = { power: 12, turbine: 3, solar: 4, fusion: 40, oilrig: 10, windpark: 5, wavefarm: 4, floatsolar: 3 }; // (out at sea: ocean.js)
 const POWER_USE = { works: 2, university: 2, vfarm: 2, dome: 2, station: 1, airfield: 1, stadium: 1, antenna: 1, museum: 1 };
 const WELL_N = 70, TOWER_N = 900, MILL_K = .25, MILL_FIELDS = 16;
 const clinicN = () => 1500 * (hasTech('genegarden') ? 3 : hasTech('computing') ? 2 : 1); // hospitals get better
@@ -54,7 +54,7 @@ function needValues(T, n, radios) {
   const v = {}, p = Math.max(1, T.pop);
   if (hasTech('wells')) {
     if (hasTech('concrete') || p < 15) v.water = 1; // piped water, or a camp small enough to carry it from the stream
-    else v.water = clamp((natWater(T) * p + (n.well || 0) * WELL_N + (n.watertower || 0) * TOWER_N * (hasTech('steam') ? 2 : 1)) / p, 0, 1);
+    else v.water = clamp((natWater(T) * p + (n.well || 0) * WELL_N + (n.watertower || 0) * TOWER_N * (hasTech('steam') ? 2 : 1) + (n.desal || 0) * TOWER_N * 2) / p, 0, 1);
   }
   if (hasTech('mills') && !hasTech('electric')) v.mill = millShare(T, n);
   if (hasTech('medicine')) v.health = clamp(((n.clinic || 0) * clinicN() + (n.bathhouse || 0) * 700 + 150) / p, 0, 1);
@@ -203,6 +203,7 @@ function tryNeeds(T) {
     return rebuild ? placeProject(T, type, []) : null;
   };
   if (v.water != null && v.water < .85) {
+    if (v.water < .7 && seaDesal(T)) return true; // (a coastal town can make it from the sea)
     if (hasTech('masonry') && T.pop > 160 && bcount(T, 'watertower') < 4 && put('watertower', ['mid', 'edge'], v.water < .5)) return true;
     if (bcount(T, 'well') < 8 && put('well', ['center', 'mid', 'backlot'], v.water < .5)) return true;
   }
@@ -211,6 +212,7 @@ function tryNeeds(T) {
   if (v.energy != null && v.energy < .95 && T.pop >= 250) {
     if (hasTech('fusion') && T.pop >= 2000 && !bcount(T, 'fusion') && put('fusion', ['edge', 'flatedge'], v.energy < .5)) return true;
     if (T.pop >= 450 && !bcount(T, 'power') && !bcount(T, 'fusion') && put('power', ['edge'], v.energy < .5)) return true;
+    if (chance(.6) && seaWind(T)) return true; // (offshore wind first where there's sea)
     if (hasTech('solar') && bcount(T, 'solar') < 14 && put('solar', ['edge', 'flatedge'])) return true;
     if (bcount(T, 'turbine') < 10 && put('turbine', ['high', 'edge'])) return true;
   }
@@ -244,7 +246,7 @@ function needsChron() {
     return;
   }
 }
-function yearlyNeeds() { refreshNeeds(true); migrate(); needsChron(); yearlyIndustry(); yearlyCulture(); }
+function yearlyNeeds() { refreshNeeds(true); migrate(); needsChron(); yearlyIndustry(); yearlyCulture(); yearlySea(); }
 
 /* ---------- read-outs ---------- */
 function needsRow(T) {
@@ -254,7 +256,7 @@ function needsRow(T) {
   return `<div class="needs">${act.map(nd => { const x = v[nd.k], cl = x >= .9 ? 'ok' : x >= .55 ? 'mid' : 'low'; return `<span class="${cl}" title="${esc(cap1(nd.n))}: ${Math.round(x * 100)}% met. ${esc(nd.tip)}">${nd.ic} ${Math.round(x * 100)}%</span>`; }).join('')}${soot}</div>`;
 }
 function needTip(B) {
-  const t = B.type;
+  const t = B.type, sx = seaTip(B); if (sx) return sx;
   if (t === 'theatre') return '🎭 culture +4 · stages a new play now and then';
   if (t === 'bathhouse') return '♨️ hot baths: people born here live a few years longer' + (hasTech('medicine') ? ` · ⚕️ helps about 700 people` : '');
   if (t === 'digsite') return B.done ? `⛏️ finished after ${B.finds || 0} finds; open for visitors` : `⛏️ ${B.finds || 0} find${B.finds === 1 ? '' : 's'} so far · every find helps research`;

@@ -268,7 +268,7 @@ function glWorks() { // called from glPeople every frame
   const sun = LIGHT.sun || { hr: 13, fixed: 1 }, day = !!sun.fixed || (sun.hr >= 6.5 && sun.hr < 20), w = S.wx || {}, wind = 1 + (w.storm || 0) * 1.5 + (w.rain || 0) * .5, sea = LIGHT.season || seasonNow();
   const L = [];
   for (const B of GL3.wk) { if (B.prog < 1 || S.B[B.id] !== B) continue; const [X, Z] = glLot(B), y = surfZ(idx(B.x, B.y)) * ZS, d = Math.hypot(X - eye[0], y - eye[1], Z - eye[2]);
-    if (d < (B.type === 'harbor' || B.type === 'turbine' || B.type === 'mill' ? WKR * 1.6 : WKR)) L.push([Math.hypot(X - cam.tx, Z - cam.tz), B, X, Z, y, d]); }
+    if (d < (B.type === 'harbor' || B.type === 'turbine' || B.type === 'mill' || B.type === 'windpark' || B.type === 'oilrig' ? WKR * 1.6 : WKR)) L.push([Math.hypot(X - cam.tx, Z - cam.tz), B, X, Z, y, d]); }
   L.sort((a, b) => a[0] - b[0]); if (L.length > 80) L.length = 80; // (what the camera looks at gets its people first)
   GL3.wkN = 0; const sv = [GLB.x, GLB.y, GLB.base];
   try {

@@ -37,7 +37,7 @@ function deserialize(obj) {
   // migrations / defaults
   S.settings = Object.assign({ pace: 'normal', captions: true, sky: 'hour', weather: true, shadows: true }, S.settings || {});
   S.flags = S.flags || {}; S.flags.intro = 0;
-  for (const k in S.B) { S.B[k].hid = 0; if (S.B[k].type === 'launchpad') S.B[k].rk = 1; }
+  for (const k in S.B) { S.B[k].hid = 0; if (S.B[k].type === 'launchpad' || S.B[k].type === 'sealaunch') S.B[k].rk = 1; }
   S.doctrines = S.doctrines || []; S.aiQueue = S.aiQueue || [];
   if (!S.springs) S.springs = placeSprings(); // saves from before the hot springs
   if (S.rev == null) S.rev = 60;
