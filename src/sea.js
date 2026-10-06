@@ -73,11 +73,11 @@ function seaLinked(A, B) { const a = townHarbour(A), b = townHarbour(B); return 
 /* ---------- routes over open water, kept a little off the coast ---------- */
 const ROUTES = new Map();
 function seaRoute(a, b) {
-  if (ROUTES.S !== S) { ROUTES.clear(); ROUTES.S = S; } // another world's routes would cross its land
+  if (ROUTES.S !== S || ROUTES.v !== S.seaV) { ROUTES.clear(); ROUTES.S = S; ROUTES.v = S.seaV; } // another world's routes would cross its land (and new things at sea are in the way)
   const key = a + '-' + b;
   if (ROUTES.has(key)) return ROUTES.get(key);
   const coast = i => { const x = i % W, y = (i / W) | 0; for (const [dx, dy] of N8) { const nx = x + dx, ny = y + dy; if (inb(nx, ny) && M.water[idx(nx, ny)] !== 1) return 1; } return 0; };
-  const path = astar(a, b, (i, j) => M.water[j] === 1 ? 1 + coast(j) * 1.6 : 1e9);
+  const path = astar(a, b, (i, j) => M.water[j] === 1 && !(M.bld[j] && SEA_T[(S.B[M.bld[j]] || {}).type]) ? 1 + coast(j) * 1.6 : 1e9);
   if (ROUTES.size > 200) ROUTES.clear();
   ROUTES.set(key, path);
   return path;
@@ -177,7 +177,7 @@ function waterPath(a, b, maxN) { // plain BFS over open water
   const prev = new Map([[a, -1]]), q = [a];
   for (let h = 0; h < q.length && h < (maxN || 900); h++) {
     const i = q[h], x = i % W, y = (i / W) | 0;
-    for (const [dx, dy] of N4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (prev.has(j) || M.water[j] !== 1 || M.road[j]) continue; prev.set(j, i); if (j === b) { const p = []; for (let k = b; k >= 0; k = prev.get(k)) p.push(k); return p.reverse(); } q.push(j); }
+    for (const [dx, dy] of N4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (prev.has(j) || M.water[j] !== 1 || M.road[j] || M.bld[j]) continue; prev.set(j, i); if (j === b) { const p = []; for (let k = b; k >= 0; k = prev.get(k)) p.push(k); return p.reverse(); } q.push(j); }
   }
   return null;
 }

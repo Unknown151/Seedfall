@@ -22,12 +22,48 @@ function railMap() { // tile -> its pieces [[prev, next, offset, offset, ballast
     let L = m.get(i); if (!L) m.set(i, L = []); L.push([a, b, -TRACK_O, -TRACK_O, RB], [a, b, TRACK_O, TRACK_O, RB]); }
   for (const [i, W2] of ways) if (W2.length > 1 && multi.get(i) > 1) jn.add(i);
   for (const i of m.keys()) if (M.road[i] && !M.water[i]) xs.push(i);
-  RAILX.S = S; RAILX.n = gen; RAILX.m = m; RAILX.xs = xs; RAILX.jn = jn; RAILX.multi = multi; return m;
+  RAILX.S = S; RAILX.n = gen; RAILX.m = m; RAILX.xs = xs; RAILX.jn = jn; RAILX.multi = multi; RAILX.geo = railGeoAll(rs); RAILX.lv = null; return m;
+}
+// The line's shape: its tile centres smoothed along it (a staircase of tiles becomes one straight diagonal, a corner a wide
+// curve), never more than RAIL_SM off a tile's middle so it keeps clear of what stands beside it. Each tile's piece runs from
+// the point it shares with the tile before to the one it shares with the next, curving through its smoothed centre. The
+// points between tiles are shared by every line through that edge (the first line to it sets it), so where lines share
+// track their pieces are one and the same, and where they part each runs on smoothly. GEO: 'i,a,b' (a < b) -> [ex, ez, cx, cz, xx, xz].
+const RAIL_SM = .4;
+function railGeoAll(rs) {
+  const geo = new Map(), bp = new Map(), ctr = i => [i % W, (i / W) | 0];
+  for (const r of rs) { const P = r.path; if (!P || P.length < 3) continue; const L = P.length - 1, cs = [];
+    for (let k = 0; k <= L; k++) { const w = Math.min(2, k, L - k), c0 = ctr(P[k]); if (!w) { cs.push(c0); continue; }
+      let x = 0, z = 0, n = 0; for (let q = -w; q <= w; q++) { const wt = w + 1 - Math.abs(q), c = ctr(P[k + q]); x += c[0] * wt; z += c[1] * wt; n += wt; }
+      x /= n; z /= n; const dx = x - c0[0], dz = z - c0[1], d = Math.hypot(dx, dz); if (d > RAIL_SM) { x = c0[0] + dx / d * RAIL_SM; z = c0[1] + dz / d * RAIL_SM; }
+      cs.push([x, z]); }
+    const edge = k => { const a = P[k], b = P[k + 1], key = Math.min(a, b) + ',' + Math.max(a, b); let e = bp.get(key); if (!e) bp.set(key, e = [(cs[k][0] + cs[k + 1][0]) / 2, (cs[k][1] + cs[k + 1][1]) / 2]); return e; };
+    for (let k = 1; k < L; k++) { const i = P[k], a = P[k - 1], b = P[k + 1], E = edge(k - 1), X = edge(k), key = i + ',' + Math.min(a, b) + ',' + Math.max(a, b);
+      if (!geo.has(key)) geo.set(key, a < b ? [E[0], E[1], cs[k][0], cs[k][1], X[0], X[1]] : [X[0], X[1], cs[k][0], cs[k][1], E[0], E[1]]); } }
+  return geo;
+}
+// The maglev runs level: the guideway's height along each line is the highest ground within a few tiles, eased into gentle
+// ramps, so it doesn't bob up and down over every terrace step and river bank (where lines share a tile, the higher wins)
+function railLevel() {
+  railMap(); if (RAILX.lv && RAILX.lvS === S) return RAILX.lv;
+  const lv = new Map(), G = .035;
+  for (const r of S.rails || []) { const P = r.path; if (!P || P.length < 3) continue; const L = P.length - 1, raw = P.map(railH0), h = [];
+    for (let k = 0; k <= L; k++) { let m = -1e9; for (let q = Math.max(0, k - 3); q <= Math.min(L, k + 3); q++) m = Math.max(m, raw[q]); h.push(m); }
+    for (let k = 1; k <= L; k++) h[k] = Math.max(h[k], h[k - 1] - G); for (let k = L - 1; k >= 0; k--) h[k] = Math.max(h[k], h[k + 1] - G);
+    for (let k = 0; k <= L; k++) lv.set(P[k], Math.max(lv.get(P[k]) || -1e9, h[k])); }
+  for (let it = 0, ch = 1; ch && it < 40; it++) { ch = 0; // (where lines meet at different levels, the lower eases up to the higher too)
+    for (const r of S.rails || []) { const P = r.path; if (!P || P.length < 3) continue;
+      for (const [k0, k1, d] of [[1, P.length, 1], [P.length - 2, -1, -1]]) for (let k = k0; k !== k1; k += d) { const want = lv.get(P[k - d]) - G; if (lv.get(P[k]) < want - 1e-6) { lv.set(P[k], want); ch = 1; } } } }
+  RAILX.lv = lv; RAILX.lvS = S; return lv;
 }
 const trainOff = tr => tr.off != null && !isNaN(tr.off) ? tr.off : TRACK_O * tr.dir; // (the track on its right, along the line's own way)
 const railEra = () => hasTech('maglev') ? 2 : hasTech('electric') ? 1 : 0;
 EV.on('tech', d => { if (d.t && (d.t.id === 'electric' || d.t.id === 'maglev')) for (const i of railMap().keys()) markDirty(i); }); // the track changes with the age
-function railH(i) { // the height the track runs at over a tile: the ground, or a deck level with the higher bank
+function railH(i) { // the height the track runs at over a tile (the maglev: level, see railLevel)
+  if (railEra() === 2) { const h = railLevel().get(i); if (h != null) return h; }
+  return railH0(i);
+}
+function railH0(i) { // the ground, or a deck level with the higher bank
   if (!M.water[i]) return GT(i);
   let h = landZ(i) * ZS + .12; const x = i % W, y = (i / W) | 0;
   for (const [dx, dy] of N4) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const j = idx(nx, ny); if (!M.water[j]) h = Math.max(h, GT(j) + .02); }
@@ -35,7 +71,9 @@ function railH(i) { // the height the track runs at over a tile: the ground, or 
 }
 // a point on tile i's piece (entered from a, left for b) at t in 0..1: [x, y, z, dx, dz] (y is the top of the rails' bed)
 function railPt(i, a, b, t, o0 = 0, o1 = 0) { // (o0, o1: its lane, to the right of the way it runs, where it comes in and goes out)
-  const x = i % W, z = (i / W) | 0, ex = (x + a % W) / 2, ez = (z + ((a / W) | 0)) / 2, xx = (x + b % W) / 2, xz = (z + ((b / W) | 0)) / 2, u = 1 - t;
+  const g = railMap() && RAILX.geo && RAILX.geo.get(i + ',' + Math.min(a, b) + ',' + Math.max(a, b)), u = 1 - t; let x, z, ex, ez, xx, xz;
+  if (g) { if (a < b) [ex, ez, x, z, xx, xz] = g; else [xx, xz, x, z, ex, ez] = g; } // (the line's smoothed shape: railGeoAll)
+  else { x = i % W; z = (i / W) | 0; ex = (x + a % W) / 2; ez = (z + ((a / W) | 0)) / 2; xx = (x + b % W) / 2; xz = (z + ((b / W) | 0)) / 2; }
   const hi = railH(i), hE = Math.max(hi, railH(a)), hX = Math.max(hi, railH(b));
   const p = [u * u * ex + 2 * u * t * x + t * t * xx, hE + (hX - hE) * t, u * u * ez + 2 * u * t * z + t * t * xz, 2 * (u * (x - ex) + t * (xx - x)), 2 * (u * (z - ez) + t * (xz - z))];
   if (o0 || o1) { const o = o0 + (o1 - o0) * t * t * (3 - 2 * t), l = Math.hypot(p[3], p[4]) || 1; p[0] -= p[4] / l * o; p[2] += p[3] / l * o; }
@@ -50,9 +88,9 @@ function railPos(path, s, o = 0) { // where along a line s is (s in tiles from i
 const RG = .07, RB = .19; // half the gauge, half the ballast's width (people are ~.27 tall here, so this is a broad gauge)
 function glRailTile(i, x, y) {
   const L = railMap().get(i); if (!L) return;
-  const era = railEra(), lod = GLB.lod, xing = M.road[i] && !M.water[i], g = GT(i), wet = !!M.water[i];
+  const era = railEra(), lod = GLB.lod, xing = M.road[i] && !M.water[i] && era < 2, g = GT(i), wet = !!M.water[i];
   for (const [a, b, o0, o1, bw] of L) {
-    const turn = (a % W !== b % W) && (((a / W) | 0) !== ((b / W) | 0)) || o0 !== o1, n = turn ? (lod ? 8 : 4) : (lod ? 2 : 1), P = []; // (a lane sliding sideways bends too)
+    const q0 = railPt(i, a, b, 0), q5 = railPt(i, a, b, .5), q1 = railPt(i, a, b, 1), turn = Math.hypot(q5[0] - (q0[0] + q1[0]) / 2, q5[2] - (q0[2] + q1[2]) / 2) > .01 || o0 !== o1, n = turn ? (lod ? 8 : 4) : (lod ? 2 : 1), P = []; // (a lane sliding sideways bends too)
     for (let k = 0; k <= n; k++) { const p = railPt(i, a, b, k / n, o0, o1), l = Math.hypot(p[3], p[4]) || 1; P.push([p[0], xing ? g + .008 : p[1], p[2], p[3] / l, p[4] / l]); }
     const side = (p, d, y) => [p[0] - p[4] * d, y, p[2] + p[3] * d]; // d across the track (the right of the way it runs)
     const strip = (d0, d1, dy, col, mat, e = 0) => { GLB.mat = mat; const c = gcol(col); for (let k = 0; k < n; k++) { const A = P[k], B = P[k + 1]; GLB.ctr = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2 - 1, (A[2] + B[2]) / 2]; gquad(side(A, d0, A[1] + dy), side(A, d1, A[1] + dy), side(B, d1, B[1] + dy), side(B, d0, B[1] + dy), c, e); } };
@@ -159,12 +197,12 @@ function stepTrains(dt) {
 }
 function trainPos(tr) { return railPos(tr.r.path, tr.s, trainOff(tr)); }
 // the crossing's barriers come down while a train is near; walkers and carts wait at the edge
-function railBusy(i) { return !!(DYN.railBusy && DYN.railBusy.has(i)); }
+function railBusy(i) { return railEra() < 2 && !!(DYN.railBusy && DYN.railBusy.has(i)); } // (the maglev runs overhead: nobody waits for it)
 
 function glTrains() {
   const eye = GL3.eye || [0, 0, 0], XG = DYN.xing || (DYN.xing = new Map()), dt = Math.min(GL3.dt || .016, .1);
   railMap();
-  for (const i of RAILX.xs || []) { // barriers
+  if (railEra() < 2) for (const i of RAILX.xs || []) { // barriers (none under the maglev's guideway)
     const x = i % W, z = (i / W) | 0; if (Math.hypot(x - eye[0], z - eye[2]) > 30) continue;
     const L = RAILX.m.get(i); if (!L) continue; const mo = Math.max(...L.map(q => Math.abs(q[2] + q[3]) / 2)), p = railPt(i, L[0][0], L[0][1], .5), l = Math.hypot(p[3], p[4]) || 1, f = [p[3] / l, 0, p[4] / l], r = [-f[2], 0, f[0]];
     const want = railBusy(i) ? 1 : 0, a = XG.get(i) || 0, na = a + clamp(want - a, -dt * .8, dt * .8); XG.set(i, na); const ang = na * Math.PI / 2, y = GT(i) + .008;

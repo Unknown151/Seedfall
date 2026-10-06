@@ -317,14 +317,16 @@ RAILWAYS AND TRAMS
   every other. Trains run between towns and stay out of them. When a
   town has grown all the way round its station, it builds a new one at the
   edge and the line is laid again. The track is ballast, sleepers and two
-  rails, curving round the corners, climbing on an embankment and crossing
+  rails, in long smooth curves rather than zig-zags from tile to tile,
+  climbing on an embankment and crossing
   rivers on an iron truss bridge. Out in the country, where a road crosses,
   there are crossbucks and barriers: they come down while a train goes by,
   and the folk and carts wait. The first trains are steam engines with a
   tender and three coaches, easing in and out of the stations. With
   Electricity come concrete sleepers, overhead wires and electric trains with
   a cab at each end, and with Maglev a concrete guideway on columns and long
-  white trains that float along it.
+  white trains that float along it. The guideway runs level, in gentle
+  ramps, instead of bobbing up and down over every terrace and river bank.
   Every line is double track and trains keep to the right, so they pass
   instead of running through each other; lines that share the way share the
   two tracks. Signals keep trains on the same track apart, and where lines
@@ -355,7 +357,40 @@ BOATS, SHIPS AND PLANES
   freighters, container ships and finally hover-freighters. Towns with
   harbours can trade by sea even when no road joins them.
   With Lenses, a lighthouse goes up on a point near the harbour, and its
-  beam sweeps the water all night.
+  beam sweeps the water all night. Red and green buoys bob at each harbour's
+  mouth, their lights winking after dark.
+
+THE SEA
+  Coastal towns use the sea more and more as the ages go by. Nothing out there
+  is ever built right next to anything else, so the ships always get through.
+  - Reed Boats: oyster beds in the shallows, trestles and stakes and a punt
+    (on a lake it's a wattle fish weir instead). A little food.
+  - Coinage: salt pans on the shore, brine turning pink, then white salt
+    raked into heaps. A little food (and a windpump once there's steam).
+  - Railways: a pleasure pier on iron legs, with kiosks at the gate, lamps,
+    benches and a bandstand at the end hung with bulbs. Culture.
+  - Steam: beach huts in every colour on the sand by bigger towns, with
+    parasols and deck chairs.
+  - Electricity / Reinforced Concrete: a desalination plant, drinking water
+    from the sea (later the town's mains water comes from it).
+  - Motorcars: oil rigs out at sea. Power for the grid, a flare that roars
+    at night, a supply boat coming and going and a helicopter landing on
+    the deck. When Fusion comes they're cut up and towed away, all but the
+    oldest, which is left standing as a reef for the fish, gulls and divers.
+  - Computing: offshore wind parks in tidy rows, blades turning in the wind
+    and red lights blinking together at night (power), and fish farms of
+    round net pens with a feed barge (food).
+  - Solar Glass: wave power, long red jointed floats bending over the swell.
+  - Skyframes: floating solar, rafts of panels tilted to the sun (lakes too).
+  - Gene Gardens: kelp farms, lines of buoys and a forest under them, with a
+    little boat working along them (food).
+  - Orbital Station: a launch platform anchored far out at sea; rockets go
+    up from there as well as from the launch pad.
+  - Arcologies: seasteads, floating neighbourhoods on hexagons of pontoons,
+    terraced white homes, gardens and a glowing edge.
+  A lake-only world gets just the small things: weirs, fish farms and floating
+  solar. In rain and storms the water gets rougher, with whitecaps. The film
+  camera visits the wind parks, rigs and seasteads now and then.
   Airfields get real planes: they wait on the apron, taxi out, take off (watch
   the shadow fall away), fly to another airfield or away over the edge of the
   world, and come back in to land. Propeller planes first, jets later, then

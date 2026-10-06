@@ -108,7 +108,7 @@ function spawnGiant() {
 function launchRocket(bid, seed) {
   const B = S.B[bid]; if (!B) return;
   DYN.rockets.push({ alt: 0, v: 0, t: 0, seed: !!seed, bid });
-  if (B.type === 'launchpad') { B.rk = 0; markDirty(idx(B.x, B.y)); }
+  if (B.type === 'launchpad' || B.type === 'sealaunch') { B.rk = 0; markDirty(idx(B.x, B.y)); }
   camHint(B.x, B.y, seed ? '🚀 A seedship lifts off' : '🚀 A launch', 4);
 }
 

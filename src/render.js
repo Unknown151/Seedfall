@@ -81,6 +81,7 @@ function drawTileObjects(i, x, y) {
   else if (B && !FLAT_TYPES[B.type]) { drawBuilding(B, i); if (B.type === 'house' && B.prog >= 1) glYard(B, x, y); }
   else if (!B && !w && !M.tree[i] && (M.bio[i] === BIO.ROCK || M.bio[i] === BIO.HIGH) && hash2(x, y, 11) < 0.3 && !M.road[i]) tileRocks(x, y);
   else if (!B && !bid && !w && !M.tree[i] && !M.road[i] && !M.rail[i] && !M.ruin[i]) tileGround(i, x, y);
+  if (!bid && !w && M.bio[i] === BIO.SAND && !M.road[i] && !M.rail[i]) glBeach(i, x, y); // beach huts by a bigger town (seamodels.js)
 }
 const gp = (u, v, z = 0) => [GLB.x + u, GLB.base + z * ZS, GLB.y + v]; // a spot on this tile (u, v from its middle, z in height units) in the world
 const post = (u, v, h, w, col, z0 = 0) => gBeam(gp(u, v, z0), gp(u, v, z0 + h), w, col); // an upright: a post, a pole, a stem

@@ -223,7 +223,7 @@ function mkBuilding(type, x, y, T, o = {}) {
     style: o.style != null ? o.style : S.styleIdx, var: rnd(), built: yr()
   };
   if (o.sub) B.sub = o.sub; if (o.name) B.name = o.name; if (o.dir) B.dir = o.dir;
-  if (type === 'launchpad') B.rk = 1;
+  if (type === 'launchpad' || type === 'sealaunch') B.rk = 1;
   S.B[B.id] = B; M.bld[i] = B.id; M.tree[i] = 0; M.wild[i] = 0; CNT_M = -1;
   if (M.road[i]) M.road[i] = 0;
   M.plan[i] = 0;
@@ -265,6 +265,8 @@ function recalcTown(T) {
     else if (B.type === 'vfarm') food += (900 + (S.ageN || 0) * 30) * (.6 + .4 * gk);
     else if (B.type === 'granary') food += 6;
     else if (B.type === 'dome') food += 60;
+    else if (SEA_FOOD[B.type]) food += SEA_FOOD[B.type]; // (from the sea: ocean.js)
+    else if (SEA_HOUSE[B.type]) house += SEA_HOUSE[B.type];
   }
   T.cap = { house, food: Math.round(food) };
 }
@@ -1299,7 +1301,7 @@ function simMonth0() {
   if (S.drought > 0) S.drought -= 1 / 12;
   // rockets
   if (hasTech('rocketry') && S.year - S.lastLaunch > 6 && chance(.03)) {
-    const pad = Object.values(S.B).find(B => B.type === 'launchpad' && B.prog >= 1);
+    const pads = Object.values(S.B).filter(B => (B.type === 'launchpad' || B.type === 'sealaunch') && B.prog >= 1), pad = pads.length > 1 ? pads[ri(0, pads.length - 1)] : pads[0]; // (from the sea platform too, once there is one)
     if (pad) {
       S.lastLaunch = S.year; S.flags.launches = (S.flags.launches || 0) + 1;
       if (S.flags.launches === 1) chron('🚀', `The first rocket leaves ${S.planet || 'the world'} from ${S.T[pad.sid].name}. The whole valley holds its breath, then cheers.`, { x: pad.x, y: pad.y, k: 'major' });
