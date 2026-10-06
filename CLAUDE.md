@@ -325,7 +325,7 @@ slow catch-ups. Tests of the sim, the panels and saves (`hover`, `needs`, `away`
   can be brought to it, `connectBig`). An older, smaller one grows where it stands if it can, or moves out to a new lot and leaves a park (`bigMove`, at most
   every 30 years). The models scale to the lot (`GL_BIG.stadium` with gates, scoreboard and flags at 4×4; the fusion plant's third dome; the university's longer ranges). The valley has one stadium (`stadiumHost`: the town with the most people within reach, `stadiumReach`; kept in `S.stadT`; `stadiumHere(T)` gates every way one can be built, and `yearlyRetire` closes an older world's extras into parks). Harbours grow
   along their shore (`yearlyHarbours`, `harbourLen` by population and era, over the shallows too) with a berth per tile
-  (`berths`, `berthTile`, ships keep `DYN.slot[bkey(B, k)]`). In 3D, `GL_BIG[type]` and `glHarbour` draw them; `glTraffic` draws ships,
+  (`berths`, `berthTile`, ships keep `DYN.slot[bkey(B, k)]`). In 3D, `GL_BIG[type]` and `glHarbour` draw them (the harbour by the age, `harbourStage`: a timber wharf, the docklands from Steam with a brick warehouse range under copper roofs, stone piers with pavilions and a beacon, portal cranes and cargo, `harbourDocks`; the container port from Computing; the far future's port from Fusion, a glass terminal, white gantries and floating piers edged with light, `harbourFuture`); `glTraffic` draws ships,
   fishing boats, ferries, trains and planes. `test/lots.mjs` checks all of it (`SHOTS=1` for pictures).
 - **Economy.** Building costs are paid per month of progress. With nothing in stock a building goes at
   35% speed; it never stops. Materials are chosen from local production. Trade needs a road (the wheel)
