@@ -168,13 +168,19 @@ function stepWeather(dt) {
       const [a, b] = WXD[w.k]; w.left = rf(a, b) * 60;
     }
   }
-  const T = on ? WXK[w.k] : WXK.fair, k = 1 - Math.exp(-dt / 70);
+  const T = on ? WXK[w.k] : WXK.fair, k = 1 - Math.exp(-dt / (w.quick > 0 ? 1.2 : 70)); if (w.quick > 0) w.quick -= dt; // (quick: the ☀️ button)
   for (const p of ['cover', 'rain', 'snow', 'fog', 'storm']) w[p] += ((T[p] || 0) - w[p]) * k;
   const se = LIGHT.season;
   if (!on) w.sc = 0;
   else if (w.snow > .3) w.sc = Math.min(1, w.sc + dt / 240 * w.snow);
   else w.sc = Math.max(0, w.sc - dt / ((se && se.winter > .5) ? 2400 : 500));
   if (on && w.storm > .5 && !DYN.intro && chance(dt / 11)) strike();
+}
+// the dock's ☀️ (W): clear skies now, for half an hour or so, the clouds and fog lifting in a few seconds rather than a minute
+// (weather is the view's alone: the sim never reads it). The Weather option turns it off for good.
+function clearSkies() {
+  const w = S.wx || (S.wx = newWx()); setWeather('clear', rf(25, 40) * 60); w.quick = 6;
+  toast(S.settings.weather === false ? 'The weather is off already: always fair (Options)' : '☀️ The clouds part. Fair skies for a good while (untick Weather in the options for always).');
 }
 function setWeather(k, secs) { // dev + future levers
   const w = S.wx || (S.wx = newWx());

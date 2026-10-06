@@ -7,7 +7,7 @@ import { launch, ROOT } from './env.mjs';
 const b = await launch(); const p = await b.newPage();
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 let fails = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++; };
-await p.goto(ROOT + 'seedfall.html?seed=4242&fresh&nointro&headless'); await p.waitForTimeout(800);
+await p.goto(ROOT + 'seedfall.html?seed=12345&fresh&nointro&headless'); await p.waitForTimeout(800); // (a world whose towns grow apart: a real network, with shared track)
 const r = await p.evaluate(() => {
   SF.ff(1150 - yr());
   const lines = S.rails.filter(r => r.path); let tiles = 0, road = 0, along = 0, bad = 0;
@@ -24,6 +24,7 @@ ok(r.along / r.tiles < .03, `lines cross streets rather than run down them (${r.
 ok(r.bad === 0, 'every tile of a line is rail and none has a building on it');
 ok(r.ends, 'every line runs station to station');
 ok(r.st >= .6, `stations stand at the edge of town (the nearest is ${(r.st * 100) | 0}% of the way out)`);
+ok(await p.evaluate(() => S.rails.filter(r => r.path).every(r => !railNear(S.T[r.a], S.T[r.b]))), 'no line between two stations a short walk apart (towns grown into each other)');
 ok(r.inT / r.tiles < .25, `lines run between towns, not through them (${r.inT} of ${r.tiles} tiles inside a town)`);
 ok(r.trams >= Math.max(1, r.big - 1) && r.okTram, `trams run along the streets of the towns (${r.trams} of ${r.big} towns, every route street to street)`);
 ok(r.moved === r.trams * 2, `and the trams go, two to a town on a track each way (${r.moved} moving)`);

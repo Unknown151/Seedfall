@@ -43,9 +43,9 @@ function stepFx3(dt) {
     else if (!m.hit) { m.hit = 1; DYN.flash = .8; for (let k = 0; k < 90; k++) { const a = Math.random() * TAU, s = rf(.5, 2.4); part3(m.x, g + .1, m.y, Math.cos(a) * s, rf(.6, 2.2), Math.sin(a) * s, rf(1, 2.6), pick(['#b9a99a', '#ffe2a8', '#8f8175']), .85, rf(.06, .16), { g: 2.2, dr: .9, glow: k % 4 === 0 ? 1 : 0 }); } } }
   DYN.meteors = DYN.meteors.filter(m => m.t < 6);
   for (const r of DYN.rockets) { const B = S.B[r.bid]; if (!B) { r.done = 1; continue; } r.t += dt; if (r.t > 2) { r.v += dt * (r.seed ? 2.3 : 3.2); r.alt += r.v * dt; }
-    const g = gGround(B.x, B.y) + (B.type === 'sealaunch' ? SL_DECK : 0), y = g + r.alt + .2;
-    for (let k = 0; k < (r.t < 2 ? 3 : 6); k++) part3(B.x + rf(-.08, .08), y, B.y + rf(-.08, .08), rf(-.5, .5), r.t < 2 ? rf(.1, .4) : -rf(1, 3), rf(-.5, .5), rf(1.2, 3), r.t < 2 ? '#eeeae4' : pick(['#f2efe9', '#e4e0da', '#d9d4cf']), .55, rf(.2, .4), { dr: .8, gr: .5 });
-    if (r.t > 2) part3(B.x, y - .1, B.y, rf(-.1, .1), -rf(2, 4), rf(-.1, .1), rf(.2, .45), pick(['#fff1c9', '#ffd28a', '#ff9a4a']), .9, rf(.12, .22), { glow: 1 });
+    const [bx, by] = glLot(B), g = gGround(bx, by) + (B.type === 'sealaunch' ? SL_DECK : 0), y = g + r.alt + .2; // (from the middle of its lot)
+    for (let k = 0; k < (r.t < 2 ? 3 : 6); k++) part3(bx + rf(-.08, .08), y, by + rf(-.08, .08), rf(-.5, .5), r.t < 2 ? rf(.1, .4) : -rf(1, 3), rf(-.5, .5), rf(1.2, 3), r.t < 2 ? '#eeeae4' : pick(['#f2efe9', '#e4e0da', '#d9d4cf']), .55, rf(.2, .4), { dr: .8, gr: .5 });
+    if (r.t > 2) part3(bx, y - .1, by, rf(-.1, .1), -rf(2, 4), rf(-.1, .1), rf(.2, .45), pick(['#fff1c9', '#ffd28a', '#ff9a4a']), .9, rf(.12, .22), { glow: 1 });
     if (r.alt > 70 && !r.done) { r.done = 1; if (B.type === 'launchpad' || B.type === 'sealaunch') setTimeout(() => { if (S.B[r.bid]) { S.B[r.bid].rk = 1; markDirty(idx(B.x, B.y)); } }, 8000); } }
   DYN.rockets = DYN.rockets.filter(r => !r.done);
   for (const b of DYN.birds) { b.t += dt; b.x += b.vx * dt; b.y += b.vy * dt; }
@@ -58,9 +58,9 @@ function stepFx3(dt) {
   if (DYN.bolt) { DYN.bolt.t += dt; if (DYN.bolt.t > .35) DYN.bolt = null; }
   // smoke and mist from the works that don't have chimney smoke (the climate engine, a launch pad after a launch), and the hot springs
   const e = GL3.eye; if (e && !FAST) {
-    for (const B of DYN.anim || []) { if (B.type !== 'terraformer' && !((B.type === 'launchpad' || B.type === 'sealaunch') && B.rk) || Math.hypot(B.x - e[0], B.y - e[2]) > 40 || Math.random() > dt * 1.2) continue; const g = gGround(B.x, B.y);
-      if (B.type === 'terraformer') part3(B.x + rf(-.2, .2), g + 3.2, B.y + rf(-.2, .2), rf(-.2, .2), rf(.2, .4), rf(-.2, .2), rf(5, 8), '#cfeff0', .35, .5, { dr: .3, gr: .4 });
-      else SMOKE3(B.x + rf(-.2, .2), g + .2, B.y + rf(-.2, .2), '#f4f2ef', .35, .3); }
+    for (const B of DYN.anim || []) { if (B.type !== 'terraformer' && !((B.type === 'launchpad' || B.type === 'sealaunch') && B.rk) || Math.hypot(B.x - e[0], B.y - e[2]) > 40 || Math.random() > dt * 1.2) continue; const [bx, by] = glLot(B), g = gGround(bx, by), big = fpBig(B), w = big ? .4 : .2;
+      if (B.type === 'terraformer') part3(bx + rf(-w, w), g + (big ? BIG_TF_H : 3.2), by + rf(-w, w), rf(-.2, .2), rf(.2, .4), rf(-.2, .2), rf(5, 8), '#cfeff0', .35, big ? .8 : .5, { dr: .3, gr: .4 }); // (the misting crown: higher on the big one)
+      else SMOKE3(bx + rf(-w, w), g + .2, by + rf(-w, w), '#f4f2ef', .35, .3); }
     for (const o of S.springs || []) if (Math.random() < dt * 1.4 && Math.hypot(o.x - e[0], o.y - e[2]) < 30) part3(o.x + rf(-.2, .2), gGround(o.x, o.y) + .05, o.y + rf(-.2, .2), rf(-.04, .04), rf(.15, .3), rf(-.04, .04), rf(3, 5), '#f4f7f7', .3, .2, { dr: .3, gr: .3 });
   }
 }
@@ -188,7 +188,7 @@ function glFxDyn() {
   const t = GL3.t, night = LIGHT.nightK || 0, lit = GL3.litNow; GLB.id = 0; GLB.ao = 1; GLB.mat = 0;
   const sv = [GLB.x, GLB.y, GLB.base]; GLB.x = GLB.y = GLB.base = 0;
   try {
-    for (const r of DYN.rockets) { const B = S.B[r.bid]; if (!B) continue; const y = gGround(B.x, B.y) + (B.type === 'sealaunch' ? SL_DECK : 0) + r.alt, X = B.x, Z = B.y; // a rocket, or the seedship
+    for (const r of DYN.rockets) { const B = S.B[r.bid]; if (!B) continue; const [X, Z] = glLot(B), y = gGround(X, Z) + (B.type === 'sealaunch' ? SL_DECK : 0) + r.alt; // a rocket, or the seedship
       if (r.seed) { gBox([X, y, Z], [.16, 0, 0], [0, 0, .16], 2.3, '#f4f6f8'); gSpire([X, y + 2.3, Z], .16, .65, '#5fd0c9'); for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) gBox([X + a * .2, y, Z + b * .2], [.04 + Math.abs(a) * .03, 0, 0], [0, 0, .04 + Math.abs(b) * .03], .5, '#c9d2da'); }
       else { GLB.x = X; GLB.y = Z; GLB.base = y; glCylAt(0, 0, .08, 1, 46, '#f4f4f2', '#f4f4f2', 10); gCone(0, 0, .08, 47, 9, '#ff8a3d', 10); GLB.x = GLB.y = GLB.base = 0; } }
     for (const d of DYN.drops) { const g = gGround(d.x, d.y), f = Math.min(1, d.t / 4), y = g + 24 * (1 - f) * (1 - f * .3); // a supply pod under its parachute

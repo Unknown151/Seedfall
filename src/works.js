@@ -217,8 +217,12 @@ const GLW = {
     const [hd] = wkMan(B, 0, X, Z + .11, c.y, h, [an, .9]); wkTool(hd, h, an - .55, .07, 'hammer');
     if (ph < .2) wkBits([X, top + .01, Z], ph / 1.6, 5, '#ffd27a', true, B.id * 23 + Math.floor(c.t * 1.6));
   },
-  works(B, c) { wkFlywheel(B, c, .1, .36, .11, .15, '#5a5f66'); },
-  power(B, c) { wkFlywheel(B, c, .08, .33, .1, .14, '#4a6a8a'); },
+  works(B, c) { // the flywheel by the wall (on its lot, the yard's gantry crane runs to and fro with a casting)
+    if (!fpBig(B)) return wkFlywheel(B, c, .1, .36, .11, .15, '#5a5f66');
+    cBig(B); KF.y0 = c.y; const u = -.05 + .8 * (.5 + .5 * Math.sin(c.t * .18)), v = .62 + .2 * Math.sin(c.t * .11), drop = .12 + .1 * (.5 + .5 * Math.sin(c.t * .5));
+    kBeam([u, .35, .41], [u, .9, .41], .012, '#e0a43a'); kBox(u, v, .38, .03, .03, .03, '#3a3d42'); kBeam([u, v, .38], [u, v, .38 - drop], .002, '#2a2a2a'); kBox(u, v, .34 - drop, .05, .03, .035, '#5a5f66');
+  },
+  power(B, c) { if (!fpBig(B)) wkFlywheel(B, c, .08, .33, .1, .14, '#4a6a8a'); },
   shipyard(B, c) { // the gantry's hoist runs to and fro with a plate; someone hammers (later welds) the hull
     const d = B.dir || [1, 0], P = (a, b, z) => [c.X + d[0] * a + d[1] * b, c.y + z * ZS, c.Z + d[1] * a + d[0] * b], hb = .22 * Math.sin(c.t * .22), hz = 9 + 4 * Math.sin(c.t * .5);
     gBox(P(.15, hb, 18.6), [.025, 0, 0], [0, 0, .025], .025, '#3a3d42'); gBeam(P(.15, hb, 18.6), P(.15, hb, hz + 1), .0025, '#2a2a2a');

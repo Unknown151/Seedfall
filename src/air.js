@@ -1,9 +1,14 @@
 /* ============================== the air: planes that actually use the airfields ============================== */
 // A plane waits on the apron, taxis out, rolls down the runway, lifts off (its shadow falling away beneath
 // it), flies to another airfield or away over the edge of the world, and comes back down the same way.
-// Runways run along the tile's x axis: from u = -0.45 to +0.45, at v = 0.08.
+// Runways run along x: on a one-tile field from u = -0.45 to +0.45 at v = 0.08; on its 4×2 lot (sim.js FP_BIG) down the
+// whole length of the lot's back row, the terminal and the apron in front (afGeo).
 
 const RWY_V = .08;
+function afGeo(B) { // the runway's ends (x0, x1) and line (y), and the apron where a plane waits (px, py)
+  if (fpW(B) >= 3) { const x0 = B.x - .42, x1 = B.x + fpW(B) - .58; return { x0, x1, y: B.y + fpH(B) - 1 + .08, px: B.x + .9, py: B.y + .02, L: x1 - x0 }; }
+  return { x0: B.x - .44, x1: B.x + .45, y: B.y + RWY_V, px: B.x - .05, py: B.y - .24, L: .89 };
+}
 const airfields = () => builtOf('airfield');
 function planeKind() { return hasTech('hover') ? 'liner' : hasTech('computing') ? 'jet' : 'prop'; }
 const afZ = B => landZ(idx(B.x, B.y));
@@ -15,11 +20,11 @@ function stepPlanes(dt) {
   const sun = LIGHT.sun || { hr: 13, fixed: 1 }, night = !sun.fixed && (sun.hr >= 23 || sun.hr < 5.5);
   for (const B of afs) {
     const a = DYN.af[B.id] = DYN.af[B.id] || { next: DYN.t + rf(8, 30), parked: 1 };
-    if (a.parked) { a.pp = a.pp || { kind: planeKind(), x: B.x - .05, y: B.y - .24, h: Math.PI, t: 0, col: pick(['#e05b52', '#3f7fb0', '#e0a43a', '#4e9a6a']), id: rnd() }; a.pp.z = afZ(B); a.pp.kind = planeKind(); } // the plane waiting on the apron
+    if (a.parked) { const g = afGeo(B); a.pp = a.pp || { kind: planeKind(), x: g.px, y: g.py, h: Math.PI, t: 0, col: pick(['#e05b52', '#3f7fb0', '#e0a43a', '#4e9a6a']), id: rnd() }; a.pp.z = afZ(B); a.pp.kind = planeKind(); a.pp.x = g.px; a.pp.y = g.py; } // the plane waiting on the apron
     if (DYN.t > a.next && a.parked && DYN.planes.length < 6) { // departure
       a.next = DYN.t + (night ? rf(160, 280) : rf(50, 110)); a.parked = 0;
       const others = afs.filter(o => o !== B), to = others.length && chance(.7) ? pick(others) : null;
-      DYN.planes.push({ kind: planeKind(), st: 'taxi', from: B.id, to: to ? to.id : 0, x: B.x - .05, y: B.y - .24, z: afZ(B), h: Math.PI, spd: 0, t: 0, col: pick(['#e05b52', '#3f7fb0', '#e0a43a', '#4e9a6a']), id: rnd() });
+      const g = afGeo(B); DYN.planes.push({ kind: planeKind(), st: 'taxi', from: B.id, to: to ? to.id : 0, x: g.px, y: g.py, z: afZ(B), h: Math.PI, spd: 0, t: 0, col: pick(['#e05b52', '#3f7fb0', '#e0a43a', '#4e9a6a']), id: rnd() });
     }
   }
   // now and then someone flies in from far away
@@ -41,17 +46,17 @@ function flyPlane(p, dt) {
   switch (p.st) {
     case 'taxi': { // out to the end of the runway
       if (!A) { p.gone = 1; return; }
-      const tx = A.x - .44, ty = A.y + RWY_V, d = Math.hypot(tx - p.x, ty - p.y);
+      const g = afGeo(A), tx = g.x0, ty = g.y, d = Math.hypot(tx - p.x, ty - p.y);
       turnTo(p, Math.atan2(ty - p.y, tx - p.x), 3, dt);
       if (d < .03) { p.st = 'line'; break; }
       const s = Math.min(d, dt * .12); p.x += Math.cos(p.h) * s; p.y += Math.sin(p.h) * s; break;
     }
     case 'line': if (turnTo(p, 0, 2, dt) < .02) { p.h = 0; p.st = 'roll'; } break; // lined up
     case 'roll': { // down the runway and up
-      p.spd = Math.min(1.9, p.spd + dt * .9); p.x += p.spd * dt; p.y = A.y + RWY_V;
-      if (p.x > A.x + .2) { p.z += (p.spd * 16) * dt; }
-      if (p.x > A.x + 1.2) p.st = 'climb';
-      if (DYN.af[p.from] && p.x > A.x + .6) DYN.af[p.from].free = 1;
+      const g = afGeo(A); p.spd = Math.min(1.9, p.spd + dt * .9); p.x += p.spd * dt; p.y = g.y;
+      if (p.x > g.x0 + g.L * .72) { p.z += (p.spd * 16) * dt; }
+      if (p.x > g.x1 + .75) p.st = 'climb';
+      if (DYN.af[p.from] && p.x > g.x0 + g.L * .8) DYN.af[p.from].free = 1;
       break;
     }
     case 'climb': case 'cruise': {
@@ -59,7 +64,7 @@ function flyPlane(p, dt) {
       p.z = Math.min(base + CRUISE, p.z + dt * 16);
       if (p.fadeIn) p.fadeIn = Math.max(0, p.fadeIn - dt * .4);
       if (B) {
-        const fx = B.x - 5.5, fy = B.y + RWY_V, d = Math.hypot(fx - p.x, fy - p.y);
+        const g = afGeo(B), fx = g.x0 - 5.06, fy = g.y, d = Math.hypot(fx - p.x, fy - p.y);
         turnTo(p, Math.atan2(fy - p.y, fx - p.x), .55, dt);
         if (d < .9) { p.st = 'final'; p.fz = p.z; }
       } else { // away over the edge of the world
@@ -75,20 +80,20 @@ function flyPlane(p, dt) {
     }
     case 'final': { // lined up with the runway, coming down
       if (!B) { p.gone = 1; return; }
-      turnTo(p, 0, 1.5, dt); p.y += (B.y + RWY_V - p.y) * Math.min(1, dt * 1.2);
+      const g = afGeo(B); turnTo(p, 0, 1.5, dt); p.y += (g.y - p.y) * Math.min(1, dt * 1.2);
       p.spd = Math.max(1.1, p.spd - dt * .15); p.x += Math.cos(p.h) * p.spd * dt;
-      const k = clamp((p.x - (B.x - 5.5)) / (5.5 - .35), 0, 1);
+      const k = clamp((p.x - (g.x0 - 5.06)) / 5.15, 0, 1);
       p.z = lerp(p.fz, afZ(B), smooth(k));
       if (k >= 1) { p.st = 'land'; p.z = afZ(B); p.h = 0; }
       break;
     }
     case 'land': { // brakes, then off the runway to the apron
-      p.spd = Math.max(.12, p.spd - dt * 1.1); p.x += p.spd * dt; p.y = B.y + RWY_V;
-      if (p.x > B.x + .28) { p.st = 'park'; }
+      const g = afGeo(B); p.spd = Math.max(.12, p.spd - dt * 1.1); p.x += p.spd * dt; p.y = g.y;
+      if (p.x > g.x0 + Math.min(g.L * .72, 1.6)) { p.st = 'park'; }
       break;
     }
     case 'park': {
-      const tx = B.x - .05, ty = B.y - .24, d = Math.hypot(tx - p.x, ty - p.y);
+      const g = afGeo(B), tx = g.px, ty = g.py, d = Math.hypot(tx - p.x, ty - p.y);
       turnTo(p, d > .05 ? Math.atan2(ty - p.y, tx - p.x) : Math.PI, 3, dt);
       if (d > .03) { const s = Math.min(d, dt * .12); p.x += Math.cos(p.h) * s; p.y += Math.sin(p.h) * s; }
       else { // parked: it takes the airfield's parking spot

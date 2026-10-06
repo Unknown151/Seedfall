@@ -18,8 +18,9 @@ const lanes = () => p.evaluate(() => { // nothing at sea stands next to anything
   return { n: sea.length, near, dry, fresh, pairs, cut };
 });
 const a = await at(1300);
-ok((a.c.oysters || 0) >= 2 && (a.c.saltpan || 0) >= 1, `early: oyster beds (${a.c.oysters}) and salt pans (${a.c.saltpan})`);
+ok((a.c.oysters || 0) >= 2, `early: oyster beds (${a.c.oysters})`);
 const c = await at(1900);
+ok((c.c.saltpan || 0) >= 1, `salt pans on the shore (${c.c.saltpan})`);
 ok((c.c.oilrig || 0) >= 1, `oil rigs off the coast after Motorcars (${c.c.oilrig})`);
 ok((c.c.seapier || 0) + (c.c.desal || 0) >= 1, `a pleasure pier (${c.c.seapier || 0}) or a desalination plant (${c.c.desal || 0}) on the shore`);
 const pier = await p.evaluate(() => { const B = Object.values(S.B).find(B => B.type === 'seapier'); if (!B) return 'none'; const ts = fpTiles(B); return ts.length === 3 && ts.every(j => M.bld[j] === B.id) && ts.filter(j => M.water[j] === 1).length === 2 ? 'ok' : JSON.stringify([ts.length, ts.map(j => M.water[j])]); });

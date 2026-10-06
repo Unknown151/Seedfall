@@ -162,7 +162,7 @@ const SERV = [
   { t: 'lighthouse', tech: 'optics', min: 300, per: 0, max: 1, site: 'point' },
   { t: 'library', tech: 'print', min: 140, per: 0, max: 1, site: 'center' },
   { t: 'observatory', tech: 'optics', min: 220, per: 0, max: 1, site: 'high' },
-  { t: 'works', tech: 'steam', min: 260, per: 700, max: 3, site: 'edge' },
+  { t: 'works', tech: 'steam', min: 260, per: 1200, max: 2, site: 'edge' },
   { t: 'station', tech: 'rail', min: 180, per: 0, max: 1, site: 'railhead' }, // (at the edge, towards the next town: trams carry folk in)
   { t: 'clinic', tech: 'medicine', min: 200, per: 1200, max: 2, site: 'mid' },
   { t: 'power', tech: 'electric', min: 450, per: 0, max: 1, site: 'edge' },

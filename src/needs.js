@@ -122,8 +122,9 @@ function yearlyRetire() {
     if (!hasTech(r.tech)) continue;
     for (const T of towns()) {
       const bs = T.bl.map(id => S.B[id]).filter(B => B && B.type === r.t && !B.up && B.prog >= 1).sort((a, b) => r.newest ? b.id - a.id : a.id - b.id); // (the one kept comes first)
-      if (r.keep && bs[0] && !bs[0].old) bs[0].old = 1;
-      if (bs.length <= r.keep || !chance(.3)) continue;
+      const keep = r.keep && bs[0] && (bs[0].built || 0) <= (S.tech.done[r.tech] != null ? S.tech.done[r.tech] : 1e9) ? r.keep : 0; // (only one that predates the age is kept for old times' sake: one built since, for a custom, comes down)
+      if (keep && !bs[0].old) bs[0].old = 1;
+      if (bs.length <= keep || !chance(.3)) continue;
       const B = bs[bs.length - 1], x = B.x, y = B.y;
       removeBuilding(B); T._fail = {}; // (the freed plot is worth a fresh look)
       if (!S.flags['ret_' + r.t + T.id]) { S.flags['ret_' + r.t + T.id] = 1; if (!FAST || chance(.5)) chron('🧱', r.txt(T), { x, y }); }
