@@ -411,6 +411,12 @@ THE SEA
     up from there as well as from the launch pad.
   - Arcologies: seasteads, floating neighbourhoods on hexagons of pontoons,
     terraced white homes, gardens and a glowing edge.
+  Past the towns' own waters, the open sea is the valley's: the more deep water
+  a world has, the more goes out there. Offshore wind farms in long rows of a
+  dozen, offshore fish farms and kelp fields, an oil field before Fusion, wave
+  power along coasts nobody lives on, and in the age of arcologies a floating
+  city of seasteads. From Steam, trawlers steam out from the harbours to the
+  fishing grounds far offshore, nets out and gulls following, and come home.
   A lake-only world gets just the small things: weirs, fish farms and floating
   solar. In rain and storms the water gets rougher, with whitecaps. The film
   camera visits the wind parks, rigs and seasteads now and then.

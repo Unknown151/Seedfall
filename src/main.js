@@ -8,7 +8,7 @@ function randSeed() { return (Math.random() * 1e9) | 0; }
 
 function startWorld(isNew) {
   M = S.map;
-  DYN.walkers.length = 0; DYN.vehicles.length = 0; DYN.trains.length = 0; DYN.boats.length = 0; DYN.ships.length = 0; DYN.ferries.length = 0; DYN.planes.length = 0; DYN.slot = {}; DYN.af = {}; DYN.herds.length = 0; DYN.caps.length = 0; DYN.parts.length = 0;
+  DYN.walkers.length = 0; DYN.vehicles.length = 0; DYN.trains.length = 0; DYN.boats.length = 0; DYN.trawl = []; DYN.ships.length = 0; DYN.ferries.length = 0; DYN.planes.length = 0; DYN.slot = {}; DYN.af = {}; DYN.herds.length = 0; DYN.caps.length = 0; DYN.parts.length = 0;
   for (const T of towns()) recalcTown(T);
   updateSoot(false); zonesOnLoad();
   renderAll();

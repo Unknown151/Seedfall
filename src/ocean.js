@@ -52,13 +52,16 @@ function seaSimple(i, extra) {
   return free >= 3 && runs === 1;
 }
 // keep clear of the harbours' approaches, the piers and the ferries
-function seaClear(i) {
-  const x = i % W, y = (i / W) | 0;
-  for (const B of harbours()) for (let k = 0; k < berths(B); k++) { const b = berthTile(B, k); if (dist(x, y, b % W, (b / W) | 0) < 3.5) return false; }
-  for (const id in S.B) { const B = S.B[id]; if ((B.type === 'dock' || B.type === 'shipyard' || B.type === 'lighthouse') && dist(x, y, B.x, B.y) < 2.5) return false; }
-  for (const f of S.ferries || []) for (let k = 0; k <= f.len + 1; k++) if (dist(x, y, f.a % W + f.dir[0] * k, ((f.a / W) | 0) + f.dir[1] * k) < 2) return false;
-  return true;
+function seaClear(i) { // (a mask of what to keep clear, worked out once a month or when something new is built: the open sea is scanned whole)
+  const k = S.month + ':' + S.nextB + ':' + (S.ferryV || 0);
+  if (SCL.S !== S || SCL.k !== k) { SCL.S = S; SCL.k = k; const m = SCL.m = new Uint8Array(W * H);
+    const ring = (cx, cy, r) => { for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(H - 1, Math.ceil(cy + r)); y++) for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(W - 1, Math.ceil(cx + r)); x++) if (dist(x, y, cx, cy) < r) m[idx(x, y)] = 1; };
+    for (const B of harbours()) for (let q = 0; q < berths(B); q++) { const b = berthTile(B, q); ring(b % W, (b / W) | 0, 3.5); }
+    for (const id in S.B) { const B = S.B[id]; if (B.type === 'dock' || B.type === 'shipyard' || B.type === 'lighthouse') ring(B.x, B.y, 2.5); }
+    for (const f of S.ferries || []) for (let q = 0; q <= f.len + 1; q++) ring(f.a % W + f.dir[0] * q, ((f.a / W) | 0) + f.dir[1] * q, 2); }
+  return !SCL.m[i];
 }
+const SCL = { S: null, k: '', m: null };
 const seaTown = T => { const d = coastDist(), R = Math.ceil(townRadius(T) + 3); for (let y = Math.max(0, T.y - R); y <= Math.min(H - 1, T.y + R); y++) for (let x = Math.max(0, T.x - R); x <= Math.min(W - 1, T.x + R); x++) { const i = idx(x, y); if (isSea(i) && bigWater(i) && d[i] <= 2) return true; } return false; };
 // kinds: shore (in the water by the shore), off (out at sea), coast (dry land on the shore); o: { d0, d1 (shore distance), sea (salt water only), lake (prefer lakes), near (a type to cluster round) }
 function seaSite(T, kind, o = {}) {
@@ -141,6 +144,7 @@ function yearlySea() {
     if (hasTech('station') && !anycount('sealaunch') && T.pop > 3000 && chance(.1) && seaPut(T, 'sealaunch', seaSite(T, 'off', { d0: 5, d1: 10 }))) continue;
     if (hasTech('arcology') && T.pop > 4000 && seaN(T, 'seastead') < 2 && chance(.1) && seaPut(T, 'seastead', seaSite(T, 'off', { d0: 2, d1: 6 }))) continue;
   }
+  openSea();
   if (hasTech('fusion')) seaRetire();
 }
 // the wind parks come with the power need (needs.js tryNeeds): one more turbine at sea, in rows near the others
@@ -164,4 +168,80 @@ function seaTip(B) {
   if (t === 'reef') return '🐟 an old oil rig left standing as a reef: fish, kelp, mussels and divers';
   if (t === 'sealaunch') return '🚀 rockets go up from here, well away from anyone’s teacups';
   return '';
+}
+
+/* ---------- the open sea: what the valley as a whole builds far out, as much as there is deep water for ---------- */
+// The towns' own waters fill up first (yearlySea). Past them, a world with a lot of sea gets offshore wind farms in tidy
+// grids (from Computing), offshore fish farms, kelp fields (Gene Gardens), oil fields further out before Fusion, wave power
+// along coasts nobody lives on (Solar Glass) and
+// a floating city of seasteads (Arcologies). How many is scaled to the deep water (seaAmount), so an island world fills
+// its ocean and a valley with a lake gets none. Each is booked to the nearest town (B.open marks it, saved).
+const OPENS = { S: null, deep: 0, coast: 0 };
+function seaAmount() {
+  if (OPENS.S === S) return OPENS; const d = coastDist(); let deep = 0, coast = 0;
+  for (let i = 0; i < W * H; i++) if (isSea(i) && bigWater(i)) { if (d[i] >= 5) deep++; else if (d[i] === 1) coast++; }
+  OPENS.S = S; OPENS.deep = deep; OPENS.coast = coast; return OPENS;
+}
+const openOf = t => Object.values(S.B).filter(B => B.open && B.type === t);
+// the best open water for type t: o.d0..d1 from shore, o.away from any town's edge, o.grid tiles in rows, o.near: close to
+// one of these (a park, a field) that has fewer than o.max round it, else a new one at least o.gap from the rest
+function openSite(o) {
+  const d = coastDist(), ts = towns(), nb = o.near || [], cand = [];
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    if (o.grid && (x % 2 || y % 2)) continue;
+    const i = idx(x, y); if (!isSea(i) || d[i] < o.d0 || d[i] > o.d1 || M.bld[i] || M.road[i] || M.rail[i] || !bigWater(i)) continue;
+    if (ts.some(T => dist(x, y, T.x, T.y) < townRadius(T) + o.away)) continue;
+    let s = rnd() * 2 - Math.abs(d[i] - (o.dw || d[i])) * .4;
+    if (nb.length) { const m = nb.reduce((a, B) => Math.min(a, dist(x, y, B.x, B.y)), 1e9);
+      if (m < 4) { const k = nb.filter(B => dist(x, y, B.x, B.y) < 7).length; if (k >= (o.max || 1e9)) continue; s += 20 - m; }
+      else if (m < (o.gap || 0)) continue; }
+    cand.push([s, i]);
+  }
+  cand.sort((a, b) => b[0] - a[0]);
+  for (const [, i] of cand.slice(0, 40)) if (seaSimple(i) && seaClear(i)) return { x: i % W, y: (i / W) | 0 };
+  return null;
+}
+function openPut(t, s) { if (!s) return null; const T = nearestTown(s.x, s.y); if (!T) return null; const B = seaPut(T, t, s); if (B) B.open = 1; return B; }
+function openSea() {
+  const A = seaAmount(); if (A.deep < 60) return;
+  if (hasTech('computing') && chance(.7)) { // offshore wind: parks of a dozen in rows, as many as the deep water will take
+    const ws = openOf('windpark'); if (ws.length < A.deep / 22) openPut('windpark', openSite({ d0: 5, d1: 40, dw: 8, away: 5, grid: 1, near: ws, max: 12, gap: 9 })); }
+  if (hasTech('motor') && !hasTech('fusion') && chance(.12)) { // an oil field further out
+    const rs = openOf('oilrig'); if (rs.length < A.deep / 180) openPut('oilrig', openSite({ d0: 6, d1: 40, dw: 10, away: 6, near: rs, max: 3, gap: 10 })); }
+  if (hasTech('computing') && chance(.2)) { // offshore fish farms, pens in a group
+    const fs = openOf('fishfarm'); if (fs.length < A.deep / 150) openPut('fishfarm', openSite({ d0: 3, d1: 9, dw: 5, away: 4, near: fs, max: 4, gap: 10 })); }
+  if (hasTech('genegarden') && chance(.25)) { // kelp fields
+    const ks = openOf('kelp'); if (ks.length < A.deep / 110) openPut('kelp', openSite({ d0: 2, d1: 7, dw: 4, away: 4, near: ks, max: 6, gap: 10 })); }
+  if (hasTech('solar') && chance(.15)) { // wave power along coasts nobody lives on
+    const wv = openOf('wavefarm'); if (wv.length < A.coast / 40) openPut('wavefarm', openSite({ d0: 1, d1: 2, away: 5, near: wv, max: 1, gap: 6 })); }
+  if (hasTech('arcology') && chance(.25)) { // a floating city out at sea
+    const ss = openOf('seastead'); if (ss.length < Math.min(14, A.deep / 70)) openPut('seastead', openSite({ d0: 4, d1: 14, dw: 6, away: 4, near: ss, max: 14, gap: 99 }));
+    if (ss.length === 6 && !S.flags.floatCity) { S.flags.floatCity = 1; chron('🌊', `The seasteads off ${(nearestTown(ss[0].x, ss[0].y) || {}).name || 'the coast'} are lashed together into a floating city. It has its own name now, and opinions about the mainland.`, { x: ss[0].x, y: ss[0].y, k: 'major', cap: 'A floating city' }); }
+  }
+}
+
+/* ---------- trawlers (view only): out from the harbours to the fishing grounds far offshore, nets out, gulls following ---------- */
+function syncTrawlers() {
+  if (!S || !hasTech('steam')) { DYN.trawl = []; return; }
+  const hs = harbours().filter(B => isSea(moorTile(B))), d = coastDist(); DYN.trawl = (DYN.trawl || []).filter(o => S.B[o.hb]);
+  const want = Math.min(10, Math.round(seaAmount().deep / 80)); if (!hs.length || DYN.trawl.length >= want) return;
+  const B = hs[(Math.random() * hs.length) | 0], a = B.dir[0] ? [0, 1] : [1, 0], m = moorTile(B), hx = m % W - a[0], hy = ((m / W) | 0) - a[1];
+  const home = inb(hx, hy) && M.water[idx(hx, hy)] === 1 && !M.bld[idx(hx, hy)] ? idx(hx, hy) : m;
+  DYN.trawl.push({ hb: B.id, home, st: 'moor', until: DYN.t + rf(5, 40), path: null, s: 0, col: ['#b8473a', '#2f4a6e', '#2e5a46', '#d8a23a'][(Math.random() * 4) | 0], ph: Math.random() * 6 });
+}
+function stepTrawlers(dt) {
+  if (!DYN.trawl || !S) return; const d = coastDist();
+  for (const o of DYN.trawl) { o.ph += dt;
+    if (o.st === 'moor' && DYN.t > o.until) { // off to the grounds: deep water, some way out
+      for (let k = 0; k < 14 && o.st === 'moor'; k++) { const a = Math.random() * TAU, r = rf(10, 30), gx = Math.round(o.home % W + Math.cos(a) * r), gy = Math.round(((o.home / W) | 0) + Math.sin(a) * r); if (!inb(gx, gy)) continue;
+        const g = idx(gx, gy); if (!isSea(g) || d[g] < 5 || M.bld[g] || !sameWater(g, o.home)) continue; const p = waterPath(o.home, g, 6000); if (p && p.length > 6) { o.path = p; o.s = 0; o.st = 'out'; o.g = g; } }
+      if (o.st === 'moor') o.until = DYN.t + rf(20, 60); }
+    else if (o.st === 'out' || o.st === 'back') { o.s += dt * .55; if (o.s >= o.path.length - 1) { if (o.st === 'out') { o.st = 'fish'; o.until = DYN.t + rf(70, 160); } else { o.st = 'moor'; o.until = DYN.t + rf(40, 120); } } }
+    else if (o.st === 'fish' && DYN.t > o.until) { o.path = o.path.slice().reverse(); o.s = 0; o.st = 'back'; }
+  }
+}
+function trawlerPos(o) {
+  if (o.st === 'moor') return [o.home % W, (o.home / W) | 0, 1, 0];
+  if (o.st === 'fish') { const x = o.g % W, y = (o.g / W) | 0, a = o.ph * .07; return [x + Math.cos(a) * .6, y + Math.sin(a) * .6, -Math.sin(a), Math.cos(a)]; } // (trawling in a slow circle)
+  const p = pathPos(o, 0, false, false); return [p[0], p[1], p[4], p[5]];
 }

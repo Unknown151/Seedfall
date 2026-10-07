@@ -41,7 +41,7 @@ function syncWalkers() {
   if (S.year < 60 && !DYN.drone && !S.flags.intro) DYN.drone = { t: 0 };
   if (S.year >= 60) DYN.drone = null;
   // boats
-  syncBoats();
+  syncBoats(); syncTrawlers();
   // trains
   for (const r of S.rails) {
     if (!r.path || DYN.trains.some(tr => tr.r === r)) continue;
@@ -121,7 +121,7 @@ function updateDyn(dt) {
     if (LVV.fireworks === 'often' && (LIGHT.emK || 0) > .6 && chance(dt * .012)) { const T = pick(towns()); if (T) (DYN.fireworks = DYN.fireworks || []).push({ x: T.x + rf(-1.5, 1.5), y: T.y + rf(-1.5, 1.5), t: 0, life: 9, next: 0 }); }
   }
   stepAgents(dt);
-  stepBoats(dt); stepShips(dt); stepFerries(dt); stepPlanes(dt);
+  stepBoats(dt); stepTrawlers(dt); stepShips(dt); stepFerries(dt); stepPlanes(dt);
   stepTrains(dt); stepTrams(dt); // (rail.js)
   for (const h of DYN.herds) {
     h.age += dt;
