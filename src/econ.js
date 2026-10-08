@@ -309,7 +309,7 @@ function tryEcon(T) {
   }
   // a harbour town builds ships of its own
   if (hasTech('masonry') && T.pop >= 500 && !e.n.shipyard && !shun('shipyard') && townHarbour(T)) {
-    const s = findSite(T, 'harbor'); if (s) { connectRoad(mkBuilding('shipyard', s.x, s.y, T, { dir: harbourSite(s.x, s.y) })); return true; }
+    const s = findSite(T, 'harbor'); if (s) { if (s.replaceFarm && M.bld[idx(s.x, s.y)]) removeBuilding(S.B[M.bld[idx(s.x, s.y)]]); connectRoad(mkBuilding('shipyard', s.x, s.y, T, { dir: harbourSite(s.x, s.y) })); return true; }
   }
   return false;
 }

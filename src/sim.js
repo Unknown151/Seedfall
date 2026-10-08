@@ -89,6 +89,7 @@ function introChronicle() {
 // Most buildings stand on one tile. Landmarks and harbours can cover B.w × B.h tiles from (B.x, B.y): every tile's
 // M.bld points at them, and they're drawn once, from the tile nearest the viewer (fpFront), centred on the lot.
 const fpW = B => B.w || 1, fpH = B => B.h || 1, fpBig = B => fpW(B) > 1 || fpH(B) > 1;
+const HB_YIELD = B => B.type === 'farm' || B.type === 'pasture' || B.type === 'dock' || B.type === 'sandpit' || B.type === 'claypit' || B.type === 'saltpan' || (B.type === 'house' && B.tier <= 3 && B.up == null); // (what gives way to a harbour on the shore)
 function fpTiles(B) { const o = []; for (let y = B.y; y < B.y + fpH(B); y++) for (let x = B.x; x < B.x + fpW(B); x++) if (inb(x, y)) o.push(idx(x, y)); return o; }
 const fpFront = B => idx(B.x + fpW(B) - 1, B.y + fpH(B) - 1);
 // room for it to spread: free, level ground that isn't street, planned street, water or ruin
@@ -333,6 +334,7 @@ function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it c
       const B = S.B[M.bld[i]];
       if (allowFarmReplace && B && (B.type === 'farm' || B.type === 'pasture') && B.sid === T.id && d < farmR && B.prog >= 1) replaceFarm = true; // the town grows over its old fields
       else if (kind === 'railhead' && B && B.prog >= 1 && !fpBig(B) && d >= R * .6 && (B.type === 'farm' || B.type === 'pasture' || (B.type === 'house' && B.tier <= 3))) replaceFarm = true; // a station out on the fields, or where an old cottage stood
+      else if (kind === 'harbor' && B && B.prog >= 1 && !fpBig(B) && HB_YIELD(B)) replaceFarm = true; // the harbour takes the best bit of shore: a field, a cottage, the old jetty or a pit gives way
       else continue;
     }
     if (OWN[i] !== T.id) continue;
@@ -361,7 +363,7 @@ function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it c
         break;
       }
       case 'shore': { if (!nearWaterDir(x, y)) continue; s += -d * 0.8 + adjRoad; break; }
-      case 'harbor': { if (!harbourSite(x, y)) continue; s += -d * .6 + adjRoad * 1.2 + waterNear(x, y, 2) * .15; break; }
+      case 'harbor': { if (!harbourSite(x, y)) continue; s += -d * .6 + adjRoad * 1.2 + waterNear(x, y, 2) * .15 - (replaceFarm ? 1.5 : 0); break; }
       case 'point': { const n = adjCount(x, y, j => bigWater(j)) + (inb(x + 1, y + 1) && bigWater(idx(x + 1, y + 1)) ? 1 : 0) + (inb(x - 1, y - 1) && bigWater(idx(x - 1, y - 1)) ? 1 : 0) + (inb(x + 1, y - 1) && bigWater(idx(x + 1, y - 1)) ? 1 : 0) + (inb(x - 1, y + 1) && bigWater(idx(x - 1, y + 1)) ? 1 : 0); if (n < 4) continue; s += n * 1.2 + waterNear(x, y, 3) * .1 - d * .2 - tree; break; }
       case 'ore': { if (!(M.ore[i] || b === BIO.ROCK)) continue; s += -d * 0.6 + M.ore[i] * 3 + around(x, y, 1, j => M.ore[j]) * .8; break; }
       case 'forest': { if (tree) continue; const n = around(x, y, 2, j => M.bld[j] ? 0 : M.tree[j]); if (n < 5) continue; s += n * .5 - d * .35 + adjRoad * .4; break; }
@@ -375,7 +377,7 @@ function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it c
       default: s += -d;
     }
     if (zt) s += zoneScore(zt, i);
-    if (replaceFarm && kind !== 'house' && kind !== 'backlot' && kind !== 'railhead') continue;
+    if (replaceFarm && kind !== 'house' && kind !== 'backlot' && kind !== 'railhead' && kind !== 'harbor') continue;
     if (s > bs) { bs = s; best = { x, y, replaceFarm }; }
   }
   if (!best) T._fail[fk] = S.month + 4 + ri(0, 4);
