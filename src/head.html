@@ -31,7 +31,7 @@ body.targeting #gl3{cursor:crosshair}
 button{font:inherit;color:inherit;cursor:pointer}
 
 /* HUD */
-#hud{position:fixed;left:16px;top:14px;pointer-events:none;transition:opacity .6s,background 2s;min-width:250px;
+#hud{position:fixed;left:16px;top:14px;z-index:5;pointer-events:none;transition:opacity .6s,background 2s;min-width:250px;
   padding:11px 15px 12px;border-radius:14px;background:rgba(255,251,245,.8);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
   box-shadow:0 4px 18px rgba(60,40,60,.12),0 0 0 1px rgba(70,45,35,.05)}
 #hudName{font-size:13px;letter-spacing:.3em;text-transform:uppercase;font-weight:700;color:rgba(43,40,51,.92)}
@@ -41,7 +41,7 @@ body.paused #hudPause{display:block}
 body.panel #hud{opacity:1}
 
 /* the town bar (top middle): the town you're looking at, Anno-style: its stores and what they gain a year, its people, room and food, its needs; the name on a plaque below */
-#tbar{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:3;display:none;flex-direction:column;align-items:center;pointer-events:none;transition:opacity .6s;font-size:12.5px}
+#tbar{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:5;display:none;flex-direction:column;align-items:center;pointer-events:none;transition:opacity .6s;font-size:12.5px}
 body.tbar #tbar{display:flex}
 #tbar .tb{display:flex;align-items:center;gap:10px;padding:7px 12px 7px 7px;border-radius:16px;background:rgba(255,251,245,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 4px 18px rgba(60,40,60,.14),0 0 0 1px rgba(70,45,35,.06);pointer-events:auto}
 #tbar .tp{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px;letter-spacing:.02em;box-shadow:inset 0 0 0 2px rgba(255,255,255,.55),0 1px 4px rgba(0,0,0,.2);flex:none}
