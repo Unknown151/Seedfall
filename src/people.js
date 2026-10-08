@@ -69,8 +69,19 @@ function qpick(pool) {
   for (let k = 1; k <= b + 1 && k < pool.length; k++) if (k >= b) bandPool.push(...pool[k]);
   return bandPool.length && chance(.35) ? pick(bandPool) : pick(pool[0]);
 }
-function firstNm(L) { let f = cap(tidy(syl(L) + pick(L.given))); if (f.length > 8) f = f.slice(0, 7); return f; }
-function lastNm(L) { let l = cap(tidy(pick(L.on) + pick(L.vo) + pick(L.co) + pick(L.fam))); if (l.length > 11) l = nameWord(L, 2); return l; }
+const NM_FIRST = ['Ada', 'Alice', 'Amelia', 'Anna', 'Beatrice', 'Clara', 'Edith', 'Eleanor', 'Elsie', 'Emma', 'Esther', 'Florence', 'Grace', 'Hannah', 'Harriet', 'Ida', 'Iris', 'Isla', 'Ivy', 'Jane',
+  'Lily', 'Lucy', 'Mabel', 'Martha', 'Mary', 'Matilda', 'Maud', 'Nell', 'Olive', 'Rose', 'Ruth', 'Sarah', 'Sophie', 'Violet', 'Agnes', 'Freya', 'Ingrid', 'Astrid', 'Kirsten', 'Margaret',
+  'Albert', 'Alfred', 'Arthur', 'Benjamin', 'Charles', 'Daniel', 'Edward', 'Edwin', 'Ernest', 'Frank', 'Frederick', 'George', 'Harold', 'Harry', 'Henry', 'Hugh', 'Isaac', 'Jack', 'Jacob', 'James',
+  'John', 'Joseph', 'Leonard', 'Louis', 'Matthew', 'Nathan', 'Oliver', 'Oscar', 'Owen', 'Peter', 'Robert', 'Samuel', 'Simon', 'Stanley', 'Thomas', 'Walter', 'William', 'Felix', 'Theo', 'Rowan',
+  'Robin', 'Morgan', 'Erik', 'Lars', 'Anders', 'Magnus', 'Patrick', 'Conor', 'Tobias', 'Elias'];
+const NM_FIRST_NEW = ['Nova', 'Kai', 'Luna', 'Zara', 'Milo', 'Aria', 'Leo', 'Mia', 'Noah', 'Ezra', 'Maya', 'Jude', 'Ellis', 'Sky', 'River', 'Wren', 'Juno', 'Orion', 'Sage', 'Ari', 'Remy', 'Nico', 'Lyra', 'Atlas'];
+const NM_LAST = ['Abbott', 'Archer', 'Ashby', 'Bailey', 'Baker', 'Barnes', 'Bell', 'Bennett', 'Bishop', 'Brooks', 'Butler', 'Carter', 'Chandler', 'Clarke', 'Collins', 'Cooper', 'Cross', 'Dawson', 'Dean',
+  'Ellis', 'Evans', 'Fairfax', 'Fisher', 'Fletcher', 'Ford', 'Foster', 'Fowler', 'Garner', 'Gray', 'Hale', 'Hall', 'Harper', 'Hart', 'Hayes', 'Holt', 'Hughes', 'Hunt', 'Irving', 'Jenkins', 'Kemp',
+  'Knight', 'Lane', 'Lawson', 'Marsh', 'Mason', 'Miller', 'Moore', 'Morgan', 'Nash', 'Newman', 'Norris', 'Page', 'Palmer', 'Parker', 'Pearce', 'Porter', 'Price', 'Reed', 'Reeve', 'Rowe', 'Sawyer',
+  'Shaw', 'Sharp', 'Slater', 'Spencer', 'Stone', 'Sutton', 'Taylor', 'Thatcher', 'Turner', 'Vaughan', 'Walker', 'Ward', 'Webb', 'Wells', 'West', 'Wheeler', 'Whitaker', 'Wood', 'Wright', 'Young',
+  'Larsen', 'Holm', 'Berg', 'Lindqvist', 'Brennan', 'Doyle', 'Quinn', 'Moreau', 'Rossi', 'Novak', 'Keller', 'Okafor', 'Silva', 'Tanaka', 'Haddad', 'Kowalski', 'Byrne', 'Fraser'];
+function firstNm(L) { return (S && (S.era || 0) >= 6 && chance(.4)) ? pick(NM_FIRST_NEW) : pick(NM_FIRST); } // (newer names creep in with the later ages)
+function lastNm(L) { return pick(NM_LAST); }
 
 const ROLE_BIAS = { inventor: { cur: 2, cft: 2 }, artist: { cft: 2, wit: 2 }, sage: { cur: 3 }, leader: { amb: 2, kin: 1 }, explorer: { amb: 1, cur: 2 }, founder: { cur: 2, amb: 1, kin: 2 } };
 function rollStats(role, parents) {

@@ -32,6 +32,11 @@ ok(g.w > 0 && g.sup >= g.w * g.k, `wind parks feed the grid (${g.w} turbines, su
 let l = await lanes();
 ok(l.n > 10 && l.near === 0 && l.dry === 0 && l.fresh === 0, `${l.n} things at sea, none next to another (${l.near}), none on land (${l.dry}), the big ones on salt water (${l.fresh})`);
 ok(l.pairs > 0 && l.cut === 0, `ships still find their way between the harbours and out to sea (${l.pairs - l.cut}/${l.pairs})`);
+const op = await p.evaluate(() => { const A = seaAmount(), ws = Object.values(S.B).filter(B => B.open && B.type === 'windpark'), far = ws.every(B => coastDist()[idx(B.x, B.y)] >= 5); // (in deep water, 5+ from any shore)
+  for (let k = 0; k < 20; k++) syncTrawlers(); for (let k = 0; k < 4000; k++) { DYN.t += .1; stepTrawlers(.1); } const st = new Set(DYN.trawl.map(o => o.st));
+  return { deep: A.deep, n: ws.length, far, tr: DYN.trawl.length, out: [...st].join(',') }; });
+ok(op.n >= 4 && op.far, `the open sea gets offshore wind farms of its own, out in deep water (${op.n} turbines, ${op.deep} tiles of deep water)`);
+ok(op.tr >= 1 && /fish|out|back/.test(op.out), `trawlers head out from the harbours to the fishing grounds (${op.tr}: ${op.out})`);
 const e = await at(3500);
 ok(!e.c.oilrig && e.c.reef === 1, `after Fusion the rigs come down, the oldest left as a reef (rigs ${e.c.oilrig || 0}, reefs ${e.c.reef || 0})`);
 ok((e.c.sealaunch || 0) === 1 && (e.c.seastead || 0) >= 1, `a launch platform at sea (${e.c.sealaunch}) and seasteads (${e.c.seastead})`);

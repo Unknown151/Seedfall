@@ -78,20 +78,21 @@ function applyName(o) {
   const n = clean(o.name, 32); if (!n) return null;
   const k = o.kind;
   if (k === 'planet') {
-    const old = S.planet; S.planet = n; UIDIRTY.stats = true;
+    const old = S.planet; S.planet = n; S.planetOwn = 1; UIDIRTY.stats = true; // (_own and the like: a name the player gave, which renameWorld leaves be)
     chron('🌍', old ? `By common agreement the world is no longer called ${old}. From now on it is ${n}.` : `The world gets a name at last: ${n}.`, { k: 'major' });
     return `The world is renamed ${n}`;
   }
   if (k === 'town') {
     const T = townByName(o.current) || (!o.current ? biggestTown() : null); if (!T) return null;
-    const old = T.name; if (old === n) return null; T.name = n;
+    const old = T.name; if (old === n) return null; T.name = n; T._own = 1;
     chron('🪧', `${old} paints over its signposts. The town is called ${n} now.`, { T });
     return `${old} is renamed ${n}`;
   }
   if (k === 'moon') {
     let j = 0;
-    if (!S.moons) S.moons = [n, placeName(S.lang).split(' ')[0]];
+    if (!S.moons) S.moons = [n, moonName()];
     else { j = S.moons.findIndex(m => o.current && m.toLowerCase() === String(o.current).toLowerCase()); if (j < 0) j = 0; S.moons[j] = n; }
+    S.moonOwn = Object.assign(S.moonOwn || {}, { [n]: 1 });
     chron('🌙', `One of the two moons gets a new name: ${n}.`, {}); UIDIRTY.lore = true;
     return `A moon is named ${n}`;
   }

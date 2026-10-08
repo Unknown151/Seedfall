@@ -132,7 +132,7 @@ function answerWithWords(q, text) {
   }
   if (q.k === 'town') {
     const Tt = S.T[q.tid]; const nm = text.replace(/[<>]/g, '').trim().slice(0, 24); if (!Tt || !nm) return;
-    const old = Tt.name; Tt.name = nm;
+    const old = Tt.name; Tt.name = nm; Tt._own = 1;
     chron('🪧', `The settlers of ${old} carve a new name over the gate: ${nm}, as the Watcher said.`, { T: Tt, cap: `${old} is now ${nm}` });
     answered(q); return;
   }

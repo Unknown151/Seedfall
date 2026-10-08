@@ -36,6 +36,7 @@ function deserialize(obj) {
   S = o; M = S.map;
   // migrations / defaults
   S.settings = Object.assign({ pace: 'normal', captions: true, sky: 'hour', weather: true, shadows: true }, S.settings || {});
+  if ((S.nameV || 0) < 2) renameWorld();
   S.flags = S.flags || {}; S.flags.intro = 0;
   for (const k in S.B) { S.B[k].hid = 0; if (S.B[k].type === 'launchpad' || S.B[k].type === 'sealaunch') S.B[k].rk = 1; }
   S.doctrines = S.doctrines || []; S.aiQueue = S.aiQueue || [];
@@ -456,3 +457,29 @@ async function forgetWorld(w) {
   openWorlds();
 }
 function bindWorlds() { $('wlNew').onclick = worldsNew; $('wlClose').onclick = () => $('worlds').classList.remove('show'); }
+
+// Older worlds were named in a drifting made-up language (Byvhede, Skeinve Lyanstøm): once, everyone and everywhere gets a
+// real-sounding name instead (util.js placeName, people.js firstNm/lastNm), families keep a surname between them, and the
+// chronicle, deeds and landmarks are rewritten to match. Not the sim's stream (it runs before the world does), and saved.
+function renameWorld() {
+  S.nameV = 2; const map = new Map(), fam = new Map(), towns0 = Object.values(S.T);
+  const own = new Set(); // names the player gave through the voice or a prayer: kept (the chronicle says which)
+  for (const e of S.chron || []) for (const re of [/The town is called (.+?) now\./, /carve a new name over the gate: (.+?), as the Watcher said/, /From now on it is (.+?)\.$/, /The world gets a name at last: (.+?)\.$/, /gets a new name: (.+?)\.$/]) { const m = re.exec(e.t || ''); if (m) own.add(m[1]); }
+  const keep = new Set(towns0.filter(T => T._own || own.has(T.name)).map(T => T.name));
+  for (const T of towns0) { if (T._own || own.has(T.name)) continue; let nm = placeName(S.lang), t = 0; while (keep.has(nm) && ++t < 20) nm = placeName(S.lang); keep.add(nm); if (T.name) map.set(T.name, nm); T.name = nm; }
+  if (S.planet && !S.planetOwn && !own.has(S.planet)) { const nm = planetName(); map.set(S.planet, nm); S.planet = nm; }
+  if (S.moons) S.moons = S.moons.map((m, k) => { if (own.has(m) || (S.moonOwn || {})[m]) return m; let nm = moonName(); if (k && nm === S.moons[0]) nm = NM_MOON[(NM_MOON.indexOf(nm) + 3) % NM_MOON.length]; map.set(m, nm); return nm; });
+  if (S.accord) { const nm = oldName(); map.set(S.accord, nm); S.accord = nm; }
+  if (S.pendingTown && S.pendingTown.name) { const nm = placeName(S.lang); map.set(S.pendingTown.name, nm); S.pendingTown.name = nm; }
+  for (const p of Object.values(S.P || {})) {
+    const oldLast = p.last || (p.name || '').split(' ').slice(1).join(' '); let last = fam.get(oldLast); if (!last) { last = lastNm(S.lang); fam.set(oldLast, last); }
+    const first = p.watcherNamed ? p.first : firstNm(S.lang), nm = first + ' ' + last; if (p.name) map.set(p.name, nm); p.first = first; p.last = last; p.name = nm; // (a baby the Watcher named keeps that name)
+  }
+  if (!map.size) return;
+  const keys = [...map.keys()].filter(k => k && k.length > 2).sort((a, b) => b.length - a.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (!keys.length) return;
+  const re = new RegExp('(?<![\\p{L}])(' + keys.join('|') + ')(?![\\p{L}])', 'gu'), fix = t => typeof t === 'string' ? t.replace(re, m => map.get(m) || m) : t;
+  for (const e of S.chron || []) e.t = fix(e.t);
+  for (const p of Object.values(S.P || {})) if (p.deeds) p.deeds = p.deeds.map(fix);
+  for (const B of Object.values(S.B || {})) if (B.name) B.name = fix(B.name);
+}

@@ -58,7 +58,7 @@ function newState0(seed) {
     year: 0, month: 0, map: g.M, B: {}, nextB: 1, T: {}, nextT: 1, P: {}, nextP: 1,
     tech: { done: {}, cur: 0, pts: 0 }, era: 0, age: null, ageN: 0, ageUsed: {},
     styles: [Object.assign({}, STYLES0[0])], styleIdx: 0,
-    lang: JSON.parse(JSON.stringify(LANG0)),
+    lang: JSON.parse(JSON.stringify(LANG0)), nameV: 2, // (named the real-world way from the start: persist.js renameWorld is for older worlds)
     chron: [], chronN: 0, mdWritten: 0, rows: [], rowN: 0, csvWritten: 0, hist: [],
     lore: 0, omens: 0, flags: { intro: 1 }, cool: {}, vault: 30, drought: 0, boost: 0,
     roads: [], rails: [], roadQ: [], landing: g.land, ruins: g.ruins, planet: null, moons: null,
@@ -89,6 +89,7 @@ function introChronicle() {
 // Most buildings stand on one tile. Landmarks and harbours can cover B.w × B.h tiles from (B.x, B.y): every tile's
 // M.bld points at them, and they're drawn once, from the tile nearest the viewer (fpFront), centred on the lot.
 const fpW = B => B.w || 1, fpH = B => B.h || 1, fpBig = B => fpW(B) > 1 || fpH(B) > 1;
+const HB_YIELD = B => B.type === 'farm' || B.type === 'pasture' || B.type === 'dock' || B.type === 'sandpit' || B.type === 'claypit' || B.type === 'saltpan' || (B.type === 'house' && B.tier <= 3 && B.up == null); // (what gives way to a harbour on the shore)
 function fpTiles(B) { const o = []; for (let y = B.y; y < B.y + fpH(B); y++) for (let x = B.x; x < B.x + fpW(B); x++) if (inb(x, y)) o.push(idx(x, y)); return o; }
 const fpFront = B => idx(B.x + fpW(B) - 1, B.y + fpH(B) - 1);
 // room for it to spread: free, level ground that isn't street, planned street, water or ruin
@@ -333,6 +334,7 @@ function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it c
       const B = S.B[M.bld[i]];
       if (allowFarmReplace && B && (B.type === 'farm' || B.type === 'pasture') && B.sid === T.id && d < farmR && B.prog >= 1) replaceFarm = true; // the town grows over its old fields
       else if (kind === 'railhead' && B && B.prog >= 1 && !fpBig(B) && d >= R * .6 && (B.type === 'farm' || B.type === 'pasture' || (B.type === 'house' && B.tier <= 3))) replaceFarm = true; // a station out on the fields, or where an old cottage stood
+      else if (kind === 'harbor' && B && B.prog >= 1 && !fpBig(B) && HB_YIELD(B)) replaceFarm = true; // the harbour takes the best bit of shore: a field, a cottage, the old jetty or a pit gives way
       else continue;
     }
     if (OWN[i] !== T.id) continue;
@@ -361,7 +363,7 @@ function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it c
         break;
       }
       case 'shore': { if (!nearWaterDir(x, y)) continue; s += -d * 0.8 + adjRoad; break; }
-      case 'harbor': { if (!harbourSite(x, y)) continue; s += -d * .6 + adjRoad * 1.2 + waterNear(x, y, 2) * .15; break; }
+      case 'harbor': { if (!harbourSite(x, y)) continue; s += -d * .6 + adjRoad * 1.2 + waterNear(x, y, 2) * .15 - (replaceFarm ? 1.5 : 0); break; }
       case 'point': { const n = adjCount(x, y, j => bigWater(j)) + (inb(x + 1, y + 1) && bigWater(idx(x + 1, y + 1)) ? 1 : 0) + (inb(x - 1, y - 1) && bigWater(idx(x - 1, y - 1)) ? 1 : 0) + (inb(x + 1, y - 1) && bigWater(idx(x + 1, y - 1)) ? 1 : 0) + (inb(x - 1, y + 1) && bigWater(idx(x - 1, y + 1)) ? 1 : 0); if (n < 4) continue; s += n * 1.2 + waterNear(x, y, 3) * .1 - d * .2 - tree; break; }
       case 'ore': { if (!(M.ore[i] || b === BIO.ROCK)) continue; s += -d * 0.6 + M.ore[i] * 3 + around(x, y, 1, j => M.ore[j]) * .8; break; }
       case 'forest': { if (tree) continue; const n = around(x, y, 2, j => M.bld[j] ? 0 : M.tree[j]); if (n < 5) continue; s += n * .5 - d * .35 + adjRoad * .4; break; }
@@ -375,7 +377,7 @@ function findSite(T, kind, extra = 0, zt = null) { // zt: what it's for, so it c
       default: s += -d;
     }
     if (zt) s += zoneScore(zt, i);
-    if (replaceFarm && kind !== 'house' && kind !== 'backlot' && kind !== 'railhead') continue;
+    if (replaceFarm && kind !== 'house' && kind !== 'backlot' && kind !== 'railhead' && kind !== 'harbor') continue;
     if (s > bs) { bs = s; best = { x, y, replaceFarm }; }
   }
   if (!best) T._fail[fk] = S.month + 4 + ri(0, 4);
@@ -743,8 +745,9 @@ function worldProjects() {
   const big = towns().sort((a, b) => b.pop - a.pop);
   if (!big.length) return;
   const T = big[0];
-  if (hasTech('rocketry') && !anycount('launchpad')) { placeProject(T, 'launchpad', ['flatedge', 'edge']); return; }
-  if (hasTech('elevator') && !anycount('elevator')) { placeProject(T, 'elevator', ['edge', 'mid'], { name: 'the Thread' }); return; }
+  const spot = (type, kinds, o) => { for (const U of big) if (placeBig(U, type, o)) return; placeProject(T, type, kinds, o); }; // (the valley's own: on a whole lot by whichever town has room, the biggest first; a plot in the biggest only when none has)
+  if (hasTech('rocketry') && !anycount('launchpad')) { spot('launchpad', ['flatedge', 'edge']); return; }
+  if (hasTech('elevator') && !anycount('elevator')) { spot('elevator', ['edge', 'mid'], { name: 'the Thread' }); return; }
   if (S.omens >= 3 && hasTech('stone') && !anycount('watchstone')) { placeProject(T, 'watchstone', ['high', 'mid']); return; }
   if (hasTech('climate') && anycount('terraformer') < 3 && chance(.3)) { const t2 = pick(big.slice(0, 3)); placeProject(t2, 'terraformer', ['barren', 'edge']); return; }
   if (S.pendingWonder) {
@@ -960,6 +963,7 @@ function tryFound() {
   parent.pop -= move;
   if (forced) S.pendingTown = null;
   const T = { id: S.nextT++, name: forced ? PT.name : placeName(S.lang), x: best.x, y: best.y, founded: yr(), pop: move, cap: { house: 0, food: 0 }, bl: [], crop: ri(0, CROPS.length - 1), linked: false, lastElect: yr() };
+  if (forced) T._own = 1; // (the name the Watcher gave)
   const f = cast('explorer', parent, p => p.st.amb + p.st.cur, { minAge: 22, maxAge: 50, filter: p => p.id !== S.founder && parent.leader !== p.id });
   f.sid = T.id; T.founder = f.id; T.leader = f.id;
   const sp = f.sp && S.P[f.sp]; if (sp && sp.died === null) sp.sid = T.id;
@@ -1026,7 +1030,7 @@ function completeTech(i) {
   if (t.era > S.era) newEra(t.era);
   // side effects
   if (t.id === 'optics' && !S.moons) {
-    S.moons = [placeName(S.lang).split(' ')[0], placeName(S.lang).split(' ')[0]];
+    S.moons = [moonName(), moonName()]; if (S.moons[1] === S.moons[0]) S.moons[1] = NM_MOON[(NM_MOON.indexOf(S.moons[0]) + 3) % NM_MOON.length];
     chron('🔭', `Through the new lenses the two moons have mountains. They are named ${S.moons[0]} and ${S.moons[1]}.`);
   }
   if (t.id === 'sats') S.sky.sats = 3;
@@ -1205,11 +1209,11 @@ const EVENTS = [
   { k: 'giant', w: .7, when: () => S.year > 50, run() { chron('🦒', pick(['A Longstrider walks through the valley, taller than the Pod. The children follow it to the river.', 'A Longstrider is seen crossing the far meadows, slow as a cloud.']), { k: 'major' }); fx('giant', {}); } },
   { k: 'meteors', w: 1.2, run() { const T = randTown(); chron('🌠', `Shooting stars fall all night. ${T.name} stays up to count them.`, { T }); fx('meteors', {}); } },
   { k: 'rivalry', w: 2.5, when: () => towns().length >= 2, run() { const ts = shuffle(towns().slice()); const A = ts[0], B = ts[1], sp = pick(sportNow()), win = pick([A, B]); chron('🏆', `${A.name} and ${B.name} settle an argument about ${pick(TOPICS)} with a match of ${sp}. ${win.name} wins; everyone shares the beer.`, { T: win }); } },
-  { k: 'comet', w: .8, run() { const T = randTown(); const nm = nameWord(S.lang, 2); chron('☄️', `A comet hangs in the sky for a season. ${T.name} names it ${nm}.`, { T }); fx('comet', {}); } },
+  { k: 'comet', w: .8, run() { const T = randTown(); const nm = `${lastNm()}’s Comet`; chron('☄️', `A comet hangs in the sky for a season. ${T.name} names it ${nm}.`, { T }); fx('comet', {}); } },
   { k: 'fever', w: 1, when: () => !hasTech('medicine') && S.year > 40, run() { const T = randTown(); T.pop *= .97; chron('🤒', `A fever season in ${T.name}. It passes with the spring, and the town is quieter for a while.`, { T }); } },
-  { k: 'accord', w: 3, once: 1, when: () => towns().length >= 3 && hasTech('script'), run() { const nm = nameWord(S.lang, 2); S.accord = nm; chron('🤝', `The towns of the valley sign the ${nm} Accord: no walls between them, ever.`, { k: 'major' }); } },
+  { k: 'accord', w: 3, once: 1, when: () => towns().length >= 3 && hasTech('script'), run() { const nm = oldName(); S.accord = nm; chron('🤝', `The towns of the valley sign the ${nm} Accord: no walls between them, ever.`, { k: 'major' }); } },
   { k: 'book', w: 1.5, when: () => hasTech('script'), run() { const T = randTown(); const p = cast('sage', T, q => q.st.cur * 2 + q.st.wit, { minAge: 20 }); const title = `${pick(['On', 'A History of', 'Letters from', 'The Book of', 'Notes on'])} ${pick(['the Pod', 'Sheep', 'the Makers', T.name, 'Potatoes', 'the Two Moons', 'Rain', 'the Watcher', 'Small Things'])}`; p.deeds.push(`“${title}”`); chron('📖', `${whoOf(p, T)} writes “${title}”.`, { T }); } },
-  { k: 'climb', w: 2, once: 1, when: () => S.year > 150, run() { const T = randTown(); chron('🏔️', `An expedition from ${T.name} climbs the highest peak on the valley’s rim and names it ${nameWord(S.lang, 1)} Top.`, { T }); } },
+  { k: 'climb', w: 2, once: 1, when: () => S.year > 150, run() { const T = randTown(); chron('🏔️', `An expedition from ${T.name} climbs the highest peak on the valley’s rim and names it Mount ${lastNm()}.`, { T }); } },
   { k: 'weave', w: 1.2, when: () => hasTech('net'), run() { chron('📡', pick(['The most watched channel on the Weave is a live feed of a sleeping cat.', 'A Weave poll decides the valley’s favourite vegetable. Potatoes win, again.', 'Someone uploads the entire Archive to the Weave as a joke. It crashes for a day.']), {}); } },
   { k: 'oldest', w: 1, when: () => living().some(p => age(p) >= 95), run() { const p = living().sort((a, b) => a.born - b.born)[0]; const T = S.T[p.sid]; chron('🎂', `${p.name}${T ? ' of ' + T.name : ''} turns ${age(p)}. The whole town gets ${p.q.food}.`, T ? { T } : {}); } },
   { k: 'swallows', w: 1.5, run() { const T = randTown(); chron('🐦', `A flock of swallows nests on the rooftops of ${T.name}. Considered very good luck.`, { T }); fx('birds', { x: T.x, y: T.y }); } },
@@ -1292,7 +1296,7 @@ function milestones() {
   if (y >= 12 && T1) once('name1', () => { const old = T1.name; T1.name = placeName(S.lang); chron('✍️', `The little camp around the Pod gets a name: ${T1.name}.`, { T: T1 }); });
   if (y >= 19) once('natural', () => chron('👶', `The first child is born on this world the old way, not from the vault. There is a party that lasts until morning.`, { T: T1, k: 'major' }));
   if (y >= 26 && S.vault <= 0) once('vaultEmpty', () => chron('🫙', 'The last cradle in the vault opens. From now on, the world will have to grow its own.', { T: T1 }));
-  if (y >= 40 && !S.planet) once('planet', () => { S.planet = nameWord(S.lang, 2); chron('🌍', `The vault children vote on a name for their world. It is ${S.planet}.`, { k: 'major' }); UIDIRTY.stats = true; });
+  if (y >= 40 && !S.planet) once('planet', () => { S.planet = planetName(); chron('🌍', `The vault children vote on a name for their world. It is ${S.planet}.`, { k: 'major' }); UIDIRTY.stats = true; });
   if (y >= 100) once('c100', () => chron('🎉', `A hundred years since Landfall. The Pod is covered in moss and flowers, and nobody would dream of moving it.`, { x: S.landing.x, y: S.landing.y }));
   if (y > 100 && y % 250 === 0) chron('🎉', `Landfall Day, ${y} years since the Pod fell. Every town lights a lantern for the Founder.`, { x: S.landing.x, y: S.landing.y });
 }

@@ -32,10 +32,16 @@ TIME
   Normal pace: 1 year every 3 minutes, roughly 160 years per workday.
   Villages on day one, trains around week 2, rockets around week 3, the end of the
   Archive around week 5. After that it keeps going: open-ended cultural Ages, new
-  architecture styles, wonders, a language that slowly drifts.
+  architecture styles, wonders, and names that follow the times.
   Pace can be changed in the chronicle panel (Relaxed / Normal / Brisk / Preview).
 
 PEOPLE
+  Names are the sort you'd meet in real life: towns like Westgate, Little
+  Sandborough or St Leonards (from the age of steam New and Port towns too, and
+  in the far ages planned towns like Meridian Bay), people like Freya Webb or
+  Hugh Sawyer (newer names creep in later), a world called New Albion with
+  moons like Selene. An older world, named in the old made-up tongue, is renamed
+  once when it loads, and its chronicle with it.
   The named people (leaders, inventors, artists, the Founder's family...) walk
   around their towns wearing a small diamond: gold = leader, green = close family
   of the Founder. Hover one to see their stats, guilty pleasure, secret fear,
@@ -366,7 +372,8 @@ BOATS, SHIPS AND PLANES
   Where the way round a lake, inlet or river is long, a town puts a ferry
   across: a raft at first, later a proper ferry with a cabin. When a bridge
   makes it pointless, the old ferry retires.
-  Bigger coastal towns build a harbour (from Masonry): a stone quay, a
+  Bigger coastal towns build a harbour (from Masonry) on the best bit of
+  shore, even if a field or an old cottage has to give way: a stone quay, a
   warehouse and a crane that swings cargo on and off. As the town grows, the
   harbour grows along the shore (out over the shallows on piles where the coast
   bends). With Steam it becomes docklands: a long brick warehouse with copper
@@ -411,6 +418,12 @@ THE SEA
     up from there as well as from the launch pad.
   - Arcologies: seasteads, floating neighbourhoods on hexagons of pontoons,
     terraced white homes, gardens and a glowing edge.
+  Past the towns' own waters, the open sea is the valley's: the more deep water
+  a world has, the more goes out there. Offshore wind farms in long rows of a
+  dozen, offshore fish farms and kelp fields, an oil field before Fusion, wave
+  power along coasts nobody lives on, and in the age of arcologies a floating
+  city of seasteads. From Steam, trawlers steam out from the harbours to the
+  fishing grounds far offshore, nets out and gulls following, and come home.
   A lake-only world gets just the small things: weirs, fish farms and floating
   solar. In rain and storms the water gets rougher, with whitecaps. The film
   camera visits the wind parks, rigs and seasteads now and then.

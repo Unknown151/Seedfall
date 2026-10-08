@@ -909,6 +909,8 @@ function glShot() { // choose what to look at next
   opts.push([2, () => { const T = pick1(T0.slice().sort((a, b) => b.pop - a.pop).slice(0, 4)); return { at: () => [T.x, z(T.x, T.y), T.y], zoom: clamp(townRadius(T) * .8 + 3, 5, 14), pitch: rf(.4, .75), cap: T.name, sub: Math.round(T.pop).toLocaleString('en-GB') + ' people' }; }]);
   { const w = glWorkShot(); if (w) opts.push([1.5, () => w]); } // a workplace close up (works.js)
   const sb = Object.values(S.B).filter(B => B.prog >= 1 && SEA_CAP[B.type]);
+  const tw = (DYN.trawl || []).filter(o => o.st === 'fish' || o.st === 'out');
+  if (tw.length) opts.push([1, () => { const o = pick1(tw); return { at: () => { const q = trawlerPos(o); return [q[0], SEA_Y + .1, q[1]]; }, zoom: rf(2.2, 3.2), pitch: rf(.25, .4), cap: '🎣 A trawler out on the fishing grounds' }; }]); // (ocean.js)
   if (sb.length) opts.push([2, () => { const B = pick1(sb), T = S.T[B.sid], [x, y] = glLot(B), tall = B.type === 'windpark' || B.type === 'oilrig' || B.type === 'sealaunch'; return { at: () => [x, SEA_Y + (tall ? .6 : .1), y], zoom: tall ? rf(3, 4.2) : rf(1.8, 2.6), pitch: rf(.22, .38), cap: SEA_CAP[B.type] + (T ? ' off ' + T.name : '') }; }]); // out on the water (seamodels.js)
   const hs = harbours(); const sun = LIGHT.sun;
   if (hs.length && sun && sun.el > -2 && sun.el < 14) opts.push([4, () => { const B = pick1(hs), [x, y] = glLot(B), T = S.T[B.sid]; return { at: () => [x + B.dir[0] * .6, z(x, y), y + B.dir[1] * .6], zoom: rf(2.5, 3.5), pitch: rf(.18, .3), cap: '🌇 Evening at the harbour' + (T ? ' of ' + T.name : ''), yaw: Math.atan2(-B.dir[0], -B.dir[1]) }; }]); // golden hour by the water
@@ -1131,6 +1133,17 @@ function glTraffic() {
     const p = boatPos(b); if (!p) continue; const h = glHeading(b, p[3], p[4]), [f, r] = H3(h), c = [p[0], ys + .015 + Math.sin(GL3.t * 2 + (b.ph || 0)) * .004, p[1]];
     const y1 = hull(c, f, r, .1, .035, .04, hasTech('steam') ? '#3f6e8c' : '#8a5a3c', '#c9b79a');
     if (hasTech('steam')) gBox(at(c, f, r, -.02, 0, y1), V3s(f, .03), V3s(r, .025), .035, '#ece6da'); else gBeam(at(c, f, r, .02, 0, y1), at(c, f, r, .02, 0, y1 + .14), .004, '#5a4030');
+  }
+  for (const o of DYN.trawl || []) { // trawlers (ocean.js): a long hull, a wheelhouse forward, a gantry at the stern; out on the grounds the net trails and gulls follow
+    const p = trawlerPos(o), h = glHeading(o, p[2], p[3]), [f, r] = H3(h), c = [p[0], ys + .015 + Math.sin(GL3.t * 1.6 + o.ph) * .006, p[1]];
+    if (Math.hypot(c[0] - GL3.eye[0], c[2] - GL3.eye[2]) > 60) continue;
+    const y1 = hull(c, f, r, .2, .06, .05, o.col, '#c9c2b4'); gBox(at(c, f, r, .07, 0, y1), V3s(f, .04), V3s(r, .045), .06, '#ece6da'); gBox(at(c, f, r, .07, 0, y1 + .06), V3s(f, .042), V3s(r, .047), .008, '#3a3d42');
+    gBox(at(c, f, r, .09, 0, y1 + .06), V3s(f, .02), V3s(r, .046), .02, '#33475a', 0, GL3.litNow ? .5 : 0); gBeam(at(c, f, r, .05, 0, y1 + .07), at(c, f, r, .05, 0, y1 + .2), .003, '#5a5f66');
+    if (GL3.litNow) gBox(at(c, f, r, .05, 0, y1 + .2), [.006, 0, 0], [0, 0, .006], .01, '#fff4d6', 0, 2);
+    for (const sd of [-1, 1]) gBeam(at(c, f, r, -.14, sd * .045, y1), at(c, f, r, -.17, 0, y1 + .12), .004, '#e0a43a');
+    if (o.st === 'fish') { gBeam(at(c, f, r, -.17, 0, y1 + .1), at(c, f, r, -.6, 0, ys - .01), .0015, '#2a2a2a'); gBox(at(c, f, r, -.62, 0, ys - .012), V3s(f, .04), V3s(r, .08), .005, '#e0a43a');
+      for (let k = 0; k < 5; k++) { const a = GL3.t * (.9 + k * .13) + k * 1.3, R = .25 + k * .06, g = [c[0] + Math.cos(a) * R, c[1] + .35 + Math.sin(GL3.t * 2 + k) * .04, c[2] + Math.sin(a) * R], fl = Math.sin(GL3.t * 9 + k) * .012, s2 = [Math.cos(a), 0, Math.sin(a)];
+        gBox(g, [.008, 0, 0], [0, 0, .008], .005, '#f2f2f0'); for (const sd of [-1, 1]) gBeam(g, [g[0] + s2[0] * .03 * sd, g[1] + fl, g[2] + s2[2] * .03 * sd], .0035, '#e8e8e6'); } } // (the gulls)
   }
   for (const o of DYN.ferries) { // ferries: a raft early, a barge with a cabin later
     const p = ferryPos(o), i = idx(clamp(Math.round(p[0]), 0, W - 1), clamp(Math.round(p[1]), 0, H - 1)), h = glHeading(o, p[2], p[3]), [f, r] = H3(h);
