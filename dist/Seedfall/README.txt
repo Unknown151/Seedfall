@@ -32,10 +32,16 @@ TIME
   Normal pace: 1 year every 3 minutes, roughly 160 years per workday.
   Villages on day one, trains around week 2, rockets around week 3, the end of the
   Archive around week 5. After that it keeps going: open-ended cultural Ages, new
-  architecture styles, wonders, a language that slowly drifts.
+  architecture styles, wonders, and names that follow the times.
   Pace can be changed in the chronicle panel (Relaxed / Normal / Brisk / Preview).
 
 PEOPLE
+  Names are the sort you'd meet in real life: towns like Westgate, Little
+  Sandborough or St Leonards (from the age of steam New and Port towns too, and
+  in the far ages planned towns like Meridian Bay), people like Freya Webb or
+  Hugh Sawyer (newer names creep in later), a world called New Albion with
+  moons like Selene. An older world, named in the old made-up tongue, is renamed
+  once when it loads, and its chronicle with it.
   The named people (leaders, inventors, artists, the Founder's family...) walk
   around their towns wearing a small diamond: gold = leader, green = close family
   of the Founder. Hover one to see their stats, guilty pleasure, secret fear,

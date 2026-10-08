@@ -30,7 +30,7 @@ function harbourSite(x, y) { // a shore tile with open water in front
     const a = [x + dx, y + dy], b = [x + dx * 2, y + dy * 2], c2 = [x + dx * 3, y + dy * 3];
     if (!inb(...c2)) continue;
     const ia = idx(...a), ib = idx(...b), ic = idx(...c2);
-    if (bigWater(ia) && bigWater(ib) && M.water[ic] === 1 && !M.road[ia]) return [dx, dy];
+    if (bigWater(ia) && bigWater(ib) && M.water[ic] === 1 && !M.road[ia] && !M.bld[ia] && !M.bld[ib]) return [dx, dy]; // (not out over oyster beds or a fish farm: ocean.js)
   }
   return null;
 }

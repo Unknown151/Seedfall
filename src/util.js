@@ -142,20 +142,38 @@ function tidy(s) {
   return s;
 }
 function syl(L) { return pick(L.on) + pick(L.vo) + pick(L.co); }
-function nameWord(L, n) { let s = ''; for (let i = 0; i < n; i++) s += syl(L); return cap(tidy(s)); }
-const PLACE_TAILS = ['Hollow', 'Ford', 'Reach', 'Landing', 'Rise', 'Crossing', 'Springs', 'Terrace', 'Bend', 'Mere'];
-function placeName(L) {
-  for (let t = 0; t < 8; t++) {
-    let s;
-    const r = rnd();
-    if (r < 0.55) s = cap(tidy(syl(L) + pick(L.place)));
-    else if (r < 0.8) s = nameWord(L, 2);
-    else s = nameWord(L, 1) + ' ' + pick(PLACE_TAILS);
-    if (s.length >= 4 && s.length <= 14) return s;
+// Names as they'd be in real life (the old syllable-language above still drifts, but nothing is named from it any more):
+// English place names from real parts (Ash+ford, Kings+bury, Little X, St Agnes, X Green), then from the age of steam a
+// New X or Port X, and in the far ages the hopeful names of planned towns (Meridian, Halcyon Bay). People get real first
+// names (newer ones creep in later) and surnames, mostly English with a few from elsewhere, as a colony's would be.
+const NM_A = ['Ash', 'Oak', 'Elm', 'Thorn', 'Brook', 'Mill', 'Kings', 'Bishops', 'Stan', 'Brad', 'Shep', 'Wood', 'Hart', 'Hazel', 'Wil', 'Mar', 'Fern', 'Bram', 'Black', 'White', 'Red', 'Green',
+  'Long', 'Broad', 'High', 'Nether', 'Cold', 'Wind', 'Stone', 'Clay', 'Sand', 'Lark', 'Raven', 'Swan', 'Fox', 'Wolf', 'Bar', 'Ald', 'Ather', 'Bly', 'Chel', 'Dun', 'Ever', 'Har', 'Kel', 'Lang', 'Mel',
+  'North', 'South', 'East', 'West', 'Pen', 'Ross', 'Shel', 'Tam', 'Wex', 'Haw', 'Lin', 'Thurl', 'Ripp', 'Sal', 'Whit', 'Ab', 'Cran', 'Dray', 'Glen', 'Hol', 'Kirk', 'Market', 'Ox', 'Rye', 'Wey', 'Win'];
+const NM_B = ['ford', 'ton', 'bury', 'ham', 'field', 'wick', 'ley', 'worth', 'stead', 'by', 'thorpe', 'dale', 'combe', 'well', 'bridge', 'cote', 'hurst', 'den', 'mere', 'borough', 'gate', 'brook', 'stow', 'wood', 'holme', 'haven', 'minster', 'church', 'cliffe', 'leigh'];
+const NM_SAINT = ['Agnes', 'Brides', 'Clement', 'Dunstan', 'Edith', 'Helens', 'Ives', 'Kenelm', 'Leonards', 'Margarets', 'Neots', 'Osyth', 'Albans', 'Columb', 'Just', 'Mawes'];
+const NM_GREEN = ['Green', 'Cross', 'Heath', 'End', 'Common', 'Marsh', 'Hill', 'Bridge', 'Magna', 'Parva'];
+const NM_NEW = ['Meridian', 'Halcyon', 'Solace', 'Aurora', 'Lumen', 'Arcadia', 'Concord', 'Harmony', 'Zenith', 'Clearwater', 'Brightwater', 'Evergreen', 'Starhaven', 'Skyline', 'Haven', 'Serenity', 'Vantage', 'Highmeadow'];
+const NM_NEWT = ['', '', ' Bay', ' Point', ' Heights', ' Park', ' Gardens', ' Reach', ' Landing'];
+const NM_PLANET = ['New Albion', 'Avalon', 'Arden', 'Hesperia', 'Caledonia', 'Elysium', 'Thule', 'Verdance', 'New Eden', 'Halcyon', 'Gaia Nova', 'Kepler’s Rest', 'Tellus', 'Hespera', 'Aurelia', 'Brightholm', 'Arcadia', 'Hope'];
+const NM_MOON = ['Selene', 'Phoebe', 'Rhea', 'Dione', 'Mira', 'Hecate', 'Calla', 'Nyx', 'Ione', 'Thea', 'Iris', 'Vesper', 'Echo', 'Leda'];
+function oldName() { const a = pick(NM_A); let b = pick(NM_B); if (/s$/.test(a) && /^s/.test(b)) b = b.slice(1); return a + b; }
+function placeName(L) { // (L, the old drifting language, is kept for older callers)
+  const era = S ? S.era || 0 : 0, used = S && S.T ? new Set(Object.values(S.T).map(T => T.name)) : new Set();
+  for (let t = 0; t < 12; t++) {
+    const r = rnd(); let s;
+    if (era >= 7 && r < .35) s = pick(NM_NEW) + pick(NM_NEWT);
+    else if (era >= 4 && r < .5) s = (chance(.6) ? 'New ' : 'Port ') + oldName();
+    else if (r < .68) s = oldName();
+    else if (r < .8) s = pick(['Little ', 'Great ', 'Upper ', 'Lower ', 'Old ']) + oldName();
+    else if (r < .9) s = oldName() + ' ' + pick(NM_GREEN);
+    else s = 'St ' + pick(NM_SAINT);
+    if (s.length <= 18 && !used.has(s)) return s;
   }
-  return nameWord(L, 2);
+  return oldName();
 }
-
+function planetName() { return pick(NM_PLANET); }
+function moonName() { return pick(NM_MOON); }
+function nameWord(L, n) { return n > 1 ? oldName() : pick(NM_A); } // (a single name: an accord, a festival; kept for older callers)
 /* ---------- misc ---------- */
 function fmtInt(n) { n = Math.round(n); return n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : n.toLocaleString('en-US'); }
 function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }

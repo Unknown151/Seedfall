@@ -58,7 +58,7 @@ function newState0(seed) {
     year: 0, month: 0, map: g.M, B: {}, nextB: 1, T: {}, nextT: 1, P: {}, nextP: 1,
     tech: { done: {}, cur: 0, pts: 0 }, era: 0, age: null, ageN: 0, ageUsed: {},
     styles: [Object.assign({}, STYLES0[0])], styleIdx: 0,
-    lang: JSON.parse(JSON.stringify(LANG0)),
+    lang: JSON.parse(JSON.stringify(LANG0)), nameV: 2, // (named the real-world way from the start: persist.js renameWorld is for older worlds)
     chron: [], chronN: 0, mdWritten: 0, rows: [], rowN: 0, csvWritten: 0, hist: [],
     lore: 0, omens: 0, flags: { intro: 1 }, cool: {}, vault: 30, drought: 0, boost: 0,
     roads: [], rails: [], roadQ: [], landing: g.land, ruins: g.ruins, planet: null, moons: null,
@@ -960,6 +960,7 @@ function tryFound() {
   parent.pop -= move;
   if (forced) S.pendingTown = null;
   const T = { id: S.nextT++, name: forced ? PT.name : placeName(S.lang), x: best.x, y: best.y, founded: yr(), pop: move, cap: { house: 0, food: 0 }, bl: [], crop: ri(0, CROPS.length - 1), linked: false, lastElect: yr() };
+  if (forced) T._own = 1; // (the name the Watcher gave)
   const f = cast('explorer', parent, p => p.st.amb + p.st.cur, { minAge: 22, maxAge: 50, filter: p => p.id !== S.founder && parent.leader !== p.id });
   f.sid = T.id; T.founder = f.id; T.leader = f.id;
   const sp = f.sp && S.P[f.sp]; if (sp && sp.died === null) sp.sid = T.id;
@@ -1026,7 +1027,7 @@ function completeTech(i) {
   if (t.era > S.era) newEra(t.era);
   // side effects
   if (t.id === 'optics' && !S.moons) {
-    S.moons = [placeName(S.lang).split(' ')[0], placeName(S.lang).split(' ')[0]];
+    S.moons = [moonName(), moonName()]; if (S.moons[1] === S.moons[0]) S.moons[1] = NM_MOON[(NM_MOON.indexOf(S.moons[0]) + 3) % NM_MOON.length];
     chron('🔭', `Through the new lenses the two moons have mountains. They are named ${S.moons[0]} and ${S.moons[1]}.`);
   }
   if (t.id === 'sats') S.sky.sats = 3;
@@ -1205,11 +1206,11 @@ const EVENTS = [
   { k: 'giant', w: .7, when: () => S.year > 50, run() { chron('🦒', pick(['A Longstrider walks through the valley, taller than the Pod. The children follow it to the river.', 'A Longstrider is seen crossing the far meadows, slow as a cloud.']), { k: 'major' }); fx('giant', {}); } },
   { k: 'meteors', w: 1.2, run() { const T = randTown(); chron('🌠', `Shooting stars fall all night. ${T.name} stays up to count them.`, { T }); fx('meteors', {}); } },
   { k: 'rivalry', w: 2.5, when: () => towns().length >= 2, run() { const ts = shuffle(towns().slice()); const A = ts[0], B = ts[1], sp = pick(sportNow()), win = pick([A, B]); chron('🏆', `${A.name} and ${B.name} settle an argument about ${pick(TOPICS)} with a match of ${sp}. ${win.name} wins; everyone shares the beer.`, { T: win }); } },
-  { k: 'comet', w: .8, run() { const T = randTown(); const nm = nameWord(S.lang, 2); chron('☄️', `A comet hangs in the sky for a season. ${T.name} names it ${nm}.`, { T }); fx('comet', {}); } },
+  { k: 'comet', w: .8, run() { const T = randTown(); const nm = `${lastNm()}’s Comet`; chron('☄️', `A comet hangs in the sky for a season. ${T.name} names it ${nm}.`, { T }); fx('comet', {}); } },
   { k: 'fever', w: 1, when: () => !hasTech('medicine') && S.year > 40, run() { const T = randTown(); T.pop *= .97; chron('🤒', `A fever season in ${T.name}. It passes with the spring, and the town is quieter for a while.`, { T }); } },
-  { k: 'accord', w: 3, once: 1, when: () => towns().length >= 3 && hasTech('script'), run() { const nm = nameWord(S.lang, 2); S.accord = nm; chron('🤝', `The towns of the valley sign the ${nm} Accord: no walls between them, ever.`, { k: 'major' }); } },
+  { k: 'accord', w: 3, once: 1, when: () => towns().length >= 3 && hasTech('script'), run() { const nm = oldName(); S.accord = nm; chron('🤝', `The towns of the valley sign the ${nm} Accord: no walls between them, ever.`, { k: 'major' }); } },
   { k: 'book', w: 1.5, when: () => hasTech('script'), run() { const T = randTown(); const p = cast('sage', T, q => q.st.cur * 2 + q.st.wit, { minAge: 20 }); const title = `${pick(['On', 'A History of', 'Letters from', 'The Book of', 'Notes on'])} ${pick(['the Pod', 'Sheep', 'the Makers', T.name, 'Potatoes', 'the Two Moons', 'Rain', 'the Watcher', 'Small Things'])}`; p.deeds.push(`“${title}”`); chron('📖', `${whoOf(p, T)} writes “${title}”.`, { T }); } },
-  { k: 'climb', w: 2, once: 1, when: () => S.year > 150, run() { const T = randTown(); chron('🏔️', `An expedition from ${T.name} climbs the highest peak on the valley’s rim and names it ${nameWord(S.lang, 1)} Top.`, { T }); } },
+  { k: 'climb', w: 2, once: 1, when: () => S.year > 150, run() { const T = randTown(); chron('🏔️', `An expedition from ${T.name} climbs the highest peak on the valley’s rim and names it Mount ${lastNm()}.`, { T }); } },
   { k: 'weave', w: 1.2, when: () => hasTech('net'), run() { chron('📡', pick(['The most watched channel on the Weave is a live feed of a sleeping cat.', 'A Weave poll decides the valley’s favourite vegetable. Potatoes win, again.', 'Someone uploads the entire Archive to the Weave as a joke. It crashes for a day.']), {}); } },
   { k: 'oldest', w: 1, when: () => living().some(p => age(p) >= 95), run() { const p = living().sort((a, b) => a.born - b.born)[0]; const T = S.T[p.sid]; chron('🎂', `${p.name}${T ? ' of ' + T.name : ''} turns ${age(p)}. The whole town gets ${p.q.food}.`, T ? { T } : {}); } },
   { k: 'swallows', w: 1.5, run() { const T = randTown(); chron('🐦', `A flock of swallows nests on the rooftops of ${T.name}. Considered very good luck.`, { T }); fx('birds', { x: T.x, y: T.y }); } },
@@ -1292,7 +1293,7 @@ function milestones() {
   if (y >= 12 && T1) once('name1', () => { const old = T1.name; T1.name = placeName(S.lang); chron('✍️', `The little camp around the Pod gets a name: ${T1.name}.`, { T: T1 }); });
   if (y >= 19) once('natural', () => chron('👶', `The first child is born on this world the old way, not from the vault. There is a party that lasts until morning.`, { T: T1, k: 'major' }));
   if (y >= 26 && S.vault <= 0) once('vaultEmpty', () => chron('🫙', 'The last cradle in the vault opens. From now on, the world will have to grow its own.', { T: T1 }));
-  if (y >= 40 && !S.planet) once('planet', () => { S.planet = nameWord(S.lang, 2); chron('🌍', `The vault children vote on a name for their world. It is ${S.planet}.`, { k: 'major' }); UIDIRTY.stats = true; });
+  if (y >= 40 && !S.planet) once('planet', () => { S.planet = planetName(); chron('🌍', `The vault children vote on a name for their world. It is ${S.planet}.`, { k: 'major' }); UIDIRTY.stats = true; });
   if (y >= 100) once('c100', () => chron('🎉', `A hundred years since Landfall. The Pod is covered in moss and flowers, and nobody would dream of moving it.`, { x: S.landing.x, y: S.landing.y }));
   if (y > 100 && y % 250 === 0) chron('🎉', `Landfall Day, ${y} years since the Pod fell. Every town lights a lantern for the Founder.`, { x: S.landing.x, y: S.landing.y });
 }
