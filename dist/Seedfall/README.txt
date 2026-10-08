@@ -372,7 +372,8 @@ BOATS, SHIPS AND PLANES
   Where the way round a lake, inlet or river is long, a town puts a ferry
   across: a raft at first, later a proper ferry with a cabin. When a bridge
   makes it pointless, the old ferry retires.
-  Bigger coastal towns build a harbour (from Masonry): a stone quay, a
+  Bigger coastal towns build a harbour (from Masonry) on the best bit of
+  shore, even if a field or an old cottage has to give way: a stone quay, a
   warehouse and a crane that swings cargo on and off. As the town grows, the
   harbour grows along the shore (out over the shallows on piles where the coast
   bends). With Steam it becomes docklands: a long brick warehouse with copper
