@@ -56,12 +56,19 @@ function harbourLen(T) { return !T ? 1 : 1 + (T.pop >= 1200 ? 1 : 0) + (hasTech(
 const HB_GROW = ['', '', 'The harbour of {T} lays a second stone quay along the shore. Two ships can tie up at once now.',
   'The harbour of {T} grows into a proper port: piers out into deep water, warehouses in a row and cranes along the quay.',
   'Container docks open at {T}: great gantry cranes, stacked boxes in every colour, and a quay that never quite sleeps.'];
+const SEA_GIVE = { oysters: 1, fishfarm: 1, kelp: 1, floatsolar: 1 }; // (small things in the water that move out of a harbour's way)
+function harbourWay(B, x, y) { // what stands in the water in front of a berth: [blocked by something big, small things that would give way]
+  const g = []; let big = false;
+  for (let q = 1; q <= 2; q++) { const nx = x + B.dir[0] * q, ny = y + B.dir[1] * q; if (!inb(nx, ny)) continue; const o = M.bld[idx(nx, ny)] && S.B[M.bld[idx(nx, ny)]]; if (o) { if (SEA_GIVE[o.type]) g.push(o); else big = true; } }
+  return [big, g];
+}
 function yearlyHarbours() {
   for (const B of harbours()) {
+    for (let k = 0; k < berths(B); k++) { const b = berthTile(B, k); for (const o of harbourWay(B, b % W - B.dir[0], ((b / W) | 0) - B.dir[1])[1]) { removeBuilding(o); S.seaV = (S.seaV || 0) + 1; } } // (an oyster bed laid before the quay grew this way moves off: ships need the berth)
     const T = S.T[B.sid], n = berths(B); if (n >= harbourLen(T) || !chance(.4)) continue;
     let hz = -1; for (const t of fpTiles(B)) if (!M.water[t]) hz = Math.max(hz, surfZ(t)); // (the lot's land height: its corner may be out over the water)
     const ok = (j) => { const z = hz;
-      const x = j % W, y = (j / W) | 0; if (!seaAhead(x, y, B.dir)) return false; // more of the same shore...
+      const x = j % W, y = (j / W) | 0; if (!seaAhead(x, y, B.dir) || harbourWay(B, x, y)[0]) return false; // more of the same shore (with nothing big moored in front)...
       if (M.water[j] === 1) return !M.bld[j] && !M.road[j] && N4.some(([dx, dy]) => inb(x + dx, y + dy) && !M.water[idx(x + dx, y + dy)]); // ...or a quay built out over the shallows, on piles
       const o = M.bld[j] && S.B[M.bld[j]]; return fpYield(j, z) || o && (o.type === 'house' || o.type === 'dock' || o.type === 'sandpit' || o.type === 'claypit') && !fpBig(o) && !M.road[j] && !M.plan[j] && surfZ(j) === z; // (docks may take any house, the old pier, a pit)
     };

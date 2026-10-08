@@ -745,8 +745,9 @@ function worldProjects() {
   const big = towns().sort((a, b) => b.pop - a.pop);
   if (!big.length) return;
   const T = big[0];
-  if (hasTech('rocketry') && !anycount('launchpad')) { placeProject(T, 'launchpad', ['flatedge', 'edge']); return; }
-  if (hasTech('elevator') && !anycount('elevator')) { placeProject(T, 'elevator', ['edge', 'mid'], { name: 'the Thread' }); return; }
+  const spot = (type, kinds, o) => { for (const U of big) if (placeBig(U, type, o)) return; placeProject(T, type, kinds, o); }; // (the valley's own: on a whole lot by whichever town has room, the biggest first; a plot in the biggest only when none has)
+  if (hasTech('rocketry') && !anycount('launchpad')) { spot('launchpad', ['flatedge', 'edge']); return; }
+  if (hasTech('elevator') && !anycount('elevator')) { spot('elevator', ['edge', 'mid'], { name: 'the Thread' }); return; }
   if (S.omens >= 3 && hasTech('stone') && !anycount('watchstone')) { placeProject(T, 'watchstone', ['high', 'mid']); return; }
   if (hasTech('climate') && anycount('terraformer') < 3 && chance(.3)) { const t2 = pick(big.slice(0, 3)); placeProject(t2, 'terraformer', ['barren', 'edge']); return; }
   if (S.pendingWonder) {

@@ -7,7 +7,7 @@ import { launch, ROOT } from './env.mjs';
 const b = await launch(); const p = await b.newPage();
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 let fails = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++; };
-await p.goto(ROOT + 'seedfall.html?seed=12345&fresh&nointro&headless'); await p.waitForTimeout(800); // (a world whose towns grow apart: a real network, with shared track)
+await p.goto(ROOT + 'seedfall.html?seed=4242&fresh&nointro&headless'); await p.waitForTimeout(800); // (a world whose towns grow apart: a real network, with shared track)
 const r = await p.evaluate(() => {
   SF.ff(1150 - yr());
   const lines = S.rails.filter(r => r.path); let tiles = 0, road = 0, along = 0, bad = 0;

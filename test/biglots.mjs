@@ -34,8 +34,8 @@ const m = await p.evaluate(() => { const out = {};
   return out; });
 ok(Object.values(m).every(v => v === 'ok' || v === 'none') && Object.values(m).filter(v => v === 'ok').length >= 7, 'every big model builds far and near ' + JSON.stringify(m));
 // an older world's one-plot works spreads onto its lot, or moves out to one
-await p.evaluate(() => { window.freeAt = () => { for (const T of towns().sort((a, b) => a.pop - b.pop)) { const s = findSite(T, 'edge') || findSite(T, 'mid') || findSite(T, 'farm'); if (s) { if (M.bld[idx(s.x, s.y)]) removeBuilding(S.B[M.bld[idx(s.x, s.y)]]); return [T, s]; } } return [null, null]; }; });
-const w = await p.evaluate(() => { const [T, s] = freeAt(); if (!s) return 'no site';
+await p.evaluate(() => { window.freeAt = (f = () => true) => { for (const T of towns().sort((a, b) => a.pop - b.pop).filter(f)) { const s = findSite(T, 'edge') || findSite(T, 'mid') || findSite(T, 'farm'); if (s) { if (M.bld[idx(s.x, s.y)]) removeBuilding(S.B[M.bld[idx(s.x, s.y)]]); return [T, s]; } } return [null, null]; }; });
+const w = await p.evaluate(() => { const [T, s] = freeAt(T => bigLotSite(T, 2, 2, 5, 2.5)); if (!s) return 'no site'; // (a town with room for one out at its edge)
   const B = mkBuilding('works', s.x, s.y, T, { prog: 1 }); B.built = yr() - 40; for (let k = 0; k < 5 && !fpBig(B); k++) fpSettle(B); return S.B[B.id] ? fpW(B) + 'x' + fpH(B) : 'gone'; });
 ok(w === '2x2', `an old one-plot works spreads or moves out to its 2×2 lot (${w})`);
 // the windmill: not built for a custom after Electricity, and one built since comes down
