@@ -10,10 +10,11 @@ function bindUI() {
   });
   document.querySelectorAll('.tool[data-tool]').forEach(b => {
     b.addEventListener('click', () => selectTool(b.dataset.tool));
-    b.addEventListener('mouseenter', () => { const k = b.dataset.tool, [n, d] = TOOL_INFO[k]; const t = $('tip2'); t.textContent = `${n}: ${d} · ${COST[k]} ✨${toolReady(k) ? '' : ` (you have ${Math.floor(S.rev)})`}`; t.style.opacity = 1; });
+    b.addEventListener('mouseenter', () => { const k = b.dataset.tool, [n, d] = TOOL_INFO[k]; const t = $('tip2'); t.textContent = `${n}: ${d} · ${COST[k] ? COST[k] + ' ✨' : 'free, and it brings Reverence'}${toolReady(k) ? '' : ` (you have ${Math.floor(S.rev)})`}`; t.style.opacity = 1; });
     b.addEventListener('mouseleave', () => $('tip2').style.opacity = 0);
   });
   $('dockChron').addEventListener('click', togglePanel);
+  $('dockHand').addEventListener('click', toggleHand); $('dockMir').addEventListener('click', toggleMir);
   $('dockSky').addEventListener('click', clearSkies);
   $('tbPrev').addEventListener('click', () => barStep(-1)); $('tbNext').addEventListener('click', () => barStep(1));
   $('tbPl').addEventListener('click', () => { setTab('towns'); if (!UI.panel) togglePanel(); else renderPanelBody(true); });
@@ -25,6 +26,7 @@ function bindUI() {
     const cp = e.target.closest('[data-copy]'); if (cp) { voiceCopy(cp.dataset.copy); return; }
     if (e.target.closest('[data-voiceset]')) { openAISettings(); return; }
     if (e.target.closest('[data-back]')) { UI.personSel = null; renderPanelBody(true); return; }
+    const ch = e.target.closest('[data-choose]'); if (ch) { if (chooseOne(+ch.dataset.choose)) renderPanelBody(true); return; }
     const fo = e.target.closest('[data-follow]');
     if (fo) { toast(camFollow(+fo.dataset.follow) ? 'Following them around for a bit.' : 'They’re indoors just now. Try again in a moment.'); return; }
     const pe = e.target.closest('[data-pid]');
@@ -55,7 +57,7 @@ function bindUI() {
   $('banner').addEventListener('click', () => reconnectFolder());
 }
 function confirmBox(title, text, yes) {
-  $('cTitle').textContent = title; $('cText').textContent = text; $('confirm').classList.add('show'); $('cSize').hidden = true;
+  $('cTitle').textContent = title; $('cText').textContent = text; $('confirm').classList.add('show'); $('cSize').hidden = true; $('cMode').hidden = true;
   $('cYes').onclick = () => { $('confirm').classList.remove('show'); yes(); };
 }
 // how big a new world is: a valley (64 tiles a side, as it always was) or wide lands (128: four times the ground, more towns, and more for the PC to draw)
@@ -65,12 +67,20 @@ function sizeRow(el) {
   el.innerHTML = SIZE_OPTS.map(([n, a, b]) => `<button class="btn${n === UI.newSize ? ' sel' : ''}" data-size="${n}">${a}<small>${b}</small></button>`).join(''); el.hidden = false;
   el.querySelectorAll('[data-size]').forEach(b => b.onclick = () => { UI.newSize = +b.dataset.size; el.querySelectorAll('[data-size]').forEach(x => x.classList.toggle('sel', x === b)); });
 }
+// how the Watcher plays a new world: calm, as it always was, or Grace & Dread (storms and blights as well as rain and bloom, miracles, a Chosen One, and a people who come to love or fear you)
+const MODE_OPTS = [['calm', 'Calm', 'gentle nudges, as it always was'], ['god', 'Grace & Dread', 'be loved or feared: storms, blights, miracles, a Chosen One']];
+function modeRow(el) {
+  if (!UI.newMode) UI.newMode = 'calm';
+  el.innerHTML = MODE_OPTS.map(([k, a, b]) => `<button class="btn${k === UI.newMode ? ' sel' : ''}" data-mode="${k}">${a}<small>${b}</small></button>`).join(''); el.hidden = false;
+  el.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { UI.newMode = b.dataset.mode; el.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('sel', x === b)); });
+}
 function togglePanel() { UI.panel = !UI.panel; document.body.classList.toggle('panel', UI.panel); if (UI.panel) { renderPanel(true); } }
 function selectTool(k) {
   if (!S || S.flags.intro) return;
   if (k === 'speak') { openSpeak(); return; }
   if (!toolReady(k)) { toast(`${TOOL_INFO[k][0]} takes ${COST[k]} ✨ Reverence. You have ${Math.floor(S.rev)}; it gathers while the world is on screen.`); return; }
   UI.tool = UI.tool === k ? null : k;
+  if (MIR.includes(k)) document.body.classList.remove('mir');
   document.querySelectorAll('.tool[data-tool]').forEach(b => b.classList.toggle('sel', b.dataset.tool === UI.tool));
   document.body.classList.toggle('targeting', !!UI.tool);
   if (UI.tool) toast(`${TOOL_INFO[k][0]}: click somewhere on the world. Esc to cancel.`);
@@ -85,9 +95,12 @@ function onKey(e) {
   else if (k === 'z' || k === 'Z') { UI.zones = !UI.zones; toast(UI.zones ? 'Zone view: blue market quarters, green homes, yellow works, teal greens. The towns draw these themselves. Z again to hide.' : 'Zone view off.'); }
   else if (k === 'f' || k === 'F') { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => { }); else document.exitFullscreen(); }
   else if (k === ' ') { UI.paused = !UI.paused; document.body.classList.toggle('paused', UI.paused); e.preventDefault(); }
-  else if (k >= '1' && k <= '6') selectTool(['rain', 'drop', 'inspire', 'starfall', 'bloom', 'speak'][+k - 1]);
+  else if (k >= '1' && k <= '6') { const t = ['rain', 'drop', 'inspire', 'starfall', 'bloom', 'speak'][+k - 1]; selectTool(GOD() && UI.hand === 'wrath' && TWIN[t] ? TWIN[t] : t); }
+  else if (k === 'q' || k === 'Q') toggleHand();
+  else if (k === 'm' || k === 'M') toggleMir();
   else if (k === 'Escape') {
     if (UI.tool) selectTool(UI.tool);
+    else if (document.body.classList.contains('mir')) document.body.classList.remove('mir');
     else if ($('help').classList.contains('show')) $('help').classList.remove('show');
     else if ($('confirm').classList.contains('show')) $('confirm').classList.remove('show');
     else if ($('away').classList.contains('show')) $('away').classList.remove('show');
@@ -139,6 +152,7 @@ function tipFor(i) {
     const extra = [];
     if (M.tree[i]) extra.push(TREE_NAME[M.ttype[i]] || 'Trees');
     if (M.ruin[i]) extra.push(M.ruin[i] === 2 ? 'Maker ruins (studied)' : 'Maker ruins');
+    if (S.craters && craterAt(i) >= 0) extra.push(`A great meteor’s crater (Year ${Math.floor(yr() - craterAge(i))})${craterAge(i) < 120 ? ', starmetal still glinting in it' : ''}`);
     if (springAt(i)) extra.push('a hot spring');
     if (M.road[i]) extra.push(w ? (rcls(i) >= 3 ? 'stone bridge' : 'bridge') : R_NAME[M.road[i]] || 'road');
     if (M.rail[i]) extra.push('railway');
@@ -225,13 +239,29 @@ function renderHUD() {
   if (idle > 3000) document.body.classList.remove('active');
   if (idle > 5000 && !UI.panel && !UI.tool && !document.querySelector('.modal.show')) document.body.classList.add('nocursor');
 }
+// Grace & Dread (god.js): the hand turns the five nudges into their dark twins; the miracles have a bar of their own
+function toggleHand() {
+  if (!GOD() || !S || S.flags.intro) return;
+  UI.hand = UI.hand === 'wrath' ? 'kind' : 'wrath'; if (UI.tool && (TWIN[UI.tool] || DARK[UI.tool])) selectTool(UI.tool);
+  renderTools(); toast(UI.hand === 'wrath' ? 'The wrathful hand: storm, tribute, eclipse, great meteor and blight. Q for the kind one again.' : 'The kind hand: rain, gifts, light, starfall and bloom.');
+}
+function toggleMir() { if (!GOD() || !S || S.flags.intro) return; document.body.classList.toggle('mir'); }
+function renderAwe() {
+  const a = S.awe || 0, b = aweBand(), k = b + '|' + Math.round(a) + '|' + UI.hand; if (UI.aweK === k) return; UI.aweK = k;
+  $('aweL').textContent = `${AWE_B[b][0]} ${AWE_B[b][1]}`; $('aweM').style.left = ((a + 100) / 2).toFixed(1) + '%';
+  const h = $('dockHand'); h.classList.toggle('wrath', UI.hand === 'wrath'); h.firstElementChild.textContent = UI.hand === 'wrath' ? '😈' : '😇';
+}
 function renderTools() {
+  const god = GOD(); document.body.classList.toggle('god', god); if (!god) { UI.hand = 'kind'; document.body.classList.remove('mir'); }
   document.querySelectorAll('.tool[data-tool]').forEach(b => {
+    if (b.dataset.base == null && TWIN[b.dataset.tool]) b.dataset.base = b.dataset.tool;
+    if (b.dataset.base) { const t = god && UI.hand === 'wrath' ? TWIN[b.dataset.base] : b.dataset.base; if (b.dataset.tool !== t) { b.dataset.tool = t; b.firstElementChild.textContent = TOOL_IC[t]; } }
     const k = b.dataset.tool, cd = b.querySelector('.cd');
-    const miss = clamp(1 - (S.rev || 0) / COST[k], 0, 1);
+    const miss = COST[k] ? clamp(1 - (S.rev || 0) / COST[k], 0, 1) : 0;
     cd.style.transform = `scaleY(${miss})`;
     b.classList.toggle('off', miss > 0);
   });
+  if (god) renderAwe();
 }
 function renderPanel(force) {
   if (!UI.panel) return;
@@ -285,7 +315,7 @@ function renderPanelBody(force) {
     const sel = UI.personSel && S.P[UI.personSel];
     if (sel) {
       const w = DYN.walkers.find(w => w.pid === sel.id);
-      h += `<div class="pback"><a data-back="1">← Everyone</a>${w ? `<a data-follow="${sel.id}">Show on map</a>` : ''}</div><div class="pd">${personCard(sel, true)}</div>`;
+      h += `<div class="pback"><a data-back="1">← Everyone</a>${w ? `<a data-follow="${sel.id}">Show on map</a>` : ''}${S.chosen && S.chosen.pid === sel.id ? '<span class="chosen">✋ The Watcher’s Chosen</span>' : canChoose(sel) ? `<a data-choose="${sel.id}" title="One at a time. They live long, and do your will in their own way">✋ Make them your Chosen · ${CHOSEN_COST} ✨</a>` : ''}</div><div class="pd">${personCard(sel, true)}</div>`;
     } else {
       const L = living();
       h += `<div class="phint">${L.length} people you know by name. Hover for details, click to open. On the map they wear a little diamond: <span style="color:#e0a63a">◆</span> leaders, <span style="color:#5cb86a">◆</span> the Founder’s line.</div>`;

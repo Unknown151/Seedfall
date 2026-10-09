@@ -109,6 +109,7 @@ function leafC(col, f) { let c = LT.leaf[1] ? mix(col, LT.leaf[0], LT.leaf[1]) :
 function lightTick(dt) {
   if (!S) return;
   LIGHT.sun = sunNow();
+  if (DYN.eclipse) { const e = DYN.eclipse, k = sstep(0, 5, e.t) * sstep(e.life, e.life - 7, e.t); if (k > 0) LIGHT.sun = Object.assign({}, LIGHT.sun, { el: lerp(LIGHT.sun.el, -14, k), fixed: 0 }); } // the Dark Noon (god.js)
   if (!LIGHT.season || (LIGHT.seasonT -= dt) <= 0) { LIGHT.season = seasonFor(); LIGHT.seasonT = 300; }
   stepWeather(dt);
   const el = LIGHT.sun.el, fx = LIGHT.sun.fixed;
@@ -116,7 +117,7 @@ function lightTick(dt) {
   LIGHT.nightK = fx ? 0 : sstep(0, -9, el);
   LIGHT.dayK = fx ? 1 : sstep(-6, 4, el);
   if ((LIGHT.chk -= dt) <= 0) { // what the art takes from the light (the era's lamps, the night's custom, gardens) changed: rebuild the view
-    LIGHT.chk = 1.5; const env = envNow(), k = [env.era, env.nl || '', env.gd || 0, LVA].join('|'); // (and the customs the buildings show: house colours, trees, decorations)
+    LIGHT.chk = 1.5; const env = envNow(), k = [env.era, env.nl || '', env.gd || 0, LVA, aweArt()].join('|'); // (and the customs the buildings show: house colours, trees, decorations)
     if (!LIGHT.cur || k !== LIGHT.artKey) { LIGHT.cur = LT = mkLight(env); if (LIGHT.artKey != null && GL3.on) for (let n = 0; n < GNC * GNC; n++) GL3.dirty.add(n); LIGHT.artKey = k; }
   }
   const night = LIGHT.nightK > .5 || S.wx && S.wx.storm > .6 && LIGHT.dayK < 1;
@@ -186,9 +187,9 @@ function setWeather(k, secs) { // dev + future levers
   const w = S.wx || (S.wx = newWx());
   w.k = k; w.left = secs || rf(...WXD[k]) * 60;
 }
-function strike() { // lightning: a bolt somewhere near the camera, from the clouds to the ground
+function strike(tx, ty) { // lightning: a bolt somewhere near the camera (or where the Watcher's storm aims it), from the clouds to the ground
   const e = GL3.eye || [W / 2, 0, H / 2], c = GL3.cam || { tx: W / 2, tz: H / 2 };
-  const x = clamp(c.tx + rf(-12, 12), 0, W - 1), y = clamp(c.tz + rf(-12, 12), 0, H - 1), g = gGround(x, y);
+  const x = clamp(tx != null ? tx : c.tx + rf(-12, 12), 0, W - 1), y = clamp(ty != null ? ty : c.tz + rf(-12, 12), 0, H - 1), g = gGround(x, y);
   if (Math.hypot(x - e[0], y - e[2]) > 60) { DYN.flash = Math.max(DYN.flash || 0, .25); return; }
   const pts = [], x0 = x + rf(-3, 3), z0 = y + rf(-3, 3), n = 10; for (let k = 0; k <= n; k++) { const f = k / n, j = k && k < n ? .5 : 0; pts.push([lerp(x0, x, f) + rf(-j, j), lerp(g + 14, g, f), lerp(z0, y, f) + rf(-j, j)]); }
   DYN.bolt = { pts, t: 0 }; DYN.flash = Math.max(DYN.flash || 0, .55);

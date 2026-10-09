@@ -23,7 +23,13 @@ function processFX() {
       case 'launch': launchRocket(f.id); break;
       case 'seedship': { const e = Object.values(S.B).find(B => B.type === 'elevator' || B.type === 'launchpad'); if (e) launchRocket(e.id, true); break; }
       case 'drop': DYN.drops.push({ x: f.x, y: f.y, t: 0 }); camHint(f.x, f.y, '📦 A supply pod'); break;
-      case 'meteor': DYN.meteors.push({ x: f.x, y: f.y, t: 0 }); camHint(f.x, f.y, '☄️ Starfall'); break;
+      case 'meteor': DYN.meteors.push({ x: f.x, y: f.y, t: 0, big: f.big }); camHint(f.x, f.y, f.big ? '💥 A great meteor' : '☄️ Starfall'); break;
+      // Grace & Dread (god.js): lightning on a spot, a blight, tribute carried up the hill, an eclipse, the ground shaking
+      case 'bolts': { DYN.boltQ = DYN.boltQ || []; for (let k = 0; k < (f.n || 3); k++) DYN.boltQ.push({ x: f.x + rf(-1.6, 1.6), y: f.y + rf(-1.6, 1.6), at: DYN.t + 1.2 + k * rf(.7, 1.6) }); camHint(f.x, f.y, '⛈️ A storm'); break; }
+      case 'blight': { const g = gGround(f.x, f.y); for (let k = 0; k < 80; k++) part3(f.x + rf(-3.4, 3.4), g + rf(.05, .5), f.y + rf(-3.4, 3.4), rf(-.1, .1), rf(.05, .3), rf(-.1, .1), rf(3, 6), pick(['#6e6a4e', '#8a8060', '#5a5440']), .5, rf(.12, .3), { dr: .5, gr: .1 }); camHint(f.x, f.y, '🥀 Blight'); break; }
+      case 'tribute': (DYN.trib = DYN.trib || []).push({ x: f.x, y: f.y, t: 0 }); camHint(f.x, f.y, '🪙 Tribute'); break;
+      case 'eclipse': DYN.eclipse = { t: 0, life: 32 }; camHint(f.x, f.y, '🌑 The Dark Noon'); break;
+      case 'quake': { DYN.shake = Math.max(DYN.shake || 0, f.s || 3); const g = gGround(f.x, f.y); for (let k = 0; k < 60; k++) part3(f.x + rf(-4, 4), g + .05, f.y + rf(-4, 4), rf(-.3, .3), rf(.2, .8), rf(-.3, .3), rf(1.5, 3.5), pick(['#b9a99a', '#a89888', '#cfc2b2']), .55, rf(.12, .3), { dr: .8, g: .3 }); camHint(f.x, f.y, '🫨 The earth moves'); break; }
       case 'sparkle': { const g = gGround(f.x, f.y); for (let k = 0; k < 70; k++) part3(f.x + rf(-2, 2), g + rf(.1, .8), f.y + rf(-2, 2), rf(-.15, .15), rf(.4, 1.2), rf(-.15, .15), rf(1.5, 3), pick(['#fff6c2', '#ffd66b', '#bff3ff', '#ffc2e0']), .9, rf(.05, .1), { glow: 1, dr: .6 }); break; }
     }
   }

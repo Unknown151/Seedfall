@@ -50,6 +50,7 @@ GL_MODEL.plaza = function (B, st) {
   }
   if (lod) for (const r of [.2, .34]) kCyl(0, 0, .007, r, .003, shade(pave, .85), M_STONE, 24, 0);
   for (const [s, f] of [[-.42, .42], [.42, -.42], [.42, .42], [-.42, -.42]]) cLampPost(s, f, .22);
+  if (godSq(B, pave, lod)) return; // (a loved or feared Watcher: god.js)
   kCyl(0, 0, .007, .2, .045, shade(pave, .9), M_STONE, 16, '#7fc7de'); if (lod) kCyl(0, 0, .052, .205, .01, shade(pave, .8), M_STONE, 16, 0);
   if (B.statue) { kBox(0, 0, .007, .05, .05, .16, '#d8d2c8', M_STONE); kBox(0, 0, .167, .06, .06, .012, '#e2dbcf', M_STONE); kBox(0, 0, .18, .022, .016, .1, '#b9a99a', M_STONE); kBox(0, 0, .28, .03, .02, .08, '#b9a99a', M_STONE); kBlob(0, 0, .38, .016, .02, '#b9a99a', M_STONE); kBeam([.025, 0, .34], [.06, 0, .43], .007, '#b9a99a', M_STONE); }
   else { kCyl(0, 0, .05, .06, .06, shade(pave, .95), M_STONE, 12, '#bfe7f2'); kCyl(0, 0, .11, .02, .04, shade(pave, .95), M_STONE, 8); if (lod) { kBox(0, 0, .15, .005, .005, .1, '#cfeff6'); for (let q = 0; q < 6; q++) { const a = q / 6 * TAU; kBeam([0, 0, .2], [Math.cos(a) * .1, Math.sin(a) * .1, .07], .003, '#cfeff6'); } } } // a fountain and its jets

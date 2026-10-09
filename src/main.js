@@ -8,7 +8,7 @@ function randSeed() { return (Math.random() * 1e9) | 0; }
 
 function startWorld(isNew) {
   M = S.map;
-  DYN.walkers.length = 0; DYN.vehicles.length = 0; DYN.trains.length = 0; DYN.boats.length = 0; DYN.trawl = []; DYN.ships.length = 0; DYN.ferries.length = 0; DYN.planes.length = 0; DYN.slot = {}; DYN.af = {}; DYN.herds.length = 0; DYN.caps.length = 0; DYN.parts.length = 0;
+  DYN.walkers.length = 0; DYN.vehicles.length = 0; DYN.trains.length = 0; DYN.boats.length = 0; DYN.trawl = []; DYN.boltQ = []; DYN.trib = []; DYN.eclipse = null; DYN.shake = 0; DYN.ships.length = 0; DYN.ferries.length = 0; DYN.planes.length = 0; DYN.slot = {}; DYN.af = {}; DYN.herds.length = 0; DYN.caps.length = 0; DYN.parts.length = 0;
   for (const T of towns()) recalcTown(T);
   updateSoot(false); zonesOnLoad();
   renderAll();
@@ -22,10 +22,10 @@ function startWorld(isNew) {
   if (!HEADLESS) { if (!GL3.gl) glInit(); else for (let k = 0; k < GNC * GNC; k++) GL3.dirty.add(k); }
   if (!RUNNING) { RUNNING = true; requestAnimationFrame(frame); }
 }
-async function newWorld(seed, archive, size) {
+async function newWorld(seed, archive, size, mode) {
   if (archive && S && FOLDER.ok) { S.savedAt = Date.now(); await archiveFolderWorld(serialize()); }
-  if (size && size !== W) { await resizeTo(size, { then: 'new', seed }); return; } // (a map of the other size: the page comes back at that size and starts it)
-  newState(seed);
+  if (size && size !== W) { await resizeTo(size, { then: 'new', seed, mode }); return; } // (a map of the other size: the page comes back at that size and starts it)
+  newState(seed); S.mode = mode === 'god' ? 'god' : 'calm'; // (Grace & Dread, or the calm world it always was)
   const pod = Object.values(S.B).find(B => B.type === 'pod'); if (pod) pod.hid = 1;
   startWorld(true);
   saveAll();
@@ -163,14 +163,14 @@ async function boot() {
   const cloud = await cloudDetect(); // served by the Worker and logged in: saves go to the cloud (file:// never is)
   if (QS.has('seed') && QS.has('fresh')) {
     SCRATCH = true; // a scratch world for testing: never saved, and it never claims the real world from another tab
-    newState(+QS.get('seed')); if (QS.has('nointro')) { S.flags.intro = 0; introChronicle(); } else { const pod = Object.values(S.B).find(B => B.type === 'pod'); if (pod) pod.hid = 1; } startWorld(true);
+    newState(+QS.get('seed')); if (QS.has('god')) S.mode = 'god'; if (QS.has('nointro')) { S.flags.intro = 0; introChronicle(); } else { const pod = Object.values(S.B).find(B => B.type === 'pod'); if (pod) pod.hid = 1; } startWorld(true);
     return;
   }
   const pend = await IDB.get('pending'); if (pend) await IDB.del('pending'); // a world parked to come back at its own size
   if (pend && pend.save && saveSize(pend.save) !== W) { await resizeTo(saveSize(pend.save), pend); return; } // (opened at the wrong size somehow: go again)
   if (cloud) {
     if (pend) { // carry on with what was being done: a new world, a switch, a loaded file, a take-over or the startup pick
-      if (pend.then === 'new') { await newWorld(pend.seed); await cloudOwn(false); return; }
+      if (pend.then === 'new') { await newWorld(pend.seed, false, 0, pend.mode); await cloudOwn(false); return; }
       try { const c = await cloudGet(true); CLOUD.rev = c ? c.meta.rev : null; } catch (e) { }
       deserialize(pend.save); if (pend.then === 'switch') S.lastLive = Date.now(); startWorld(false);
       if (pend.then === 'switch' || pend.then === 'load') toast(`Welcome back to ${S.planet || 'your world'}.`);
@@ -190,19 +190,19 @@ async function boot() {
         if (fs && (!st || (fs.state.savedAt || 0) > (st.state.savedAt || 0))) st = fs;
       } else showBanner();
     }
-    if (pend && pend.then === 'new') { await newWorld(pend.seed); return; }
+    if (pend && pend.then === 'new') { await newWorld(pend.seed, false, 0, pend.mode); return; }
     if (pend && pend.save) { deserialize(pend.save); startWorld(false); saveAll(); return; }
     if (st) { if (!(await fitSize(st, 'boot'))) return; deserialize(st); startWorld(false); return; }
   }
   // first run
-  const w = $('welcome'); w.classList.add('show'); sizeRow($('wSize'));
+  const w = $('welcome'); w.classList.add('show'); sizeRow($('wSize')); modeRow($('wMode'));
   if (cloud) {
     $('wText').textContent = 'The world grows while it\'s on screen, and keeps going for up to 8 hours while you\'re away. It is saved to the cloud, so you can carry on from any browser you log in from. Already have a world? Load its save.json.';
     $('wFine').innerHTML = `World seed <input id="wSeed" spellcheck="false"> · saving to the cloud${CLOUD.email ? ' as ' + esc(CLOUD.email) : ''}.`;
     $('wSeed').value = randSeed();
     $('wFolder').textContent = 'Load a save.json…'; $('wLocal').textContent = 'Start a new world';
     $('wFolder').onclick = async () => { if (await cloudLoadFile(true)) w.classList.remove('show'); };
-    $('wLocal').onclick = async () => { w.classList.remove('show'); await newWorld(+$('wSeed').value || randSeed(), false, UI.newSize); cloudOwn(false); };
+    $('wLocal').onclick = async () => { w.classList.remove('show'); await newWorld(+$('wSeed').value || randSeed(), false, UI.newSize, UI.newMode); cloudOwn(false); };
     return;
   }
   $('wSeed').value = randSeed();
@@ -212,9 +212,9 @@ async function boot() {
     if (fs === false) return;
     w.classList.remove('show');
     if (fs) { if (!(await fitSize(fs, 'boot'))) return; deserialize(fs); startWorld(false); toast(`Welcome back to ${S.planet || 'your world'}.`); }
-    else { await newWorld(+$('wSeed').value || randSeed(), false, UI.newSize); }
+    else { await newWorld(+$('wSeed').value || randSeed(), false, UI.newSize, UI.newMode); }
   };
-  $('wLocal').onclick = () => { w.classList.remove('show'); newWorld(+$('wSeed').value || randSeed(), false, UI.newSize); };
+  $('wLocal').onclick = () => { w.classList.remove('show'); newWorld(+$('wSeed').value || randSeed(), false, UI.newSize, UI.newMode); };
 }
 setInterval(() => { if (S && RUNNING && !RESIZING) saveAll(); }, 45000);
 setInterval(() => { if (S && RUNNING) aiMaybeGossip(); }, 30000);

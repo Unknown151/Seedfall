@@ -132,6 +132,47 @@ REVERENCE AND PRAYERS
   weather, a drought, a smoky town, a new baby, an old rivalry, a telescope, a
   seedship crew list. Hundreds of ways of asking, and of how it turns out.
 
+GRACE & DREAD (A WAY TO PLAY, CHOSEN FOR EACH NEW WORLD)
+  When you start a new world (the welcome card, or New world... / Worlds...) you
+  pick Calm (gentle nudges, as it always was) or Grace & Dread. A world keeps
+  its choice for good, and worlds from before stay Calm.
+  In Grace & Dread you can be kind or cruel, and your people notice:
+    Q   turns your hand wrathful and back. The five nudges become their twins:
+          storm 20     lightning sets a house alight (buckets, a crowd, saved
+                       or burnt down) and hail flattens the crops
+          tribute      free: a town carries a third of its stores up the hill
+                       and you get Reverence; it grumbles for years, and won't
+                       pay again for a dozen
+          eclipse 35   the Dark Noon: the sun goes out, a child is born in the
+                       dark, and the shrines fill for years after
+          great meteor 70  a crater where you point, starmetal for the scholars
+          blight 25    the fields wither for three lean years, the woods go grey
+    M   opens the miracles, the big ones you save up for:
+          raise the land 80   a hill, a mountain if you do it again, new land
+                              out of the sea
+          sink the land 80    a hollow; below the water line a new lake (and
+                              whatever stood there)
+          golden age 110      a town's houses all go up a tier, its streets are
+                              paved, the Watcher gets a statue, a generation of
+                              plenty
+          call a people 90    settlers found a new town where you point
+          earthquake 110      old houses come down, a new ridge splits the land
+          flood 70            the river rises into a riverside town
+    The Chosen One: open someone's card (C > People) and make them your Chosen
+    (60). They live long, wear a violet diamond, the film camera follows them
+    about, and they do your will in their own way: heal and teach and feast
+    under a kind Watcher, preach and tithe and ring the dawn bell under a feared
+    one. When they die they get a statue, a feast day, and half the babies.
+  Under the Reverence meter a bar shows how they see you, from Dreaded to
+  Adored. Kindness (rain, gifts, answered prayers, a golden age) makes you
+  loved: painted houses, flower boxes, bunting, bright clothes, late nights,
+  fireworks, feasts, more children and a white statue with flowers in every
+  square. Wrath makes you feared: earthy colours, dark clothes, early nights,
+  candlelight, flags, dark shrines with fire bowls and offerings piled up,
+  black obelisks in the squares, harder work and far more Reverence, but fewer
+  children. Your own words to them still win over all of that.
+  Nobody ever dies of anything you do: homes, fields and stores, never lives.
+
 SKY, WEATHER AND SEASONS
   Day and night: C > Sky picks the clock.
     Day and night 1 hour   (default) a full day every hour, noon at half past

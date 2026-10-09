@@ -74,6 +74,16 @@ body.active #dock, #dock:hover{opacity:1;pointer-events:auto;transform:translate
 .tool .cd{position:absolute;inset:0;background:rgba(255,251,245,.78);transform-origin:bottom;pointer-events:none}
 .tool .k{position:absolute;right:4px;bottom:2px;font-size:9px;color:var(--ink3);font-weight:600}
 .tool.off{filter:grayscale(1);opacity:.55}
+.gonly{display:none}
+body.god .gonly{display:block}
+#dockHand.wrath{background:rgba(120,40,60,.16)}
+#mirbar{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);display:none;gap:6px;padding:7px;border-radius:16px;background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:var(--shadow);z-index:6}
+body.god.mir #mirbar{display:flex}
+#hudAwe{display:none;position:relative;margin-top:7px;font-size:12px;color:rgba(43,40,51,.78)}
+body.god #hudAwe{display:block}
+#hudAwe i{display:block;position:relative;height:5px;border-radius:3px;margin-top:5px;background:linear-gradient(90deg,#5a2a3c,#9a6a74 35%,#c9c2bc 50%,#e8c46a 65%,#ffd98a)}
+#hudAwe i b{position:absolute;top:-3px;width:3px;height:11px;margin-left:-1.5px;border-radius:2px;background:#2b2833;box-shadow:0 0 0 1.5px rgba(255,255,255,.85);transition:left .8s}
+body.night #hudAwe{color:rgba(240,236,246,.82)}
 .dsep{width:1px;background:var(--line);margin:6px 3px}
 #tip2{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:rgba(43,40,51,.86);color:#fff;
   font-size:12px;padding:6px 10px;border-radius:8px;pointer-events:none;opacity:0;transition:opacity .2s;white-space:nowrap}
@@ -179,6 +189,7 @@ select{font:inherit;font-size:12px;padding:4px 6px;border-radius:7px;border:1px 
 .pc a:hover{text-decoration:underline}
 .pback{display:flex;justify-content:space-between;padding:8px 0 4px;font-size:12.5px;font-weight:600}
 .pback a{color:var(--accent);cursor:pointer}
+.pback .chosen{color:#8a5cc9}
 .phint{font-size:11.5px;color:var(--ink3);padding:6px 0 4px;line-height:1.45}
 .pgrp{font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 4px;font-weight:600}
 .pgrp small{font-weight:400}
@@ -309,6 +320,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
 
 <div id="hud"><div id="hudName"></div><div id="hudLine"></div>
   <div id="hudRev" title="Reverence: the colonists' faith in the Watcher. It gathers while the world is on screen; nudges and words cost it."><span class="rv-l">✨ <b id="revNum">0</b><em>/<span id="revMax">0</span></em> <small id="revRate"></small></span><i><b id="revBar"></b></i></div>
+  <div id="hudAwe" title="Grace and Dread: how your people see you. Kindness (rain, gifts, answered prayers, a golden age) makes you loved; storms, blights, tribute and meteors make you feared. Both are a way to rule."><span class="aw-l" id="aweL"></span><i><b id="aweM"></b></i></div>
   <div id="hudPause">PAUSED</div></div>
 <div id="tbar"><div class="tb"><div class="tp" id="tbP"></div><div class="rows"><div class="r1" id="tbR1"></div><div class="r2" id="tbR2"></div></div><div class="nav"><button id="tbPrev" title="The town before">▲</button><button id="tbNext" title="The next town (T)">▼</button></div></div><div class="pl" id="tbPl" title="Open the Towns tab"></div></div>
 <div id="prayers"></div>
@@ -320,11 +332,22 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
   <button class="tool" data-tool="starfall"><span>☄️</span><i class="cd"></i><span class="k">4</span></button>
   <button class="tool" data-tool="bloom"><span>🌱</span><i class="cd"></i><span class="k">5</span></button>
   <button class="tool" data-tool="speak"><span>🗣️</span><i class="cd"></i><span class="k">6</span></button>
+  <div class="dsep gonly"></div>
+  <button class="tool gonly" id="dockHand" title="Your hand (Q): kind or wrathful. The five nudges turn into their dark twins"><span>😇</span><span class="k">Q</span></button>
+  <button class="tool gonly" id="dockMir" title="Miracles (M): the big ones, saved up for"><span>🌟</span><span class="k">M</span></button>
   <div class="dsep"></div>
   <button class="tool" id="dockSky" title="Clear skies (W): blow the rain and fog away for a good while"><span>☀️</span><span class="k">W</span></button>
   <button class="tool" id="dockChron" title="Chronicle (C)"><span>📜</span><span class="k">C</span></button>
 </div>
 <div id="tip2"></div>
+<div id="mirbar">
+  <button class="tool" data-tool="raise"><span>⛰️</span><i class="cd"></i></button>
+  <button class="tool" data-tool="sink"><span>🕳️</span><i class="cd"></i></button>
+  <button class="tool" data-tool="golden"><span>👑</span><i class="cd"></i></button>
+  <button class="tool" data-tool="call"><span>🧭</span><i class="cd"></i></button>
+  <button class="tool" data-tool="quake"><span>🫨</span><i class="cd"></i></button>
+  <button class="tool" data-tool="flood"><span>🌊</span><i class="cd"></i></button>
+</div>
 
 <aside id="panel">
   <button id="pClose" title="Close (C)">✕</button>
@@ -383,6 +406,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
   <p>A single seed pod is about to fall onto an unnamed world. One colonist, a vault of sleeping embryos, and a lot of time.</p>
   <p id="wText">The world grows while it's on screen, and keeps going for up to 8 hours while you're away. Pick a folder and Seedfall will keep <b>save.json</b>, a readable <b>chronicle.md</b> and <b>stats.csv</b> in it.</p>
   <div class="sizes" id="wSize"></div>
+  <div class="sizes" id="wMode"></div>
   <div class="acts">
     <button class="btn primary" id="wFolder">Choose a save folder…</button>
     <button class="btn" id="wLocal">Start without a folder</button>
@@ -400,6 +424,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
     <span>⛵</span><span>Fishing boats, ferries, harbours with ships trading along the coast, and later planes flying between airfields. Some of it takes a few eras to show up.</span>
     <span>🪨</span><span>Towns build from what their land gives: timber by the woods, stone under the crags, brick by the river. C › Towns shows their stores and what they are known for.</span>
     <span><kbd>6</kbd></span><span>Speak to your people. With a voice key (Voice… in the panel) they actually try to understand you, and your words can reshape how they build, grow, light their nights and even the weather.</span>
+    <span><kbd>Q</kbd> <kbd>M</kbd></span><span>In a Grace &amp; Dread world: Q turns your hand wrathful (storm, tribute, eclipse, great meteor, blight) and back; M opens the miracles (raise or sink the land, a golden age, call a people, an earthquake, a flood). Open a person’s card to make them your Chosen. Kindness makes you loved, wrath feared; nobody ever dies of it.</span>
     <span><kbd>W</kbd></span><span>Clear skies: the ☀️ in the dock blows the rain and fog away for a good while (untick Weather in the panel for always fair).</span>
     <span><kbd>B</kbd></span><span>The town bar at the top: the town you're looking at, its stores and what they gain a year, its people, homes, food and needs. The arrows go to the next town; click the name for the Towns tab.</span>
     <span><kbd>F</kbd></span><span>Fullscreen</span>
@@ -464,6 +489,7 @@ body.night #toast,body.night #fps{color:rgba(255,246,232,.6)}
   <h2 id="cTitle">Start a new world?</h2>
   <p id="cText"></p>
   <div class="sizes" id="cSize" hidden></div>
+  <div class="sizes" id="cMode" hidden></div>
   <div class="acts"><button class="btn primary" id="cYes">Yes</button><button class="btn" id="cNo">Cancel</button></div>
 </div></div>
 

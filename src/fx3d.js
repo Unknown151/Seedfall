@@ -40,7 +40,8 @@ function stepFx3(dt) {
   for (const m of DYN.meteors) { m.t += dt; const g = gGround(m.x, m.y);
     if (m.t < 2.6) { const f = m.t / 2.6, x = m.x + 18 * (1 - f), y = g + 30 * (1 - f), z = m.y - 10 * (1 - f);
       for (let k = 0; k < 3; k++) part3(x + rf(-.1, .1), y + rf(-.1, .1), z + rf(-.1, .1), rf(-.2, .2) + 1, rf(-.2, .2) + 1.6, rf(-.2, .2) - .5, rf(.4, 1), pick(['#fff4c2', '#ffc46b', '#ff8a4a']), .9, rf(.08, .16), { glow: 1, dr: 1 }); }
-    else if (!m.hit) { m.hit = 1; DYN.flash = .8; for (let k = 0; k < 90; k++) { const a = Math.random() * TAU, s = rf(.5, 2.4); part3(m.x, g + .1, m.y, Math.cos(a) * s, rf(.6, 2.2), Math.sin(a) * s, rf(1, 2.6), pick(['#b9a99a', '#ffe2a8', '#8f8175']), .85, rf(.06, .16), { g: 2.2, dr: .9, glow: k % 4 === 0 ? 1 : 0 }); } } }
+    else if (!m.hit) { m.hit = 1; DYN.flash = .8; if (m.big) { DYN.shake = Math.max(DYN.shake || 0, 2.5); DYN.flash = 1; for (let k = 0; k < 160; k++) { const a = Math.random() * TAU, s = rf(1, 4); part3(m.x, g + .1, m.y, Math.cos(a) * s, rf(1, 3.4), Math.sin(a) * s, rf(2, 4.5), pick(['#6d6258', '#8f8175', '#ffb070', '#4a4440']), .8, rf(.1, .3), { g: 1.6, dr: .7, glow: k % 5 === 0 ? 1 : 0 }); } }
+      for (let k = 0; k < 90; k++) { const a = Math.random() * TAU, s = rf(.5, 2.4); part3(m.x, g + .1, m.y, Math.cos(a) * s, rf(.6, 2.2), Math.sin(a) * s, rf(1, 2.6), pick(['#b9a99a', '#ffe2a8', '#8f8175']), .85, rf(.06, .16), { g: 2.2, dr: .9, glow: k % 4 === 0 ? 1 : 0 }); } } }
   DYN.meteors = DYN.meteors.filter(m => m.t < 6);
   for (const r of DYN.rockets) { const B = S.B[r.bid]; if (!B) { r.done = 1; continue; } r.t += dt; if (r.t > 2) { r.v += dt * (r.seed ? 2.3 : 3.2); r.alt += r.v * dt; }
     const [bx, by] = glLot(B), g = gGround(bx, by) + (B.type === 'sealaunch' ? SL_DECK : 0), y = g + r.alt + .2; // (from the middle of its lot)
@@ -56,6 +57,10 @@ function stepFx3(dt) {
   if (DYN.meteorShower > 0) { DYN.meteorShower -= dt; if (Math.random() < dt * 1.5 && night > .3) { const a = rf(0, TAU), e = rf(.4, .9); skyPart(a, e, 1.4, '#ffffff', .9, 2.2, [Math.cos(a + 1.6) * .5, -.25, Math.sin(a + 1.6) * .5]); } }
   if (DYN.comet) { DYN.comet.t += dt; if (DYN.comet.t > DYN.comet.life) DYN.comet = null; }
   if (DYN.bolt) { DYN.bolt.t += dt; if (DYN.bolt.t > .35) DYN.bolt = null; }
+  if (DYN.boltQ && DYN.boltQ.length) { for (const b of DYN.boltQ) if (DYN.t >= b.at && !DYN.bolt) { b.done = 1; strike(b.x, b.y); } DYN.boltQ = DYN.boltQ.filter(b => !b.done && DYN.t - b.at < 20); }
+  if (DYN.trib && DYN.trib.length) { for (const o of DYN.trib) { o.t += dt; const g = gGround(o.x, o.y); if (o.t < 7 && Math.random() < dt * 30) part3(o.x + rf(-.6, .6), g + rf(.1, .5), o.y + rf(-.6, .6), rf(-.05, .05), rf(1.2, 2.2), rf(-.05, .05), rf(2.5, 4), pick(['#ffd66b', '#f2b84b', '#fff1c4']), .9, rf(.05, .1), { glow: 1, dr: .3 }); } DYN.trib = DYN.trib.filter(o => o.t < 8); }
+  if (DYN.eclipse) { DYN.eclipse.t += dt; if (DYN.eclipse.t > DYN.eclipse.life) DYN.eclipse = null; }
+  if (DYN.shake > 0) DYN.shake = Math.max(0, DYN.shake - dt);
   // smoke and mist from the works that don't have chimney smoke (the climate engine, a launch pad after a launch), and the hot springs
   const e = GL3.eye; if (e && !FAST) {
     for (const B of DYN.anim || []) { if (B.type !== 'terraformer' && !((B.type === 'launchpad' || B.type === 'sealaunch') && B.rk) || Math.hypot(B.x - e[0], B.y - e[2]) > 40 || Math.random() > dt * 1.2) continue; const [bx, by] = glLot(B), g = gGround(bx, by), big = fpBig(B), w = big ? .4 : .2;
@@ -240,7 +245,7 @@ function glTrader(o, X, Z, y, h, lit) { // a trade wagon (a cart and horse, a lo
 // the people you know carry a diamond over their heads (the founder orange, a leader gold, the newly famous green); a candle when they pray
 function glMark(w, X, Z, y0) {
   const p = S.P[w.pid]; if (!p) return; const T = S.T[p.sid], top = y0 + (w.kid ? .17 : .22) + Math.sin(GL3.t * 2 + w.pid) * .01;
-  const col = w.pid === S.founder ? '#e5874f' : T && T.leader === p.id ? '#f2b84b' : p.fl != null && p.fl <= 3 ? '#7fd08a' : '#5fd0c9', a = .035, C = gcol(col), sv = GLB.mat; GLB.mat = 0; GLB.ctr = [X, top, Z];
+  const col = S.chosen && S.chosen.pid === w.pid ? '#b98cff' : w.pid === S.founder ? '#e5874f' : T && T.leader === p.id ? '#f2b84b' : p.fl != null && p.fl <= 3 ? '#7fd08a' : '#5fd0c9', a = .035, C = gcol(col), sv = GLB.mat; GLB.mat = 0; GLB.ctr = [X, top, Z];
   for (const [u, v] of [[a, 0], [0, a], [-a, 0], [0, -a]].map((q, k, A) => [q, A[(k + 1) % 4]])) for (const yy of [top + a * 1.4, top - a * 1.4]) gtri([X + u[0], top, Z + u[1]], [X + v[0], top, Z + v[1]], [X, yy, Z], C, 2);
   GLB.mat = sv;
   if ((S.prayers || []).some(q => q.st === 'open' && q.pid === w.pid)) FXA.glow.push(X, top + .09, Z, .12, 1, .82, .48, .55 + .2 * Math.sin(GL3.t * 7 + w.pid), 0, 0, 0, 0, 0); // a candle over them

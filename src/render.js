@@ -54,6 +54,7 @@ function topColor(i) {
   const v = q2((0.965 + hash2(x, y, 5) * 0.06 + M.elev[i] * 0.006) * g);
   col = shade(col, v);
   if (SOOT[i] > .02) col = mix(col, '#6f6a66', q2(Math.min(.4, SOOT[i] * .5))); // soot from the works
+  if (S.craters) col = craterTint(i, col); // a great meteor's scorch (god.js)
   if (LT.snow && b !== BIO.SAND) col = mix(col, SNOWC, q2(LT.snow * (b === BIO.SNOW ? 0 : .85)));
   return col;
 }
@@ -79,6 +80,7 @@ function drawTileObjects(i, x, y) {
   if (M.road[i]) glTramTile(i, x, y); // and the trams' rails in the road
   if (B && fpBig(B)) { if (i === fpFront(B) && !FLAT_TYPES[B.type]) drawBuilding(B, i); } // a big lot is built once, from its front tile (its model works in world units: gl.js GL_BIG)
   else if (B && !FLAT_TYPES[B.type]) { drawBuilding(B, i); if (B.type === 'house' && B.prog >= 1) glYard(B, x, y); }
+  else if (!B && !bid && !w && !M.road[i] && craterAt(i) >= 0) tileCrater(i, x, y); // a great meteor's crater (god.js)
   else if (!B && !w && !M.tree[i] && (M.bio[i] === BIO.ROCK || M.bio[i] === BIO.HIGH) && hash2(x, y, 11) < 0.3 && !M.road[i]) tileRocks(x, y);
   else if (!B && !bid && !w && !M.tree[i] && !M.road[i] && !M.rail[i] && !M.ruin[i]) tileGround(i, x, y);
   if (!bid && !w && M.bio[i] === BIO.SAND && !M.road[i] && !M.rail[i]) glBeach(i, x, y); // beach huts by a bigger town (seamodels.js)

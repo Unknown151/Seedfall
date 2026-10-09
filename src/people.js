@@ -80,7 +80,7 @@ const NM_LAST = ['Abbott', 'Archer', 'Ashby', 'Bailey', 'Baker', 'Barnes', 'Bell
   'Knight', 'Lane', 'Lawson', 'Marsh', 'Mason', 'Miller', 'Moore', 'Morgan', 'Nash', 'Newman', 'Norris', 'Page', 'Palmer', 'Parker', 'Pearce', 'Porter', 'Price', 'Reed', 'Reeve', 'Rowe', 'Sawyer',
   'Shaw', 'Sharp', 'Slater', 'Spencer', 'Stone', 'Sutton', 'Taylor', 'Thatcher', 'Turner', 'Vaughan', 'Walker', 'Ward', 'Webb', 'Wells', 'West', 'Wheeler', 'Whitaker', 'Wood', 'Wright', 'Young',
   'Larsen', 'Holm', 'Berg', 'Lindqvist', 'Brennan', 'Doyle', 'Quinn', 'Moreau', 'Rossi', 'Novak', 'Keller', 'Okafor', 'Silva', 'Tanaka', 'Haddad', 'Kowalski', 'Byrne', 'Fraser'];
-function firstNm(L) { return (S && (S.era || 0) >= 6 && chance(.4)) ? pick(NM_FIRST_NEW) : pick(NM_FIRST); } // (newer names creep in with the later ages)
+function firstNm(L) { return S && S.favNames && S.favNames.length && chance(.12) ? pick(S.favNames.slice(-3)) : (S && (S.era || 0) >= 6 && chance(.4)) ? pick(NM_FIRST_NEW) : pick(NM_FIRST); } // (a Chosen One's name, for a generation: god.js) // (newer names creep in with the later ages)
 function lastNm(L) { return pick(NM_LAST); }
 
 const ROLE_BIAS = { inventor: { cur: 2, cft: 2 }, artist: { cft: 2, wit: 2 }, sage: { cur: 3 }, leader: { amb: 2, kin: 1 }, explorer: { amb: 1, cur: 2 }, founder: { cur: 2, amb: 1, kin: 2 } };
@@ -297,6 +297,7 @@ function notableScore(p) {
 function personRow(p) {
   const T = S.T[p.sid], dead = p.died !== null;
   const ic = [];
+  if (S.chosen && S.chosen.pid === p.id) ic.push('✋'); // (the Watcher's Chosen: god.js)
   if (p.id === S.founder) ic.push('⭐'); else if (!dead && T && T.leader === p.id) ic.push('👑');
   if (p.fl != null && p.fl > 0 && p.fl <= 3) ic.push('🌱');
   if (p.sp && !dead) ic.push('💍');
