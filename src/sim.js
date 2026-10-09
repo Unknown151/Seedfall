@@ -58,7 +58,7 @@ function newState0(seed) {
     year: 0, month: 0, map: g.M, B: {}, nextB: 1, T: {}, nextT: 1, P: {}, nextP: 1,
     tech: { done: {}, cur: 0, pts: 0 }, era: 0, age: null, ageN: 0, ageUsed: {},
     styles: [Object.assign({}, STYLES0[0])], styleIdx: 0,
-    lang: JSON.parse(JSON.stringify(LANG0)), nameV: 2, // (named the real-world way from the start: persist.js renameWorld is for older worlds)
+    lang: JSON.parse(JSON.stringify(LANG0)), nameV: 2, mode: 'calm', awe: 0, // (named the real-world way from the start: persist.js renameWorld is for older worlds)
     chron: [], chronN: 0, mdWritten: 0, rows: [], rowN: 0, csvWritten: 0, hist: [],
     lore: 0, omens: 0, flags: { intro: 1 }, cool: {}, vault: 30, drought: 0, boost: 0,
     roads: [], rails: [], roadQ: [], landing: g.land, ruins: g.ruins, planet: null, moons: null,
@@ -266,9 +266,9 @@ function recalcTown(T) {
   for (const id of T.bl) {
     const B = S.B[id]; if (!B) continue;
     if (B.type === 'pod') { house += 3; food += 8; continue; }
-    if (B.prog < 1) continue;
+    if (B.prog < 1) { if (B.gl) house += HT[B.tier].cap; continue; } // (a golden age's scaffolding: still lived in while it's done up, god.js)
     if (B.type === 'house') house += HT[B.tier].cap;
-    else if (B.type === 'farm') food += fy * mk;
+    else if (B.type === 'farm') food += fy * mk * (B.blight > S.year ? .15 : 1);
     else if (B.type === 'dock') food += 8 + Object.keys(S.tech.done).length * 0.45;
     else if (B.type === 'vfarm') food += (900 + (S.ageN || 0) * 30) * (.6 + .4 * gk);
     else if (B.type === 'granary') food += 6;
@@ -896,7 +896,7 @@ const FIRST_TXT = {
 };
 function completeBuilding(B, T) {
   EV.fire('built', { B, T }); econDirty(T);
-  if (B.up != null) { B.tier = B.up; B.up = null; }
+  if (B.up != null) { B.tier = B.up; B.up = null; delete B.gl; }
   B.style = S.styleIdx; B.built = yr();
   if (B.type === 'house') houseNbrDirty(B); // joins a terrace, maybe
   econComplete(B, T);
@@ -919,7 +919,7 @@ function completeBuilding(B, T) {
 function growTown(T) {
   recalcTown(T);
   const cap = Math.min(T.cap.house, T.cap.food);
-  const r = (0.045 + (hasTech('medicine') ? 0.01 : 0)) * (S.drought > 0 ? 0.6 : 1) * (1 + .3 * (CULT.bs || 0)) * (lever('growth') === 'stay_small' ? .55 : 1) * needGrowthK(T);
+  const r = (0.045 + (hasTech('medicine') ? 0.01 : 0)) * (S.drought > 0 ? 0.6 : 1) * (1 + .3 * (CULT.bs || 0)) * (lever('growth') === 'stay_small' ? .55 : 1) * needGrowthK(T) * godGrowK(T);
   if (S.year >= 17 || T.id !== 1) {
     if (T.pop < cap) T.pop += Math.max(0.02, T.pop * r / 12 * (1 - T.pop / Math.max(1, cap)));
     else T.pop -= (T.pop - cap) * 0.04;
@@ -940,10 +940,12 @@ function tryFound() {
     if (ts.length >= MAX_TOWNS[S.era] * K + (S.age ? 1 : 0) + more || ts.length >= 8 * K + more) return;
     if (S.year - S.lastFound < (more ? 12 : BIGMAP ? 16 : 25)) return;
   }
-  const parent = ts.filter(T => T.pop > (forced ? 20 : 40 + ts.length * 30)).sort((a, b) => b.pop - a.pop)[0];
+  const at = forced && PT.x != null; // (called to a spot by the Watcher: god.js godCall)
+  const parent = ts.filter(T => T.pop > (forced ? 20 : 40 + ts.length * 30)).sort((a, b) => at ? dist(a.x, a.y, PT.x, PT.y) - dist(b.x, b.y, PT.x, PT.y) : b.pop - a.pop)[0];
   if (!parent) return;
   let best = null, bs = -1e9;
-  for (let t = 0; t < (forced ? 1500 : 500) * K; t++) {
+  if (at) for (let r = 0; r <= 4 && !best; r++) for (let dy = -r; dy <= r && !best; dy++) for (let dx = -r; dx <= r; dx++) { const x = PT.x + dx, y = PT.y + dy; if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !inb(x, y) || x < 2 || y < 2 || x > W - 3 || y > H - 3) continue; const i = idx(x, y); if (!M.water[i] && !M.bld[i] && !M.ruin[i] && !M.road[i] && M.elev[i] <= 7) { best = { x, y }; break; } }
+  if (!best) for (let t = 0; t < (forced ? 1500 : 500) * K; t++) {
     const x = 3 + ri(0, W - 7), y = 3 + ri(0, H - 7), i = idx(x, y);
     if (M.water[i] || M.bld[i] || M.ruin[i] || M.elev[i] > 5 || M.bio[i] === BIO.ROCK || M.bio[i] === BIO.SNOW) continue;
     const dp = dist(x, y, parent.x, parent.y);
@@ -1346,6 +1348,7 @@ function simMonth0() {
     for (const T of towns()) if (S.year - T.lastElect > 45 && chance(.04) && S.year > 60) electAnnounce(T);
     stepRelations();
     stepCulture();
+    if (GOD()) godYear();
     yearlyEcon();
     yearlyNeeds();
     yearlyZones();
@@ -1372,7 +1375,14 @@ function recordStats() {
 const COOLDOWN = { rain: 8, drop: 20, inspire: 15, starfall: 30, bloom: 10, speak: 10 }; // minutes of real time
 const TOOL_INFO = {
   rain: ['Rain', 'Water the fields and end a drought'], drop: ['Supply pod', 'Drop seeds and a data crystal: research boost'],
-  inspire: ['Inspire', 'A festival and a bright new mind in a town'], starfall: ['Starfall', 'A gentle meteor brings starmetal to the wilds'], bloom: ['Bloom', 'Forests, flowers and grazers spring up'], speak: ['Speak', 'Say something to your people. They will try to understand']
+  inspire: ['Inspire', 'A festival and a bright new mind in a town'], starfall: ['Starfall', 'A gentle meteor brings starmetal to the wilds'], bloom: ['Bloom', 'Forests, flowers and grazers spring up'], speak: ['Speak', 'Say something to your people. They will try to understand'],
+  // Grace & Dread (god.js): the dark twins, then the miracles
+  storm: ['Storm', 'A black storm out of a clear sky: lightning sets a house alight, hail flattens the crops'], blight: ['Blight', 'The fields wither for three lean years and the woods go grey'],
+  tribute: ['Tribute', 'A town carries a third of its stores up the hill for you: Reverence now, grumbling for years'], eclipse: ['Eclipse', 'The sun goes out at noon. A child is born in the dark, and the shrines fill for years'],
+  meteor: ['Great meteor', 'A crater where you point (everyone gets out in time), starmetal for the scholars'],
+  raise: ['Raise the land', 'A hill where you point, a mountain if you do it again, new land out of the water'], sink: ['Sink the land', 'A hollow where you point; below the water line a new lake, and whatever stood there'],
+  quake: ['Earthquake', 'Old houses come down in a town and a new ridge splits the land'], flood: ['Flood', 'The river rises into a riverside town'],
+  golden: ['Golden age', 'Every house in a town goes up a tier, its streets are paved, and the Watcher gets a statue'], call: ['Call a people', 'Settlers set out and found a new town where you point']
 };
 function toolReady(k) { return canAfford(k); }
 function nearestTown(x, y) { let b = null, bd = 1e9; for (const T of towns()) { const d = dist(x, y, T.x, T.y); if (d < bd) { bd = d; b = T; } } return b; }
@@ -1397,6 +1407,11 @@ function omen(txt) {
 function useTool(k, x, y) {
   if (!canAfford(k) || !inb(x, y)) return false;
   const T = nearestTown(x, y), pq = prayerFor(k, x, y);
+  if (DARK[k] || MIR.includes(k)) { // (Grace & Dread only: god.js)
+    if (!GOD() || !(DARK[k] ? useDark(k, x, y, T) : useMiracle(k, x, y, T))) return false;
+    if (!S.omens) omen('The sky does something no sky should.'); else S.omens++;
+    spendRev(k); aweShift(AWE_ACT[k], T); UIDIRTY.tools = true; return true;
+  }
   if (k === 'rain') {
     fx('rain', { x, y, big: 1 });
     for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const i = idx(nx, ny); if (!M.water[i] && M.fert[i] < 4) M.fert[i]++; }
@@ -1436,7 +1451,7 @@ function useTool(k, x, y) {
     }
     omen(`Overnight, the land ${T ? 'near ' + T.name : ''} bursts into bloom. Nobody planted it.`);
   }
-  spendRev(k);
+  spendRev(k); aweShift(AWE_ACT[k], T);
   if (pq) answered(pq);
   UIDIRTY.tools = true;
   return true;

@@ -265,7 +265,7 @@ function drawPasture(B, st) {
 // goes where the field ends. A styled field (round pivot rings, an orchard, flowers, stripes) follows the style.
 GL_MODEL.farm = function (B, st0) {
   iSet(B); const T = S.T[B.sid], st = S.styles[B.style] || STYLES0[0], fk = st.fields || (dsRound() ? 'round' : null), lod = KF.lod, v = B.var || 0;
-  const ck = T ? T.crop % CROPS.length : 5, crop = CROPS[ck].c, cn = CROPS[ck].n, soil = '#9a7350', au = v < .5, grown = B.prog >= 1 ? 1 : B.prog, green = hasTech('genegarden');
+  const ck = T ? T.crop % CROPS.length : 5, crop = B.blight > S.year ? '#7d7256' : CROPS[ck].c, cn = CROPS[ck].n, soil = '#9a7350', au = v < .5, grown = B.prog >= 1 ? 1 : B.prog, green = hasTech('genegarden');
   const isFarm = (dx, dy) => { const x = B.x + dx, y = B.y + dy; if (!inb(x, y)) return false; const C = S.B[M.bld[idx(x, y)]]; return !!C && C.type === 'farm'; };
   const edge = () => { // the boundary where the field ends: a hedgerow, a dry-stone wall or a post-and-rail fence (by the town's land and age)
     const h = hash2(B.sid | 0, 3, 61), ty = h < .45 ? 'hedge' : h < .7 && !hasTech('motor') ? 'wall' : 'rail', col = ty === 'wall' ? '#a8a092' : '#8a6d57', E = .47;

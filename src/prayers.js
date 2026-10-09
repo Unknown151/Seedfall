@@ -18,7 +18,7 @@ function prayCtx(p) {
     old: age(p) >= 60, young: age(p) < 26, widowed: !!(p.sp && sp && sp.died !== null), wed: !!(sp && sp.died === null),
     kids: kids.filter(k => k.died === null), grown: kids.filter(k => k.died === null && age(k) >= 18), lost: kids.filter(k => k.died !== null).length,
     big: T && T.pop > 3000, small: T && T.pop < 200, shrine: T && townIndex()[T.id] && (townIndex()[T.id].shrine || townIndex()[T.id].watchstone),
-    sea: T && !!townHarbour(T), moon: S.moons ? S.moons[1] : 'the far moon', planet: S.planet || 'this world'
+    awe: GOD() ? aweBand() : 0, sea: T && !!townHarbour(T), moon: S.moons ? S.moons[1] : 'the far moon', planet: S.planet || 'this world'
   };
 }
 const kidName = c => c.kids.length ? pick(c.kids).first : 'the little one';

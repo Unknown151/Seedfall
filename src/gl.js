@@ -283,7 +283,7 @@ function glBuildRows(k, near, r0, r1, v, lamps, c0 = 0, c1 = GCH) {
     for (let y = cy0 + r0; y < cy0 + r1; y++) for (let x = cx0 + c0; x < cx0 + c1; x++) {
       const i = idx(x, y), h = GT(i);
       GLB = { v, x, y, base: surfZ(i) * ZS, id: i + 1, wall: 0, mat: 0, lod: near, ctr: null, wallC: null, flat: '', ao: 1, B: null, smk: null }; // (every field up front: one shape keeps the primitives fast)
-      const bio = M.bio[i], gmat = M.water[i] ? 0 : bio === BIO.MEADOW || bio === BIO.LUSH ? M_GRASS : bio === BIO.ROCK || bio === BIO.SNOW ? M_STONE : bio === BIO.SAND ? M_SAND : M_EARTH;
+      const bio = M.bio[i], gmat = M.water[i] || (S.craters && craterAt(i) >= 0) ? 0 : bio === BIO.MEADOW || bio === BIO.LUSH ? M_GRASS : bio === BIO.ROCK || bio === BIO.SNOW ? M_STONE : bio === BIO.SAND ? M_SAND : M_EARTH;
       // ground
       const top = gcol(topColor(i)), sc = gcol(sideCol(i));
       GLB.ctr = [x, h - 1, y]; GLB.mat = gmat;
@@ -902,6 +902,8 @@ function glShot() { // choose what to look at next
   if (sail.length) opts.push([3, () => { const sh = pick1(sail), B = S.B[sh.to], T = B && S.T[B.sid]; return { at: () => { const q = shipPos(sh); return q ? [q[0], SEAZ * ZS, q[1]] : null; }, zoom: rf(2.2, 3), pitch: rf(.2, .32), cap: '⛵ A ship coming in' + (T ? ' to ' + T.name : ''), dur: 26 }; }]);
   const ws = DYN.walkers.filter(w => w.pid && S.P[w.pid] && w.st !== 'in' && w.st !== 'idle' && walkerPos(w));
   if (ws.length) opts.push([3, () => { const w = pick1(ws), P = S.P[w.pid], T = S.T[P.sid]; return { follow: w, at: () => { const q = walkerPos(w); return q ? [q[0], q[2] * ZS, q[1]] : null; }, zoom: rf(1.4, 2), pitch: rf(.42, .55), cap: P.name, sub: [P.role, T && T.name].filter(Boolean).join(' · ') }; }]);
+  const cw = S.chosen && ws.find(w => w.pid === S.chosen.pid); // the Watcher's Chosen, out and about (god.js)
+  if (cw) opts.push([2.5, () => { const P = S.P[cw.pid], T = S.T[P.sid]; return { follow: cw, at: () => { const q = walkerPos(cw); return q ? [q[0], q[2] * ZS, q[1]] : null; }, zoom: rf(1.3, 1.8), pitch: rf(.42, .55), cap: '✋ ' + P.name, sub: 'The Watcher’s Chosen' + (T ? ' · ' + T.name : '') }; }]);
   if (DYN.trains.length) opts.push([1.5, () => { const tr = pick1(DYN.trains); return { at: () => { const p = trainPos(tr); return p ? [p[0], p[1], p[2]] : null; }, zoom: rf(2.2, 3.2), pitch: rf(.45, .6), cap: '🚂 The train' }; }]);
   if ((DYN.trams || []).length) opts.push([1.5, () => { const tm = pick1(DYN.trams), T = S.T[tm.sid]; return { at: () => { const p = tramPos(tm.P, tm.s); return [p[0], p[1], p[2]]; }, zoom: rf(1.8, 2.6), pitch: rf(.45, .6), cap: '🚋 The tram' + (T ? ' in ' + T.name : '') }; }]);
   const big = Object.values(S.B).filter(B => fpBig(B) && B.prog >= 1);
@@ -992,7 +994,8 @@ function glFrame(dt) {
     if (GL3.pe !== pit) { pit = GL3.pe; dir = [Math.cos(pit) * Math.sin(cam.yaw), Math.sin(pit), Math.cos(pit) * Math.cos(cam.yaw)]; eye = [tgt[0] + dir[0] * dist, tgt[1] + dir[1] * dist, tgt[2] + dir[2] * dist]; }
   }
   GL3.eye = eye;
-  const VP = m4mul(cam.persp ? m4persp(fov, aspect, Math.max(.2, dist * .02), dist + 520) : m4ortho(-zz * aspect, zz * aspect, -zz, zz, 1, 220), m4look(eye, tgt, [0, 1, 0]));
+  const shk = DYN.shake > 0 ? Math.min(1, DYN.shake) * .006 * Math.max(4, dist) : 0, eyeV = shk ? eye.map(v => v + (Math.random() - .5) * shk) : eye; // (an earthquake, a great meteor: god.js)
+  const VP = m4mul(cam.persp ? m4persp(fov, aspect, Math.max(.2, dist * .02), dist + 520) : m4ortho(-zz * aspect, zz * aspect, -zz, zz, 1, 220), m4look(eyeV, tgt, [0, 1, 0]));
   const sc = [32, 2, 32], se = [sc[0] + sd[0] * 80, sc[1] + sd[1] * 80, sc[2] + sd[2] * 80];
   const SVP = m4mul(m4ortho(-50, 50, -50, 50, 1, 180), m4look(se, sc, [0, 1, 0]));
   // lamps near the middle of the view light the streets

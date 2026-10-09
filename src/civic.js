@@ -389,7 +389,7 @@ GL_MODEL.granary = function (B, st) { // a round store up on staddle stones (the
   if (lod) for (const [s, f] of [[.26, .26], [.3, .2], [-.28, .26]]) kBlob(s, f, .02, .03, .025, '#d8c49a', 0); // sacks of grain
 };
 GL_MODEL.shrine = function (B, st) { // stone steps, a white pillar with a niche, a pointed roof, candles, flowers, an offering bowl
-  kSetB(B); const lod = KF.lod;
+  kSetB(B); const lod = KF.lod; if (godShrine(B, st)) return; // (a feared Watcher's shrine: god.js)
   kBox(0, 0, 0, .28, .28, .035, '#d6cfc3', M_STONE); kBox(0, 0, .035, .2, .2, .03, '#e2dbcf', M_STONE);
   kBox(0, 0, .065, .075, .075, .62, '#ece6da', M_STONE); if (lod) for (const y of [.12, .62]) kBox(0, 0, .065 + y, .082, .082, .014, '#d8d0c2', M_STONE);
   kBox(0, .07, .28, .032, .01, .1, '#4a4038'); kBox(0, .07, .29, .012, .008, .04, '#e8d27a', 0, 3); // the niche, a little figure glowing in it

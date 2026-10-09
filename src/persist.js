@@ -37,6 +37,7 @@ function deserialize(obj) {
   // migrations / defaults
   S.settings = Object.assign({ pace: 'normal', captions: true, sky: 'hour', weather: true, shadows: true }, S.settings || {});
   if ((S.nameV || 0) < 2) renameWorld();
+  if (S.mode !== 'god') S.mode = 'calm'; // (a world from before the modes stays calm)
   S.flags = S.flags || {}; S.flags.intro = 0;
   for (const k in S.B) { S.B[k].hid = 0; if (S.B[k].type === 'launchpad' || S.B[k].type === 'sealaunch') S.B[k].rk = 1; }
   S.doctrines = S.doctrines || []; S.aiQueue = S.aiQueue || [];
@@ -326,7 +327,7 @@ async function cloudTakeOver() {
 function choose(title, text, yes, no) {
   return new Promise(res => {
     const cY = $('cYes'), cN = $('cNo'), l = [cY.textContent, cN.textContent];
-    $('cSize').hidden = true;
+    $('cSize').hidden = true; $('cMode').hidden = true;
     const done = v => { $('confirm').classList.remove('show'); cY.textContent = l[0]; cN.textContent = l[1]; cY.onclick = cN.onclick = null; res(v); };
     $('cTitle').textContent = title; $('cText').textContent = text; cY.textContent = yes; cN.textContent = no;
     cY.onclick = () => done(true); cN.onclick = () => done(false);
@@ -410,7 +411,7 @@ async function cloudFetchWorld(wid) {
 }
 function openWorlds() {
   if (!CLOUD.on) { // file://: the old way, archived to the save folder if there is one
-    confirmBox('Start a new world?', `${S.planet || 'This world'} will be archived${FOLDER.ok ? ' to the worlds folder' : ''} and a new pod will fall somewhere else.`, () => newWorld(randSeed(), true, UI.newSize)); sizeRow($('cSize'));
+    confirmBox('Start a new world?', `${S.planet || 'This world'} will be archived${FOLDER.ok ? ' to the worlds folder' : ''} and a new pod will fall somewhere else.`, () => newWorld(randSeed(), true, UI.newSize, UI.newMode)); sizeRow($('cSize')); modeRow($('cMode'));
     return;
   }
   $('worlds').classList.add('show'); renderWorlds();
@@ -429,10 +430,10 @@ async function renderWorlds() {
 }
 async function worldsNew() {
   $('worlds').classList.remove('show');
-  const q = choose('Start a new world?', `${S.planet || 'This world'} is kept in your list of worlds, and a new pod will fall somewhere else.`, 'Start a new world', 'Cancel'); sizeRow($('cSize'));
+  const q = choose('Start a new world?', `${S.planet || 'This world'} is kept in your list of worlds, and a new pod will fall somewhere else.`, 'Start a new world', 'Cancel'); sizeRow($('cSize')); modeRow($('cMode'));
   if (!(await q)) return;
   if (!(await keepWorld())) return;
-  await newWorld(randSeed(), false, UI.newSize); if (RESIZING) return;
+  await newWorld(randSeed(), false, UI.newSize, UI.newMode); if (RESIZING) return;
   toast('A new pod is falling. The old world is safe in your list.');
 }
 async function switchWorld(w) {

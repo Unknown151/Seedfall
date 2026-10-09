@@ -1,7 +1,7 @@
 /* ============================== faith: Reverence and prayers ============================== */
 // Reverence slowly gathers while the world is on screen. Nudges and speaking cost Reverence.
 // Now and then a named colonist prays for something; answering pays back more than it costs.
-const COST = { rain: 15, bloom: 20, inspire: 30, drop: 40, starfall: 55, speak: 25 };
+const COST = { rain: 15, bloom: 20, inspire: 30, drop: 40, starfall: 55, speak: 25, storm: 20, blight: 25, tribute: 0, eclipse: 35, meteor: 70, raise: 80, sink: 80, quake: 110, flood: 70, golden: 110, call: 90 }; // (the last two rows: Grace & Dread only, god.js)
 const FAITH = { t: 0, rate: 1, max: 120, shown: '', cards: '' };
 const PRAY_TOOL = { rain: 'rain', bloom: 'bloom', inspire: 'inspire', drop: 'drop', starfall: 'starfall' };
 const PRAY_IC = { rain: '🌧️', bloom: '🌱', inspire: '✨', drop: '📦', starfall: '☄️', name: '👶', town: '🪧', ask: '🕯️' };
@@ -13,7 +13,7 @@ function faithRecalc() {
   const shrines = wcount('shrine') + wcount('watchstone') * 3;
   FAITH.max = Math.round(120 + Math.min(12, shrines) * 12 + Math.min(80, Object.keys(S.tech.done).length * 2) + Math.min(60, (S.prayOk || 0) * 3));
   let dv = 0; for (const d of S.doctrines || []) dv += d.str;
-  FAITH.rate = (1.2 + .6 * Math.log10(totalPop() + 1) + .3 * Math.min(8, shrines) + Math.min(2, dv * .5) + Math.min(1.5, (S.prayOk || 0) * .05) + cultureFaith()) * (lever('faith') === 'devout' ? 1.3 : lever('faith') === 'secular' ? .75 : 1);
+  FAITH.rate = (1.2 + .6 * Math.log10(totalPop() + 1) + .3 * Math.min(8, shrines) + Math.min(2, dv * .5) + Math.min(1.5, (S.prayOk || 0) * .05) + cultureFaith()) * (lever('faith') === 'devout' ? 1.3 : lever('faith') === 'secular' ? .75 : 1) * (S.surge > S.year ? 1.5 : 1);
 }
 function gainRev(n, why) {
   if (!S || S.flags.intro) return;
@@ -99,7 +99,7 @@ function prayerFor(k, x, y) { // an open prayer this nudge answers
 function answered(q, extra) {
   const p = S.P[q.pid], T = S.T[p.sid];
   q.st = 'done'; q.tEnd = S.playSec;
-  S.prayOk = (S.prayOk || 0) + 1;
+  S.prayOk = (S.prayOk || 0) + 1; aweShift(2, T); // (an answered prayer is a kindness: god.js)
   if (!p.deeds.includes('a prayer the Watcher answered')) p.deeds.push('a prayer the Watcher answered');
   if (chance(.3)) p.q.tag = 'Heard by the Watcher';
   const o = OUTCOME[q.k] && OUTCOME[q.k].length;

@@ -9,10 +9,11 @@
 const INC = {
   fire: {
     yr: .07, n: 3,
-    begin() {
-      const hs = Object.values(S.B).filter(B => B.type === 'house' && B.prog >= 1 && B.tier >= 1 && B.tier <= 5 && !B.hid && S.T[B.sid]);
+    begin(o) {
+      const hs = o && o.B ? [o.B] : Object.values(S.B).filter(B => B.type === 'house' && B.prog >= 1 && B.tier >= 1 && B.tier <= 5 && !B.hid && S.T[B.sid]);
       if (!hs.length) return null;
       const B = pick(hs), T = S.T[B.sid], st = rcls(nearestRoad(B.x, B.y)) >= 3 ? 'street' : 'lane';
+      if (o && o.why === 'storm') { chron('🔥', `Lightning from the Watcher’s storm strikes a house on a ${st} of ${T.name}. It’s ablaze before the thunder has finished, and the whole ${st} turns out with buckets.`, { x: B.x, y: B.y, k: 'major' }); return { k: 'fire', x: B.x, y: B.y, sid: T.id, bid: B.id }; }
       chron('🔥', pick([`Fire! A house on a ${st} of ${T.name} is burning. The neighbours are out with buckets.`, `Smoke over ${T.name}: a house has caught fire, and the whole ${st} turns out to fight it.`, `A chimney fire in ${T.name} gets into the roof beams. Bells ring, and the buckets come running.`]), { x: B.x, y: B.y, cap: 'Fire!' });
       return { k: 'fire', x: B.x, y: B.y, sid: T.id, bid: B.id };
     },
@@ -58,8 +59,8 @@ const INC = {
   },
   flood: {
     yr: .035, n: 3,
-    begin() {
-      const ts = towns().filter(T => incFloodTiles(T.x, T.y).length >= 4); if (!ts.length) return null;
+    begin(o) {
+      const ts = o && o.T ? [o.T] : towns().filter(T => incFloodTiles(T.x, T.y).length >= 4); if (!ts.length) return null;
       const T = pick(ts), f = incFloodTiles(T.x, T.y), c = f[(f.length / 2) | 0];
       chron('🌊', pick([`The river bursts its banks at ${T.name}. Water in the lower streets, and everyone carrying things uphill.`, `After weeks of rain the river rises into ${T.name}. Boats in the lanes, chickens on the roofs.`]), { x: c % W, y: (c / W) | 0, cap: 'Flood!' });
       return { k: 'flood', x: c % W, y: (c / W) | 0, tx: T.x, ty: T.y, sid: T.id };
@@ -119,8 +120,8 @@ function stepIncidents() {
   if (L.length >= 2 || S.flags.intro || yr() < 20) return;
   for (const k in INC) if (!L.some(I => I.k === k) && chance(INC[k].yr / 12) && startIncident(k)) break;
 }
-function startIncident(k) { // (also SF.incident(k), for trying one out)
-  const d = INC[k], I = d && d.begin(); if (!I) return null;
+function startIncident(k, o) { // (also SF.incident(k), for trying one out; o: where the Watcher started it, god.js)
+  const d = INC[k], I = d && d.begin(o); if (!I) return null;
   Object.assign(I, { id: (S.incN = (S.incN || 0) + 1), t0: S.month, n: d.n }); (S.inc || (S.inc = [])).push(I); EV.fire('incident', { I });
   return I;
 }

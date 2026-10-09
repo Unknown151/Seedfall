@@ -139,7 +139,7 @@ NOTABLE PEOPLE:
 ${ppl.join('\n')}
 RECENT CHRONICLE:
 ${recent.join('\n')}
-${cu ? 'CUSTOMS IN FORCE: ' + cu + '\n' : ''}${docs.length ? 'EARLIER WORDS OF THE WATCHER:\n' + docs.join('\n') : 'The Watcher has never spoken in words before.'}`;
+${aweBrief()}${cu ? 'CUSTOMS IN FORCE: ' + cu + '\n' : ''}${docs.length ? 'EARLIER WORDS OF THE WATCHER:\n' + docs.join('\n') : 'The Watcher has never spoken in words before.'}`;
 }
 
 const TOOL_WORDS = {
@@ -364,6 +364,7 @@ function recomputeCulture() {
   }
   for (const k in c.tb) c.tb[k] = clamp(c.tb[k], -3, 3);
   c.rs = clamp(c.rs, -1, 1); c.bs = clamp(c.bs, -1, 1);
+  if (GOD()) aweCulture(c); // (how loved or feared the Watcher is: god.js)
   if (c.lv.faith && c.lv.faith.v === 'devout' && c.lv.faith.w >= .25) c.bld.shrine = (c.bld.shrine || 0) + c.lv.faith.w; // (a devout people put up shrines)
   const lk = JSON.stringify(c.lv && Object.fromEntries(Object.entries(c.lv).map(([k, x]) => [k, x.w >= .25 ? x.v : null])));
   if (CULT.lk !== lk && typeof LIGHT !== 'undefined') { LIGHT.chk = 0; LIGHT.seasonT = 0; } // (the art, the season and the sky look again)
